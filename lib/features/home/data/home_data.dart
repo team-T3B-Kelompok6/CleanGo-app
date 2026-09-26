@@ -58,7 +58,7 @@ abstract final class HomeData {
       badgeStyle: PopularServiceBadgeStyle.primary,
       rating: '4.9',
       reviewCount: '(1.2k)',
-      title: 'Deep Cleaning Rumah',
+      title: 'Deep Cleaning',
       description: 'Sanitasi menyeluruh & debu vakum',
       duration: '2 - 3 Jam Pengerjaan',
       price: 'Rp150.000',

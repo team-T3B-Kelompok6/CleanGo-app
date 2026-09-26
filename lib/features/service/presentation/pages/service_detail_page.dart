@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../booking/presentation/controllers/booking_controller.dart';
 import '../../../booking/presentation/pages/booking_page.dart';
 import '../../domain/models/service_model.dart';
 import '../controllers/service_controller.dart';
@@ -79,6 +80,7 @@ class ServiceDetailPage extends StatelessWidget {
   }
 
   void _openBooking(BuildContext context, ServiceModel service) {
+    context.read<BookingController>().startBooking(service);
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => BookingPage(service: service)),
     );

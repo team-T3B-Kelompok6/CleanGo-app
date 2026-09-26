@@ -12,7 +12,7 @@ abstract final class ServiceData {
   static const List<ServiceModel> services = [
     ServiceModel(
       id: 'deep-cleaning',
-      title: 'Deep Cleaning Rumah & Apartemen',
+      title: 'Deep Cleaning',
       description: 'Pembersihan menyeluruh kerak debu dan kotoran mendalam',
       duration: '±2–3 jam',
       price: 'Rp150.000',

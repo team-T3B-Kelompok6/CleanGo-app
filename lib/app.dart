@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'core/constants/app_routes.dart';
 import 'core/theme/app_theme.dart';
+import 'features/booking/presentation/controllers/booking_controller.dart';
 import 'features/home/presentation/pages/home_page.dart';
 import 'features/service/presentation/controllers/service_controller.dart';
 import 'features/service/presentation/pages/service_list_page.dart';
@@ -12,8 +13,11 @@ class CleanGoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ServiceController(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ServiceController()),
+        ChangeNotifierProvider(create: (_) => BookingController()),
+      ],
       child: MaterialApp(
         title: 'CleanGo',
         debugShowCheckedModeBanner: false,

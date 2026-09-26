@@ -4,11 +4,24 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/theme/app_theme.dart';
 
 class ChatbotButton extends StatelessWidget {
-  const ChatbotButton({this.onTap, super.key});
+  const ChatbotButton({
+    this.onTap,
+    this.diameter = height,
+    this.iconPath = 'assets/icons/pandy.svg',
+    this.outlined = false,
+    this.showStatus = true,
+    this.labelColor = AppColors.primary,
+    super.key,
+  });
 
   static const double height = 56;
 
   final VoidCallback? onTap;
+  final double diameter;
+  final String iconPath;
+  final bool outlined;
+  final bool showStatus;
+  final Color labelColor;
 
   @override
   Widget build(BuildContext context) {
@@ -39,13 +52,13 @@ class ChatbotButton extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Text.rich(
-                  TextSpan(
+                child: Text.rich(
+                  const TextSpan(
                     text: 'Tanya Boo! ',
                     children: [TextSpan(text: '✨')],
                   ),
                   style: TextStyle(
-                    color: AppColors.primary,
+                    color: labelColor,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     height: 1.33,
@@ -54,13 +67,16 @@ class ChatbotButton extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                width: height,
-                height: height,
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
+                width: diameter,
+                height: diameter,
+                padding: EdgeInsets.all(outlined ? 2 : 4),
+                decoration: BoxDecoration(
+                  color: outlined ? Colors.white : AppColors.primary,
                   shape: BoxShape.circle,
-                  boxShadow: [
+                  border: outlined
+                      ? Border.all(color: const Color(0xFF14B8A6), width: 2)
+                      : null,
+                  boxShadow: const [
                     BoxShadow(
                       color: Color(0x1A000000),
                       offset: Offset(0, 6),
@@ -76,24 +92,23 @@ class ChatbotButton extends StatelessWidget {
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
-                      child: Center(
-                        child: SvgPicture.asset('assets/icons/pandy.svg'),
-                      ),
+                      child: Center(child: SvgPicture.asset(iconPath)),
                     ),
-                    const Positioned(
-                      right: -4,
-                      top: -4,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Color(0xFF6BD8CB),
-                          shape: BoxShape.circle,
-                          border: Border.fromBorderSide(
-                            BorderSide(color: Color(0xFFE4FFFB), width: 2),
+                    if (showStatus)
+                      const Positioned(
+                        right: -4,
+                        top: -4,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Color(0xFF6BD8CB),
+                            shape: BoxShape.circle,
+                            border: Border.fromBorderSide(
+                              BorderSide(color: Color(0xFFE4FFFB), width: 2),
+                            ),
                           ),
+                          child: SizedBox.square(dimension: 12),
                         ),
-                        child: SizedBox.square(dimension: 12),
                       ),
-                    ),
                   ],
                 ),
               ),

@@ -3,86 +3,22 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/bottom_navigation.dart';
 import '../../../../shared/widgets/chatbot_button.dart';
+import '../../data/home_data.dart';
+import '../../domain/models/popular_service_model.dart';
+import '../../domain/models/service_category_model.dart';
+import '../../../service/presentation/controllers/service_controller.dart';
+import '../../../service/presentation/pages/service_detail_page.dart';
 import '../widgets/popular_service_card.dart';
 import '../widgets/service_category_item.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
-
-  static const List<_CategoryData> _categories = [
-    _CategoryData(
-      iconPath: 'assets/icons/daily_cleaning.svg',
-      label: 'Cleaning',
-      accentText: 'harian',
-    ),
-    _CategoryData(iconPath: 'assets/icons/ac_wash.svg', label: 'Cuci AC'),
-    _CategoryData(
-      iconPath: 'assets/icons/deep_cleaning.svg',
-      label: 'Deep\nCleaning',
-    ),
-    _CategoryData(
-      iconPath: 'assets/icons/ironing.svg',
-      label: 'Layanan\nSetrika',
-    ),
-    _CategoryData(
-      iconPath: 'assets/icons/monthly_cleaning.svg',
-      label: 'Cleaning',
-      accentText: 'bulanan',
-    ),
-    _CategoryData(
-      iconPath: 'assets/icons/sofa_mattress.svg',
-      label: 'Sofa &\nKasur',
-    ),
-    _CategoryData(
-      iconPath: 'assets/icons/ac_installation.svg',
-      label: 'Pasang AC',
-    ),
-    _CategoryData(iconPath: 'assets/icons/office.svg', label: 'Kantor'),
-  ];
-
-  static const List<_PopularServiceData> _popularServices = [
-    _PopularServiceData(
-      imagePath: 'assets/images/deep_cleaning.jpeg',
-      badge: 'Terlaris',
-      badgeColor: AppColors.primary,
-      badgeTextColor: Colors.white,
-      rating: '4.9',
-      reviewCount: '(1.2k)',
-      title: 'Deep Cleaning Rumah',
-      description: 'Sanitasi menyeluruh & debu vakum',
-      duration: '2 - 3 Jam Pengerjaan',
-      price: 'Rp150.000',
-    ),
-    _PopularServiceData(
-      imagePath: 'assets/images/sofa_cleaning.jpeg',
-      badge: 'Promo',
-      badgeColor: AppColors.primaryBorder,
-      badgeTextColor: AppColors.primary,
-      rating: '4.8',
-      reviewCount: '(850)',
-      title: 'Cuci Sofa & Springbed',
-      description: 'Ekstraksi tungau & noda membandel',
-      duration: '1 - 2 Jam Pengerjaan',
-      price: 'Rp120.000',
-    ),
-    _PopularServiceData(
-      imagePath: 'assets/images/ac_service.jpeg',
-      badge: 'Cepat',
-      badgeColor: Color(0xFF006A61),
-      badgeTextColor: Colors.white,
-      rating: '4.9',
-      reviewCount: '(2.1k)',
-      title: 'Service & Cuci AC',
-      description: 'Cuci unit, cek freon & antibakteri',
-      duration: '45 - 60 Menit',
-      price: 'Rp75.000',
-      unit: '/unit',
-    ),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -120,13 +56,19 @@ class HomePage extends StatelessWidget {
                       const SliverToBoxAdapter(child: _HomeIntroSection()),
                       SliverToBoxAdapter(
                         child: _ServiceCategoriesSection(
-                          categories: _categories,
+                          categories: HomeData.categories,
+                          onViewAll: () => _openServices(context),
+                          onServiceSelected: (serviceId) =>
+                              _openServiceDetail(context, serviceId),
                         ),
                       ),
                       SliverToBoxAdapter(
                         child: _PopularServicesSection(
-                          services: _popularServices,
+                          services: HomeData.popularServices,
                           cardWidth: cardWidth,
+                          onViewAll: () => _openServices(context),
+                          onServiceSelected: (serviceId) =>
+                              _openServiceDetail(context, serviceId),
                         ),
                       ),
                       SliverToBoxAdapter(
@@ -149,10 +91,34 @@ class HomePage extends StatelessWidget {
         ),
         bottomNavigationBar: BottomNavigation(
           currentIndex: 0,
-          onDestinationSelected: (_) {},
+          onDestinationSelected: (index) {
+            if (index == 1) {
+              _openServices(context);
+            }
+          },
         ),
       ),
     );
+  }
+
+  void _openServices(BuildContext context) {
+    context.read<ServiceController>().resetFilters();
+    Navigator.pushNamed(context, AppRoutes.services);
+  }
+
+  void _openServiceDetail(BuildContext context, String? serviceId) {
+    final controller = context.read<ServiceController>();
+    final service = controller.findServiceById(serviceId);
+
+    if (service == null) {
+      _openServices(context);
+      return;
+    }
+
+    controller.selectService(service);
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ServiceDetailPage()));
   }
 }
 
@@ -176,16 +142,25 @@ class _HomeIntroSection extends StatelessWidget {
         ),
       ),
       child: Column(
-        children: [_HomeHeader(), _SearchSection(), _PromoSection()],
+        children: [
+          _HomeHeader(),
+          _PromoSection(bannerPaths: HomeData.promoBanners),
+        ],
       ),
     );
   }
 }
 
 class _ServiceCategoriesSection extends StatelessWidget {
-  const _ServiceCategoriesSection({required this.categories});
+  const _ServiceCategoriesSection({
+    required this.categories,
+    required this.onViewAll,
+    required this.onServiceSelected,
+  });
 
-  final List<_CategoryData> categories;
+  final List<ServiceCategoryModel> categories;
+  final VoidCallback onViewAll;
+  final ValueChanged<String?> onServiceSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -207,10 +182,11 @@ class _ServiceCategoriesSection extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const _SectionHeader(
+          _SectionHeader(
             title: 'Layanan',
             actionLabel: 'Lihat semua',
             bottomPadding: 12,
+            onActionPressed: onViewAll,
           ),
           GridView.builder(
             shrinkWrap: true,
@@ -229,7 +205,7 @@ class _ServiceCategoriesSection extends StatelessWidget {
                 iconPath: category.iconPath,
                 label: category.label,
                 accentText: category.accentText,
-                onTap: () {},
+                onTap: () => onServiceSelected(category.serviceId),
               );
             },
           ),
@@ -380,60 +356,38 @@ class _LocationLabel extends StatelessWidget {
   }
 }
 
-class _SearchSection extends StatelessWidget {
-  const _SearchSection();
+class _PromoSection extends StatefulWidget {
+  const _PromoSection({required this.bannerPaths});
+
+  final List<String> bannerPaths;
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-      child: Semantics(
-        textField: true,
-        label: 'Cari layanan',
-        child: Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0D000000),
-                offset: Offset(0, 1),
-                blurRadius: 1,
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              SvgPicture.asset(
-                'assets/icons/search.svg',
-                width: 17,
-                height: 17,
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Text(
-                  'Cari layanan deep clean, AC, sofa...',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 14,
-                    height: 1.2,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  State<_PromoSection> createState() => _PromoSectionState();
 }
 
-class _PromoSection extends StatelessWidget {
-  const _PromoSection();
+class _PromoSectionState extends State<_PromoSection> {
+  late final PageController _pageController;
+  int _activePage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _selectPage(int page) {
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -443,27 +397,39 @@ class _PromoSection extends StatelessWidget {
         children: [
           AspectRatio(
             aspectRatio: 3,
-            child: Image.asset(
-              'assets/images/promo_banner.png',
-              fit: BoxFit.contain,
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: widget.bannerPaths.length,
+              onPageChanged: (page) {
+                setState(() => _activePage = page);
+              },
+              itemBuilder: (context, index) {
+                return Semantics(
+                  image: true,
+                  label: 'Promo ${index + 1} dari ${widget.bannerPaths.length}',
+                  child: Image.asset(
+                    widget.bannerPaths[index],
+                    fit: BoxFit.contain,
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 12),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.all(Radius.circular(999)),
+            children: List.generate(
+              widget.bannerPaths.length,
+              (index) => Padding(
+                padding: EdgeInsets.only(
+                  right: index == widget.bannerPaths.length - 1 ? 0 : 8,
                 ),
-                child: SizedBox(width: 24, height: 6),
+                child: _CarouselIndicator(
+                  selected: _activePage == index,
+                  onTap: () => _selectPage(index),
+                ),
               ),
-              SizedBox(width: 8),
-              _CarouselDot(),
-              SizedBox(width: 8),
-              _CarouselDot(),
-            ],
+            ),
           ),
         ],
       ),
@@ -471,17 +437,35 @@ class _PromoSection extends StatelessWidget {
   }
 }
 
-class _CarouselDot extends StatelessWidget {
-  const _CarouselDot();
+class _CarouselIndicator extends StatelessWidget {
+  const _CarouselIndicator({required this.selected, required this.onTap});
+
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        shape: BoxShape.circle,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: selected ? 'Promo aktif' : 'Buka promo',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            width: selected ? 24 : 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary : AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ),
       ),
-      child: SizedBox(width: 6, height: 6),
     );
   }
 }
@@ -491,11 +475,13 @@ class _SectionHeader extends StatelessWidget {
     required this.title,
     required this.actionLabel,
     required this.bottomPadding,
+    required this.onActionPressed,
   });
 
   final String title;
   final String actionLabel;
   final double bottomPadding;
+  final VoidCallback onActionPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -514,7 +500,7 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () {},
+            onPressed: onActionPressed,
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primaryAction,
               padding: EdgeInsets.zero,
@@ -540,10 +526,14 @@ class _PopularServicesSection extends StatelessWidget {
   const _PopularServicesSection({
     required this.services,
     required this.cardWidth,
+    required this.onViewAll,
+    required this.onServiceSelected,
   });
 
-  final List<_PopularServiceData> services;
+  final List<PopularServiceModel> services;
   final double cardWidth;
+  final VoidCallback onViewAll;
+  final ValueChanged<String> onServiceSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -590,7 +580,7 @@ class _PopularServicesSection extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   TextButton(
-                    onPressed: () {},
+                    onPressed: onViewAll,
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       padding: EdgeInsets.zero,
@@ -622,19 +612,9 @@ class _PopularServicesSection extends StatelessWidget {
                   final service = services[index];
                   return PopularServiceCard(
                     width: cardWidth,
-                    imagePath: service.imagePath,
-                    badge: service.badge,
-                    badgeColor: service.badgeColor,
-                    badgeTextColor: service.badgeTextColor,
-                    rating: service.rating,
-                    reviewCount: service.reviewCount,
-                    title: service.title,
-                    description: service.description,
-                    duration: service.duration,
-                    price: service.price,
-                    unit: service.unit,
-                    onTap: () {},
-                    onAdd: () {},
+                    service: service,
+                    onTap: () => onServiceSelected(service.serviceId),
+                    onAdd: () => onServiceSelected(service.serviceId),
                   );
                 },
               ),
@@ -644,44 +624,4 @@ class _PopularServicesSection extends StatelessWidget {
       ),
     );
   }
-}
-
-class _CategoryData {
-  const _CategoryData({
-    required this.iconPath,
-    required this.label,
-    this.accentText,
-  });
-
-  final String iconPath;
-  final String label;
-  final String? accentText;
-}
-
-class _PopularServiceData {
-  const _PopularServiceData({
-    required this.imagePath,
-    required this.badge,
-    required this.badgeColor,
-    required this.badgeTextColor,
-    required this.rating,
-    required this.reviewCount,
-    required this.title,
-    required this.description,
-    required this.duration,
-    required this.price,
-    this.unit,
-  });
-
-  final String imagePath;
-  final String badge;
-  final Color badgeColor;
-  final Color badgeTextColor;
-  final String rating;
-  final String reviewCount;
-  final String title;
-  final String description;
-  final String duration;
-  final String price;
-  final String? unit;
 }

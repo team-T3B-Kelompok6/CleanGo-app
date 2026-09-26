@@ -2,38 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../domain/models/popular_service_model.dart';
 
 class PopularServiceCard extends StatelessWidget {
   const PopularServiceCard({
     required this.width,
-    required this.imagePath,
-    required this.badge,
-    required this.badgeColor,
-    required this.badgeTextColor,
-    required this.rating,
-    required this.reviewCount,
-    required this.title,
-    required this.description,
-    required this.duration,
-    required this.price,
-    this.unit,
+    required this.service,
     this.onTap,
     this.onAdd,
     super.key,
   });
 
   final double width;
-  final String imagePath;
-  final String badge;
-  final Color badgeColor;
-  final Color badgeTextColor;
-  final String rating;
-  final String reviewCount;
-  final String title;
-  final String description;
-  final String duration;
-  final String price;
-  final String? unit;
+  final PopularServiceModel service;
   final VoidCallback? onTap;
   final VoidCallback? onAdd;
 
@@ -78,24 +59,27 @@ class PopularServiceCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           child: ColoredBox(
                             color: AppColors.primaryContainer,
-                            child: Image.asset(imagePath, fit: BoxFit.cover),
+                            child: Image.asset(
+                              service.imagePath,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         ),
                         Positioned(
                           left: 8,
                           top: 8,
                           child: _Badge(
-                            label: badge,
-                            backgroundColor: badgeColor,
-                            textColor: badgeTextColor,
+                            label: service.badge,
+                            backgroundColor: _badgeBackgroundColor,
+                            textColor: _badgeTextColor,
                           ),
                         ),
                         Positioned(
                           right: 8,
                           bottom: 8,
                           child: _RatingBadge(
-                            rating: rating,
-                            reviewCount: reviewCount,
+                            rating: service.rating,
+                            reviewCount: service.reviewCount,
                           ),
                         ),
                       ],
@@ -103,7 +87,7 @@ class PopularServiceCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    title,
+                    service.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -114,7 +98,7 @@ class PopularServiceCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    description,
+                    service.description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -134,7 +118,7 @@ class PopularServiceCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          duration,
+                          service.duration,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -168,12 +152,12 @@ class PopularServiceCard extends StatelessWidget {
                             ),
                             Text.rich(
                               TextSpan(
-                                text: price,
-                                children: unit == null
+                                text: service.price,
+                                children: service.unit == null
                                     ? const []
                                     : [
                                         TextSpan(
-                                          text: unit,
+                                          text: service.unit,
                                           style: const TextStyle(
                                             color: AppColors.body,
                                             fontSize: 12,
@@ -225,6 +209,18 @@ class PopularServiceCard extends StatelessWidget {
       ),
     );
   }
+
+  Color get _badgeBackgroundColor => switch (service.badgeStyle) {
+    PopularServiceBadgeStyle.primary => AppColors.primary,
+    PopularServiceBadgeStyle.soft => AppColors.primaryBorder,
+    PopularServiceBadgeStyle.dark => const Color(0xFF006A61),
+  };
+
+  Color get _badgeTextColor => switch (service.badgeStyle) {
+    PopularServiceBadgeStyle.soft => AppColors.primary,
+    PopularServiceBadgeStyle.primary ||
+    PopularServiceBadgeStyle.dark => Colors.white,
+  };
 }
 
 class _Badge extends StatelessWidget {

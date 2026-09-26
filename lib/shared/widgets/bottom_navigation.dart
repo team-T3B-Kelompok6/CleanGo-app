@@ -9,6 +9,9 @@ class BottomNavigation extends StatelessWidget {
   const BottomNavigation({
     required this.currentIndex,
     this.onDestinationSelected,
+    this.inactiveColor = AppColors.slate400,
+    this.showOrderBadge = true,
+    this.showActiveIndicator = true,
     super.key,
   });
 
@@ -16,27 +19,34 @@ class BottomNavigation extends StatelessWidget {
 
   final int currentIndex;
   final ValueChanged<int>? onDestinationSelected;
+  final Color inactiveColor;
+  final bool showOrderBadge;
+  final bool showActiveIndicator;
 
   static const List<_NavigationDestinationData> _destinations = [
     _NavigationDestinationData(
-      iconPath: 'assets/icons/home.svg',
+      activeIconPath: 'assets/icons/home.svg',
+      inactiveIconPath: 'assets/icons/nav_home_inactive.svg',
       label: 'Beranda',
     ),
     _NavigationDestinationData(
-      iconPath: 'assets/icons/services.svg',
+      activeIconPath: 'assets/icons/nav_services_active.svg',
+      inactiveIconPath: 'assets/icons/services.svg',
       label: 'Layanan',
     ),
     _NavigationDestinationData(
-      iconPath: 'assets/icons/orders.svg',
+      activeIconPath: 'assets/icons/nav_orders_inactive.svg',
+      inactiveIconPath: 'assets/icons/nav_orders_inactive.svg',
       label: 'Pesanan',
-      iconExtent: 32,
     ),
     _NavigationDestinationData(
-      iconPath: 'assets/icons/messages.svg',
+      activeIconPath: 'assets/icons/nav_messages_inactive.svg',
+      inactiveIconPath: 'assets/icons/nav_messages_inactive.svg',
       label: 'Pesan',
     ),
     _NavigationDestinationData(
-      iconPath: 'assets/icons/profile.svg',
+      activeIconPath: 'assets/icons/nav_profile_inactive.svg',
+      inactiveIconPath: 'assets/icons/nav_profile_inactive.svg',
       label: 'Akun',
     ),
   ];
@@ -67,11 +77,17 @@ class BottomNavigation extends StatelessWidget {
                   child: Row(
                     children: List.generate(_destinations.length, (index) {
                       final destination = _destinations[index];
+                      final active = currentIndex == index;
                       return _BottomNavigationItem(
-                        iconPath: destination.iconPath,
+                        iconPath: active
+                            ? destination.activeIconPath
+                            : destination.inactiveIconPath,
                         label: destination.label,
-                        active: currentIndex == index,
-                        iconExtent: destination.iconExtent,
+                        active: active,
+                        iconExtent: 24,
+                        inactiveColor: inactiveColor,
+                        showBadge: showOrderBadge && index == 2,
+                        showActiveIndicator: showActiveIndicator,
                         onTap: () => onDestinationSelected?.call(index),
                       );
                     }),
@@ -92,6 +108,9 @@ class _BottomNavigationItem extends StatelessWidget {
     required this.label,
     required this.active,
     required this.iconExtent,
+    required this.inactiveColor,
+    required this.showBadge,
+    required this.showActiveIndicator,
     required this.onTap,
   });
 
@@ -99,6 +118,9 @@ class _BottomNavigationItem extends StatelessWidget {
   final String label;
   final bool active;
   final double iconExtent;
+  final Color inactiveColor;
+  final bool showBadge;
+  final bool showActiveIndicator;
   final VoidCallback onTap;
 
   @override
@@ -118,12 +140,34 @@ class _BottomNavigationItem extends StatelessWidget {
                 SizedBox.square(
                   dimension: 34,
                   child: Center(
-                    child: SizedBox.square(
-                      dimension: iconExtent,
-                      child: FittedBox(
-                        fit: BoxFit.contain,
-                        child: SvgPicture.asset(iconPath),
-                      ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox.square(
+                          dimension: iconExtent,
+                          child: SvgPicture.asset(
+                            iconPath,
+                            fit: BoxFit.contain,
+                            colorFilter: ColorFilter.mode(
+                              active ? AppColors.primary : inactiveColor,
+                              BlendMode.srcIn,
+                            ),
+                          ),
+                        ),
+                        if (showBadge)
+                          const Positioned(
+                            right: 1,
+                            top: 1,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryAction,
+                                shape: BoxShape.circle,
+                              ),
+                              child: SizedBox.square(dimension: 8),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -132,13 +176,23 @@ class _BottomNavigationItem extends StatelessWidget {
                   label,
                   maxLines: 1,
                   style: TextStyle(
-                    color: active ? AppColors.primary : AppColors.muted,
+                    color: active ? AppColors.primary : inactiveColor,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     height: 1.27,
                     letterSpacing: 0.2,
                   ),
                 ),
+                if (showActiveIndicator) ...[
+                  const SizedBox(height: 2),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: active ? AppColors.primary : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const SizedBox.square(dimension: 4),
+                  ),
+                ],
               ],
             ),
           ),
@@ -150,12 +204,12 @@ class _BottomNavigationItem extends StatelessWidget {
 
 class _NavigationDestinationData {
   const _NavigationDestinationData({
-    required this.iconPath,
+    required this.activeIconPath,
+    required this.inactiveIconPath,
     required this.label,
-    this.iconExtent = 24,
   });
 
-  final String iconPath;
+  final String activeIconPath;
+  final String inactiveIconPath;
   final String label;
-  final double iconExtent;
 }

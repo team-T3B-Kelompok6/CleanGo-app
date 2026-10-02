@@ -10,12 +10,12 @@ class BottomNavigation extends StatelessWidget {
     required this.currentIndex,
     this.onDestinationSelected,
     this.inactiveColor = AppColors.slate400,
-    this.showOrderBadge = true,
+    this.showOrderBadge = false,
     this.showActiveIndicator = true,
     super.key,
   });
 
-  static const double contentHeight = 82;
+  static const double contentHeight = 64;
 
   final int currentIndex;
   final ValueChanged<int>? onDestinationSelected;
@@ -84,7 +84,7 @@ class BottomNavigation extends StatelessWidget {
                             : destination.inactiveIconPath,
                         label: destination.label,
                         active: active,
-                        iconExtent: 24,
+                        iconExtent: 22,
                         inactiveColor: inactiveColor,
                         showBadge: showOrderBadge && index == 2,
                         showActiveIndicator: showActiveIndicator,
@@ -133,12 +133,12 @@ class _BottomNavigationItem extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 SizedBox.square(
-                  dimension: 34,
+                  dimension: 28,
                   child: Center(
                     child: Stack(
                       clipBehavior: Clip.none,
@@ -157,30 +157,30 @@ class _BottomNavigationItem extends StatelessWidget {
                         ),
                         if (showBadge)
                           const Positioned(
-                            right: 1,
-                            top: 1,
+                            right: 0,
+                            top: 0,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: AppColors.primaryAction,
                                 shape: BoxShape.circle,
                               ),
-                              child: SizedBox.square(dimension: 8),
+                              child: SizedBox.square(dimension: 7),
                             ),
                           ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   label,
                   maxLines: 1,
                   style: TextStyle(
                     color: active ? AppColors.primary : inactiveColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    height: 1.27,
-                    letterSpacing: 0.2,
+                    fontSize: 10.5,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    height: 1.2,
+                    letterSpacing: 0.1,
                   ),
                 ),
                 if (showActiveIndicator) ...[
@@ -190,7 +190,7 @@ class _BottomNavigationItem extends StatelessWidget {
                       color: active ? AppColors.primary : Colors.transparent,
                       shape: BoxShape.circle,
                     ),
-                    child: const SizedBox.square(dimension: 4),
+                    child: const SizedBox.square(dimension: 3.5),
                   ),
                 ],
               ],

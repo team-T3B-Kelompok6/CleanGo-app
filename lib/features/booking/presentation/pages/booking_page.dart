@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../checkout/presentation/pages/checkout_page.dart';
 import '../../../service/domain/models/service_model.dart';
 import '../controllers/booking_controller.dart';
 import '../widgets/booking_widgets.dart';
@@ -146,7 +147,14 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   void _handleContinue() {
-    widget.onContinue?.call();
+    if (widget.onContinue != null) {
+      widget.onContinue!.call();
+      return;
+    }
+
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const CheckoutPage()));
   }
 }
 

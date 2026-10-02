@@ -22,16 +22,99 @@ abstract final class AppColors {
 }
 
 abstract final class AppTheme {
+  static const String fontFamily = 'Inter';
+
+  static const TextTheme textTheme = TextTheme(
+    titleLarge: TextStyle(
+      color: AppColors.slate900,
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+      height: 1.25,
+    ),
+    titleMedium: TextStyle(
+      color: AppColors.slate900,
+      fontSize: 18,
+      fontWeight: FontWeight.w600,
+      height: 1.3,
+    ),
+    titleSmall: TextStyle(
+      color: AppColors.slate900,
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      height: 1.35,
+    ),
+    bodyLarge: TextStyle(
+      color: AppColors.slate600,
+      fontSize: 16,
+      fontWeight: FontWeight.w400,
+      height: 1.5,
+    ),
+    bodyMedium: TextStyle(
+      color: AppColors.slate600,
+      fontSize: 14,
+      fontWeight: FontWeight.w400,
+      height: 1.45,
+    ),
+    bodySmall: TextStyle(
+      color: AppColors.slate500,
+      fontSize: 12,
+      fontWeight: FontWeight.w400,
+      height: 1.4,
+    ),
+    labelLarge: TextStyle(
+      color: AppColors.slate900,
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      height: 1.3,
+    ),
+    labelMedium: TextStyle(
+      color: AppColors.slate600,
+      fontSize: 12,
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+    ),
+    labelSmall: TextStyle(
+      color: AppColors.slate500,
+      fontSize: 11,
+      fontWeight: FontWeight.w500,
+      height: 1.3,
+    ),
+  );
+
   static ThemeData get light {
     return ThemeData(
       useMaterial3: true,
-      fontFamily: 'Plus Jakarta Sans',
+      fontFamily: fontFamily,
+      textTheme: textTheme.apply(fontFamily: fontFamily),
       scaffoldBackgroundColor: Colors.white,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         brightness: Brightness.light,
       ),
       splashFactory: InkRipple.splashFactory,
+      appBarTheme: const AppBarTheme(
+        titleTextStyle: TextStyle(
+          color: AppColors.slate900,
+          fontFamily: fontFamily,
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          height: 1.25,
+        ),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        labelStyle: TextStyle(
+          color: AppColors.slate600,
+          fontFamily: fontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+        hintStyle: TextStyle(
+          color: AppColors.slate500,
+          fontFamily: fontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
     );
   }
 }

@@ -24,11 +24,12 @@ class CleaningAddress {
 class BookingController extends ChangeNotifier {
   static final DateTime initialDate = DateTime(2026, 10, 15);
 
+  static const int platformFee = 5000;
+
   static const List<String> availableTimes = [
-    '09.00',
-    '11:00',
-    '13:00',
-    '15:00',
+    '08:00',
+    '12:00',
+    '16:00',
   ];
 
   static const CleaningAddress initialAddress = CleaningAddress(
@@ -44,7 +45,7 @@ class BookingController extends ChangeNotifier {
 
   ServiceModel? _service;
   DateTime _selectedDate = initialDate;
-  String _selectedTime = '11:00';
+  String _selectedTime = '12:00';
   CleaningAddress _address = initialAddress;
   String _note = initialNote;
 
@@ -53,6 +54,42 @@ class BookingController extends ChangeNotifier {
   String get selectedTime => _selectedTime;
   CleaningAddress get address => _address;
   String get note => _note;
+  int get servicePriceValue => _parsePrice(_service?.price ?? '');
+  int get totalPayment => servicePriceValue + platformFee;
+  String get formattedServicePrice => formatRupiah(servicePriceValue);
+  String get formattedPlatformFee => formatRupiah(platformFee);
+  String get formattedTotalPayment => formatRupiah(totalPayment);
+  String get formattedSelectedDate {
+    const weekdays = [
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+
+    return '${weekdays[_selectedDate.weekday - 1]}, '
+        '${_selectedDate.day} ${months[_selectedDate.month - 1]} '
+        '${_selectedDate.year}';
+  }
+
+  String get formattedSelectedTime => '$_selectedTime WIB';
 
   void startBooking(ServiceModel service) {
     if (_service?.id == service.id) {
@@ -61,7 +98,7 @@ class BookingController extends ChangeNotifier {
 
     _service = service;
     _selectedDate = initialDate;
-    _selectedTime = '11:00';
+    _selectedTime = '12:00';
     _address = initialAddress;
     _note = initialNote;
     notifyListeners();
@@ -101,5 +138,22 @@ class BookingController extends ChangeNotifier {
 
     _note = note;
     notifyListeners();
+  }
+
+  static int _parsePrice(String price) {
+    final digits = price.replaceAll(RegExp(r'[^0-9]'), '');
+    return int.tryParse(digits) ?? 0;
+  }
+
+  static String formatRupiah(int amount) {
+    final digits = amount.toString();
+    final groups = <String>[];
+
+    for (var end = digits.length; end > 0; end -= 3) {
+      final start = end - 3 < 0 ? 0 : end - 3;
+      groups.insert(0, digits.substring(start, end));
+    }
+
+    return 'Rp${groups.join('.')}';
   }
 }

@@ -10,6 +10,8 @@ import '../../../booking/presentation/controllers/booking_controller.dart';
 import '../../../booking/presentation/pages/booking_page.dart';
 import '../../domain/models/service_model.dart';
 import '../controllers/service_controller.dart';
+import '../widgets/review_card.dart';
+import 'all_reviews_page.dart';
 
 class ServiceDetailPage extends StatelessWidget {
   const ServiceDetailPage({super.key});
@@ -211,6 +213,7 @@ class _DetailContent extends StatelessWidget {
               const SizedBox(height: 10),
               Text(
                 detail?.description ?? service.description,
+                textAlign: TextAlign.justify,
                 style: const TextStyle(
                   color: AppColors.slate600,
                   fontSize: 14,
@@ -247,16 +250,29 @@ class _DetailContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _ReviewHeader(),
-                const SizedBox(height: 14),
-                ...detail.reviews.indexed.map(
-                  (entry) => Padding(
-                    padding: EdgeInsets.only(
-                      bottom: entry.$1 == detail.reviews.length - 1 ? 0 : 10,
-                    ),
-                    child: _ReviewItem(review: entry.$2),
-                  ),
+                _ReviewHeader(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => AllReviewsPage(service: service),
+                      ),
+                    );
+                  },
                 ),
+                const SizedBox(height: 14),
+                ...detail.reviews
+                    .take(2)
+                    .indexed
+                    .map(
+                      (entry) => Padding(
+                        padding: EdgeInsets.only(
+                          bottom: entry.$1 == detail.reviews.take(2).length - 1
+                              ? 0
+                              : 10,
+                        ),
+                        child: _ReviewItem(review: entry.$2),
+                      ),
+                    ),
               ],
             ),
           ),
@@ -460,26 +476,40 @@ class _BenefitItem extends StatelessWidget {
 }
 
 class _ReviewHeader extends StatelessWidget {
-  const _ReviewHeader();
+  const _ReviewHeader({required this.onPressed});
+
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         const Expanded(child: _SectionTitle('Ulasan Pengguna')),
-        const Text(
-          'Lihat Semua',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+        InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Lihat Semua',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SvgPicture.asset(
+                  'assets/icons/detail_chevron.svg',
+                  width: 5,
+                  height: 8,
+                ),
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        SvgPicture.asset(
-          'assets/icons/detail_chevron.svg',
-          width: 5,
-          height: 8,
         ),
       ],
     );
@@ -517,20 +547,7 @@ class _ReviewItem extends StatelessWidget {
                   ),
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(
-                  review.rating,
-                  (_) => Padding(
-                    padding: const EdgeInsets.only(left: 2),
-                    child: SvgPicture.asset(
-                      'assets/icons/detail_review_star.svg',
-                      width: 12,
-                      height: 12,
-                    ),
-                  ),
-                ),
-              ),
+              RatingStars(rating: review.rating),
             ],
           ),
           const SizedBox(height: 7),

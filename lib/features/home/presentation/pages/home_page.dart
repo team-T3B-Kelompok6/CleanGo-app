@@ -9,6 +9,7 @@ import '../../../../core/constants/app_routes.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/bottom_navigation.dart';
 import '../../../../shared/widgets/chatbot_button.dart';
+import '../../../chatbot/presentation/pages/chatbot_page.dart';
 import '../../data/home_data.dart';
 import '../../domain/models/popular_service_model.dart';
 import '../../domain/models/service_category_model.dart';
@@ -85,15 +86,22 @@ class HomePage extends StatelessWidget {
                   BottomNavigation.contentHeight +
                   mediaQuery.viewPadding.bottom +
                   12,
-              child: ChatbotButton(onTap: () {}),
+              child: ChatbotButton(onTap: () => _openChatbot(context)),
             ),
           ],
         ),
         bottomNavigationBar: BottomNavigation(
           currentIndex: 0,
+          showOrderBadge: false,
           onDestinationSelected: (index) {
             if (index == 1) {
               _openServices(context);
+            } else if (index == 2) {
+              Navigator.pushNamed(context, AppRoutes.orders);
+            } else if (index == 3) {
+              Navigator.pushNamed(context, AppRoutes.messages);
+            } else if (index == 4) {
+              Navigator.pushNamed(context, AppRoutes.profile);
             }
           },
         ),
@@ -104,6 +112,11 @@ class HomePage extends StatelessWidget {
   void _openServices(BuildContext context) {
     context.read<ServiceController>().resetFilters();
     Navigator.pushNamed(context, AppRoutes.services);
+  }
+
+  void _openChatbot(BuildContext context) {
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const ChatbotPage()));
   }
 
   void _openServiceDetail(BuildContext context, String? serviceId) {
@@ -290,7 +303,7 @@ class _HomeHeader extends StatelessWidget {
             button: true,
             label: 'Notifikasi',
             child: InkWell(
-              onTap: () {},
+              onTap: () => Navigator.pushNamed(context, AppRoutes.messages),
               customBorder: const CircleBorder(),
               child: SizedBox(
                 width: 44,

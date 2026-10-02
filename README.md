@@ -23,12 +23,13 @@ cleango_app/
 ├── windows/                              # Konfigurasi dan runner Windows
 │
 ├── assets/
-│   ├── fonts/                            # Font Plus Jakarta Sans dan lisensinya
-│   │   ├── OFL.txt
-│   │   ├── PlusJakartaSans-Regular.ttf
-│   │   ├── PlusJakartaSans-Medium.ttf
-│   │   ├── PlusJakartaSans-SemiBold.ttf
-│   │   └── PlusJakartaSans-Bold.ttf
+│   ├── fonts/                            # Font Inter dan lisensinya
+│   │   ├── Inter-OFL.txt
+│   │   ├── Inter-Regular.ttf
+│   │   ├── Inter-Medium.ttf
+│   │   ├── Inter-SemiBold.ttf
+│   │   ├── Inter-Bold.ttf
+│   │   └── Inter-ExtraBold.ttf
 │   ├── icons/                            # Ikon SVG untuk navigasi dan komponen UI
 │   │   ├── ac_installation.svg
 │   │   ├── ac_wash.svg
@@ -56,8 +57,7 @@ cleango_app/
 │   │   ├── notification.svg
 │   │   ├── office.svg
 │   │   ├── orders.svg
-│   │   ├── pandy.svg
-│   │   ├── pandy_compact.svg
+│   │   ├── boo.svg
 │   │   ├── profile.svg
 │   │   ├── rating_star.svg
 │   │   ├── search.svg
@@ -116,9 +116,11 @@ cleango_app/
 │   │   │       │   └── service_controller.dart # Filter, pencarian, dan layanan terpilih
 │   │   │       ├── pages/
 │   │   │       │   ├── service_list_page.dart
-│   │   │       │   └── service_detail_page.dart
+│   │   │       │   ├── service_detail_page.dart
+│   │   │       │   └── all_reviews_page.dart
 │   │   │       └── widgets/
-│   │   │           └── service_card.dart
+│   │   │           ├── service_card.dart
+│   │   │           └── review_card.dart
 │   │   │
 │   │   └── booking/
 │   │       └── presentation/

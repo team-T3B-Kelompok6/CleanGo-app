@@ -69,7 +69,9 @@ cleango_app/
 │   │   └── star.svg
 │   └── images/                           # Foto layanan, promo, dan profil pengguna
 │       ├── ac_service.jpeg
+│       ├── cleaner_siti.jpeg                 # Foto potret profil cleaner Siti Rahmawati
 │       ├── deep_cleaning.jpeg
+│       ├── malang_map_route.jpeg             # Ilustrasi rute peta Malang City Point - Sigura Gura
 │       ├── promo_banner.png
 │       ├── service_ac_care.jpeg
 │       ├── service_daily_cleaning.jpeg
@@ -90,51 +92,149 @@ cleango_app/
 │   │   └── theme/
 │   │       └── app_theme.dart            # Warna, tipografi, dan tema global
 │   │
-│   ├── features/                         # Modul berdasarkan fitur aplikasi
-│   │   ├── home/
+│   ├── features/                         # Modul berdasarkan fitur aplikasi (Clean Architecture)
+│   │   ├── address/                      # Fitur Alamat Pembersihan & Tersimpan
+│   │   │   ├── domain/
+│   │   │   │   └── models/
+│   │   │   │       └── address_model.dart           # Model entitas alamat & mapper CleaningAddress
+│   │   │   ├── controllers/
+│   │   │   │   └── address_controller.dart          # Global state provider (tambah, edit, hapus, set utama)
+│   │   │   ├── pages/
+│   │   │   │   ├── address_list_page.dart           # Layar daftar alamat & pemilihan alamat booking
+│   │   │   │   ├── add_address_page.dart            # Layar tambah alamat baru
+│   │   │   │   └── edit_address_page.dart           # Layar edit & hapus alamat
+│   │   │   └── widgets/
+│   │   │       ├── address_card.dart                # Kartu alamat responsif dengan badge & status
+│   │   │       └── delete_address_dialog.dart       # Modal konfirmasi hapus alamat
+│   │   │
+│   │   ├── auth/                         # Fitur Autentikasi Pengguna
 │   │   │   ├── data/
-│   │   │   │   └── home_data.dart       # Data lokal kategori, promo, dan layanan populer
+│   │   │   │   └── dummy_auth_service.dart          # Layanan simulasi login dan registrasi
+│   │   │   ├── pages/
+│   │   │   │   ├── login_page.dart                  # Halaman masuk akun
+│   │   │   │   └── register_page.dart               # Halaman pendaftaran akun baru
+│   │   │   └── widgets/
+│   │   │       ├── auth_social_buttons.dart         # Tombol masuk sosial (Google & Apple)
+│   │   │       └── auth_text_field.dart             # Komponen input form autentikasi
+│   │   │
+│   │   ├── booking/                      # Fitur Penjadwalan & Pemesanan Layanan
+│   │   │   ├── controllers/
+│   │   │   │   └── booking_controller.dart          # State layanan, jadwal, alamat, dan catatan
+│   │   │   ├── pages/
+│   │   │   │   └── booking_page.dart                # Halaman booking dengan CustomScrollView
+│   │   │   └── widgets/
+│   │   │       └── booking_widgets.dart             # Kalender, pemilih jam, dan kartu alamat
+│   │   │
+│   │   ├── chatbot/                      # Fitur Asisten Interaktif AI
+│   │   │   └── pages/
+│   │   │       └── chatbot_page.dart                # Halaman interaksi asisten chatbot
+│   │   │
+│   │   ├── checkout/                     # Fitur Pembayaran & Konfirmasi Pesanan
+│   │   │   ├── domain/
+│   │   │   │   └── models/
+│   │   │   │       └── payment_method_model.dart    # Model metode pembayaran (QRIS, VA, Transfer)
+│   │   │   ├── controllers/
+│   │   │   │   └── checkout_controller.dart         # Kalkulasi promo, biaya platform, dan total bayar
+│   │   │   ├── pages/
+│   │   │   │   ├── checkout_page.dart               # Halaman rincian checkout pengerjaan
+│   │   │   │   ├── payment_method_page.dart         # Layar pemilihan metode pembayaran
+│   │   │   │   └── payment_page.dart                # Layar instruksi & status pembayaran
+│   │   │   └── widgets/
+│   │   │       ├── order_confirmation_dialog.dart
+│   │   │       └── payment_method_icon.dart
+│   │   │
+│   │   ├── home/                         # Fitur Beranda & Penemuan Layanan
+│   │   │   ├── data/
+│   │   │   │   └── home_data.dart                   # Data dummy kategori, banner promo, & layanan populer
 │   │   │   ├── domain/
 │   │   │   │   └── models/
 │   │   │   │       ├── popular_service_model.dart
 │   │   │   │       └── service_category_model.dart
-│   │   │   └── presentation/
-│   │   │       ├── pages/
-│   │   │       │   └── home_page.dart
-│   │   │       └── widgets/
-│   │   │           ├── popular_service_card.dart
-│   │   │           └── service_category_item.dart
+│   │   │   ├── pages/
+│   │   │   │   └── home_page.dart                   # Halaman beranda utama
+│   │   │   └── widgets/
+│   │   │       ├── popular_service_card.dart
+│   │   │       └── service_category_item.dart
 │   │   │
-│   │   ├── service/
+│   │   ├── message/                      # Fitur Notifikasi & Pesanan Real-time
 │   │   │   ├── data/
-│   │   │   │   └── service_data.dart    # Sumber data lokal seluruh layanan
+│   │   │   │   └── message_data.dart                # Data notifikasi status cleaner & promo
 │   │   │   ├── domain/
 │   │   │   │   └── models/
-│   │   │   │       └── service_model.dart
-│   │   │   └── presentation/
-│   │   │       ├── controllers/
-│   │   │       │   └── service_controller.dart # Filter, pencarian, dan layanan terpilih
-│   │   │       ├── pages/
-│   │   │       │   ├── service_list_page.dart
-│   │   │       │   ├── service_detail_page.dart
-│   │   │       │   └── all_reviews_page.dart
-│   │   │       └── widgets/
-│   │   │           ├── service_card.dart
-│   │   │           └── review_card.dart
+│   │   │   │       └── message_notification_model.dart
+│   │   │   └── pages/
+│   │   │       └── messages_page.dart               # Halaman notifikasi pesan dan status cleaner
 │   │   │
-│   │   └── booking/
-│   │       └── presentation/
-│   │           ├── controllers/
-│   │           │   └── booking_controller.dart # State layanan, jadwal, alamat, dan catatan
-│   │           ├── pages/
-│   │           │   └── booking_page.dart
-│   │           └── widgets/
-│   │               └── booking_widgets.dart     # Kalender, pilihan jam, dan kartu alamat
+│   │   ├── order/                        # Fitur Manajemen Pesanan Pelanggan
+│   │   │   ├── data/
+│   │   │   │   └── order_data.dart                  # Data pesanan aktif, terjadwal, dan riwayat
+│   │   │   ├── domain/
+│   │   │   │   └── models/
+│   │   │   │       └── order_model.dart             # Model status pesanan, tahapan layanan, ulasan, & rating
+│   │   │   ├── controllers/
+│   │   │   │   └── order_controller.dart            # Global state provider tahapan pesanan & review
+│   │   │   ├── pages/
+│   │   │   │   ├── orders_page.dart                 # Halaman pesanan terjadwal & riwayat selesai
+│   │   │   │   ├── order_status_page.dart           # Layar status pesanan interaktif (5 tahapan & live map)
+│   │   │   │   └── review_rating_page.dart          # Layar ulasan & rating bintang pengalaman pengerjaan
+│   │   │   └── widgets/
+│   │   │       └── order_tracking_map.dart          # Komponen peta rute Malang City Point - Sigura Gura
+│   │   │
+│   │   ├── profile/                      # Fitur Pengaturan Akun & Profil Pengguna
+│   │   │   ├── models/
+│   │   │   │   └── user_profile_model.dart          # Model entitas profil pengguna & kata sandi
+│   │   │   ├── controllers/
+│   │   │   │   ├── profile_controller.dart          # Global state provider profil & kata sandi akun
+│   │   │   │   └── change_password_controller.dart  # State provider validasi & kekuatan kata sandi
+│   │   │   └── pages/
+│   │   │       ├── profile_page.dart                # Halaman profil akun & menu pengaturan
+│   │   │       ├── personal_data_page.dart          # Layar Data Diri (form identitas, gender, tgl lahir)
+│   │   │       └── change_password_page.dart        # Layar Ubah Kata Sandi (validasi & indikator kekuatan)
+│   │   │
+│   │   ├── support/                      # Fitur Pusat Bantuan & FAQ (Customer Service)
+│   │   │   ├── data/
+│   │   │   │   └── faq_data.dart                    # Data inisial FAQ populer & kontak CS
+│   │   │   ├── models/
+│   │   │   │   └── faq_item_model.dart              # Model entitas item FAQ & status ekspansi
+│   │   │   ├── controllers/
+│   │   │   │   └── support_controller.dart          # Global state provider FAQ (pencarian & accordion)
+│   │   │   └── pages/
+│   │   │       └── help_center_page.dart            # Layar Pusat Bantuan & FAQ
+│   │   │
+│   │   └── service/                      # Fitur Katalog Layanan Kebersihan
+│   │       ├── data/
+│   │       │   └── service_data.dart                # Sumber data katalog lengkap layanan
+│   │       ├── domain/
+│   │       │   └── models/
+│   │       │       └── service_model.dart
+│   │       ├── controllers/
+│   │       │   ├── service_controller.dart          # Filter kategori & pencarian layanan
+│   │       │   └── service_sort.dart                # Pengurutan harga, rating, & popularitas
+│   │       ├── pages/
+│   │       │   ├── service_list_page.dart           # Katalog pencarian & filter layanan
+│   │       │   ├── service_detail_page.dart         # Informasi detail layanan & paket pengerjaan
+│   │       │   └── all_reviews_page.dart            # Halaman ulasan & testimoni pelanggan
+│   │       └── widgets/
+│   │           ├── service_card.dart
+│   │           └── review_card.dart
 │   │
-│   └── shared/                           # Komponen yang dipakai oleh beberapa fitur
+│   └── shared/                           # Komponen global lintas modul
 │       └── widgets/
-│           ├── bottom_navigation.dart
-│           └── chatbot_button.dart
+│           ├── bottom_navigation.dart               # Navigasi bawah 5 menu utama
+│           ├── chatbot_button.dart                  # Floating Action Button Chatbot
+│           └── chatbot_icon.dart                    # Desain vektor ikon chatbot
+│
+├── test/                                 # Pengujian otomatis (Unit & Widget Test - 38 Tests)
+│   └── features/
+│       ├── address/
+│       │   └── address_controller_test.dart         # Unit test AddressController & AddressModel
+│       ├── order/
+│       │   └── order_controller_test.dart           # Unit test OrderController & Pemetaan Reorder
+│       ├── profile/
+│       │   ├── profile_controller_test.dart         # Unit test ProfileController & UserProfileModel
+│       │   └── change_password_controller_test.dart # Unit test validasi & kekuatan kata sandi
+│       └── support/
+│           └── support_controller_test.dart         # Unit test SupportController & FAQ accordion
 │
 ├── .gitignore                            # Daftar file yang tidak dilacak Git
 ├── .metadata                             # Metadata project Flutter

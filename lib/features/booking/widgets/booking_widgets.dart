@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../controllers/booking_controller.dart';
+import '../domain/models/cleaning_address.dart';
 
 class BookingCalendarCard extends StatelessWidget {
   const BookingCalendarCard({

@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/address_controller.dart';
+import '../controllers/address_form_controller.dart';
 import '../controllers/address_form_validator.dart';
-import '../domain/models/address_model.dart';
 import '../widgets/address_type_dropdown.dart';
 import 'address_map_picker_page.dart';
 
@@ -22,66 +22,50 @@ class AddAddressPage extends StatefulWidget {
 class _AddAddressPageState extends State<AddAddressPage> {
   static const double _sidePadding = 20.0;
   final _formKey = GlobalKey<FormState>();
+  bool _hasSubmitted = false;
 
-  late final TextEditingController _addressTitleController;
-  late final TextEditingController _fullAddressController;
-  late final TextEditingController _noteController;
-  late final TextEditingController _contactNameController;
-  late final TextEditingController _phoneController;
+  late final AddressFormController _addressForm;
 
-  String _selectedType = 'Rumah';
-  final List<String> _typeOptions = [
-    'Rumah',
-    'Kantor',
-    'Apartemen',
-    'Kost',
-    'Lainnya',
-  ];
-
-  bool _isSaving = false;
-  double? _selectedLatitude;
-  double? _selectedLongitude;
+  TextEditingController get _addressTitleController =>
+      _addressForm.addressTitle;
+  TextEditingController get _fullAddressController => _addressForm.fullAddress;
+  TextEditingController get _noteController => _addressForm.note;
+  TextEditingController get _contactNameController => _addressForm.contactName;
+  TextEditingController get _phoneController => _addressForm.phone;
+  String get _selectedType => _addressForm.selectedType;
+  List<String> get _typeOptions => AddressFormController.typeOptions;
+  bool get _isSaving => _addressForm.isSaving;
+  double? get _selectedLatitude => _addressForm.latitude;
 
   @override
   void initState() {
     super.initState();
-    _addressTitleController = TextEditingController();
-    _fullAddressController = TextEditingController();
-    _noteController = TextEditingController();
-    _contactNameController = TextEditingController();
-    _phoneController = TextEditingController();
+    _addressForm = AddressFormController.forNew(
+      isPrimary: widget.autoSetPrimary,
+    );
   }
 
   @override
   void dispose() {
-    _addressTitleController.dispose();
-    _fullAddressController.dispose();
-    _noteController.dispose();
-    _contactNameController.dispose();
-    _phoneController.dispose();
+    _addressForm.dispose();
     super.dispose();
   }
 
   Future<void> _handleSave() async {
     FocusScope.of(context).unfocus();
 
+    if (!_hasSubmitted) {
+      setState(() => _hasSubmitted = true);
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() => _addressForm.setSaving(true));
 
-    final newAddress = AddressModel(
+    final newAddress = _addressForm.createAddress(
       id: 'addr-${DateTime.now().millisecondsSinceEpoch}',
-      title: _addressTitleController.text.trim(),
-      fullAddress: _fullAddressController.text.trim(),
-      note: _noteController.text.trim(),
-      type: _selectedType,
-      contactName: _contactNameController.text.trim(),
-      phoneNumber: AddressFormValidator.formatPhone(_phoneController.text),
-      isPrimary: widget.autoSetPrimary,
-      latitude: _selectedLatitude,
-      longitude: _selectedLongitude,
     );
 
     final addressController = context.read<AddressController>();
@@ -116,12 +100,16 @@ class _AddAddressPageState extends State<AddAddressPage> {
     if (selection == null || !mounted) return;
 
     setState(() {
-      _selectedLatitude = selection.position.latitude;
-      _selectedLongitude = selection.position.longitude;
-      _addressTitleController.text = selection.shortLabel;
-      _fullAddressController.text = selection.addressText;
+      _addressForm.applyMapSelection(
+        selectedLatitude: selection.position.latitude,
+        selectedLongitude: selection.position.longitude,
+        shortLabel: selection.shortLabel,
+        addressText: selection.addressText,
+      );
     });
-    _formKey.currentState?.validate();
+    if (_hasSubmitted) {
+      _formKey.currentState?.validate();
+    }
   }
 
   @override
@@ -182,6 +170,9 @@ class _AddAddressPageState extends State<AddAddressPage> {
                     sliver: SliverToBoxAdapter(
                       child: Form(
                         key: _formKey,
+                        autovalidateMode: _hasSubmitted
+                            ? AutovalidateMode.onUserInteraction
+                            : AutovalidateMode.disabled,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -295,8 +286,9 @@ class _AddAddressPageState extends State<AddAddressPage> {
                             AddressTypeDropdown(
                               value: _selectedType,
                               options: _typeOptions,
-                              onChanged: (value) =>
-                                  setState(() => _selectedType = value),
+                              onChanged: (value) => setState(
+                                () => _addressForm.selectType(value),
+                              ),
                             ),
                             const SizedBox(height: 20),
 

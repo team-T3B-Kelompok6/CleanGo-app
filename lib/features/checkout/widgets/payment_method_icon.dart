@@ -22,11 +22,7 @@ Future<Uint8List> _loadDanaIconBytes() async {
 }
 
 class PaymentMethodIcon extends StatelessWidget {
-  const PaymentMethodIcon({
-    required this.method,
-    this.size = 40,
-    super.key,
-  });
+  const PaymentMethodIcon({required this.method, this.size = 40, super.key});
 
   final PaymentMethodModel method;
   final double size;

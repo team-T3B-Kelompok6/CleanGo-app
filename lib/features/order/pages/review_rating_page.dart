@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../controllers/order_controller.dart';
+import '../controllers/review_draft_controller.dart';
 import 'orders_page.dart';
 
 class ReviewRatingPage extends StatefulWidget {
@@ -22,21 +23,13 @@ class ReviewRatingPage extends StatefulWidget {
 }
 
 class _ReviewRatingPageState extends State<ReviewRatingPage> {
-  int _selectedRating = 5;
-  final List<String> _selectedChips = [
-    'Bersih Maksimal ✨',
-    'Tepat Waktu ⏰',
-    'Peralatan Lengkap 📦',
-  ];
+  final ReviewDraftController _draft = ReviewDraftController();
   final TextEditingController _reviewController = TextEditingController();
-  final List<String> _attachedPhotos = [];
 
-  final List<String> _availableChips = [
-    'Bersih Maksimal ✨',
-    'Tepat Waktu ⏰',
-    'Ramah & Sopan 😊',
-    'Peralatan Lengkap 📦',
-  ];
+  int get _selectedRating => _draft.selectedRating;
+  List<String> get _selectedChips => _draft.selectedChips;
+  List<String> get _attachedPhotos => _draft.attachedPhotos;
+  List<String> get _availableChips => ReviewDraftController.availableChips;
 
   @override
   void dispose() {
@@ -44,35 +37,14 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
     super.dispose();
   }
 
-  String get _ratingLabel {
-    switch (_selectedRating) {
-      case 5:
-        return 'Sempurna (5/5)';
-      case 4:
-        return 'Sangat Baik (4/5)';
-      case 3:
-        return 'Cukup Baik (3/5)';
-      case 2:
-        return 'Kurang Memuaskan (2/5)';
-      case 1:
-        return 'Kecewa (1/5)';
-      default:
-        return 'Sempurna (5/5)';
-    }
-  }
+  String get _ratingLabel => _draft.ratingLabel;
 
   void _toggleChip(String chip) {
-    setState(() {
-      if (_selectedChips.contains(chip)) {
-        _selectedChips.remove(chip);
-      } else {
-        _selectedChips.add(chip);
-      }
-    });
+    setState(() => _draft.toggleChip(chip));
   }
 
   void _addMockPhoto() {
-    if (_attachedPhotos.length >= 3) {
+    if (!_draft.addMockPhoto()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -85,9 +57,7 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
       return;
     }
 
-    setState(() {
-      _attachedPhotos.add('assets/images/ac_clean.png');
-    });
+    setState(() {});
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -101,9 +71,7 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
   }
 
   void _removePhoto(int index) {
-    setState(() {
-      _attachedPhotos.removeAt(index);
-    });
+    setState(() => _draft.removePhoto(index));
   }
 
   void _navigateToHistoryOrders(BuildContext context) {
@@ -120,9 +88,9 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
     orderController.submitReview(
       orderId: widget.orderId,
       rating: _selectedRating,
-      tags: _selectedChips,
+      tags: _draft.selectedChips,
       comment: _reviewController.text.trim(),
-      photos: _attachedPhotos,
+      photos: _draft.attachedPhotos,
     );
 
     showDialog<void>(
@@ -435,9 +403,7 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
               final isFilled = starIndex <= _selectedRating;
               return GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _selectedRating = starIndex;
-                  });
+                  setState(() => _draft.selectRating(starIndex));
                 },
                 behavior: HitTestBehavior.opaque,
                 child: Padding(

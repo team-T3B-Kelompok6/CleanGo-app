@@ -48,7 +48,12 @@ void main() {
       expect(notified, true);
       expect(controller.searchQuery, 'jadwal');
       expect(controller.filteredFaqs.isNotEmpty, true);
-      expect(controller.filteredFaqs.any((f) => f.question.toLowerCase().contains('jadwal')), true);
+      expect(
+        controller.filteredFaqs.any(
+          (f) => f.question.toLowerCase().contains('jadwal'),
+        ),
+        true,
+      );
 
       // Search non-existent
       controller.search('xyz999tidakada');
@@ -81,10 +86,16 @@ void main() {
     test('setExpanded sets exact expansion state', () {
       final targetId = controller.allFaqs[0].id;
       controller.setExpanded(targetId, false);
-      expect(controller.allFaqs.firstWhere((f) => f.id == targetId).isExpanded, false);
+      expect(
+        controller.allFaqs.firstWhere((f) => f.id == targetId).isExpanded,
+        false,
+      );
 
       controller.setExpanded(targetId, true);
-      expect(controller.allFaqs.firstWhere((f) => f.id == targetId).isExpanded, true);
+      expect(
+        controller.allFaqs.firstWhere((f) => f.id == targetId).isExpanded,
+        true,
+      );
     });
   });
 }

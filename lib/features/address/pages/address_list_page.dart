@@ -11,10 +11,7 @@ import 'add_address_page.dart';
 import 'edit_address_page.dart';
 
 class AddressListPage extends StatefulWidget {
-  const AddressListPage({
-    super.key,
-    this.isSelectionMode = true,
-  });
+  const AddressListPage({super.key, this.isSelectionMode = true});
 
   final bool isSelectionMode;
 
@@ -79,7 +76,12 @@ class _AddressListPageState extends State<AddressListPage> {
                   // Subjudul: "Daftar alamat tersimpan"
                   const SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.fromLTRB(_sidePadding, 4, _sidePadding, 16),
+                      padding: EdgeInsets.fromLTRB(
+                        _sidePadding,
+                        4,
+                        _sidePadding,
+                        16,
+                      ),
                       child: Text(
                         'Daftar alamat tersimpan',
                         style: TextStyle(
@@ -149,31 +151,29 @@ class _AddressListPageState extends State<AddressListPage> {
                         130, // Ruang untuk 2 tombol bottom bar
                       ),
                       sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final address = addresses[index];
-                            final isSelected = address.id == selectedId;
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          final address = addresses[index];
+                          final isSelected = address.id == selectedId;
 
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: AddressCard(
-                                address: address,
-                                isSelected: isSelected,
-                                onTap: () {
-                                  addressController.selectAddress(address.id);
-                                },
-                                onEdit: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => EditAddressPage(address: address),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                          childCount: addresses.length,
-                        ),
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: AddressCard(
+                              address: address,
+                              isSelected: isSelected,
+                              onTap: () {
+                                addressController.selectAddress(address.id);
+                              },
+                              onEdit: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        EditAddressPage(address: address),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        }, childCount: addresses.length),
                       ),
                     ),
                 ],
@@ -216,7 +216,10 @@ class _AddressListPageState extends State<AddressListPage> {
                         );
                       },
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary, width: 1.5),
+                        side: const BorderSide(
+                          color: AppColors.primary,
+                          width: 1.5,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -248,10 +251,12 @@ class _AddressListPageState extends State<AddressListPage> {
                     child: ElevatedButton(
                       onPressed: addresses.isNotEmpty
                           ? () {
-                              final active = addressController.selectedAddress ?? addresses.first;
-                              context
-                                  .read<BookingController>()
-                                  .updateAddress(active.toCleaningAddress());
+                              final active =
+                                  addressController.selectedAddress ??
+                                  addresses.first;
+                              context.read<BookingController>().updateAddress(
+                                active.toCleaningAddress(),
+                              );
                               Navigator.of(context).pop(active);
                             }
                           : null,
@@ -299,11 +304,7 @@ class _CircularBackButton extends StatelessWidget {
         child: const SizedBox.square(
           dimension: 40,
           child: Center(
-            child: Icon(
-              Icons.arrow_back,
-              size: 20,
-              color: AppColors.slate900,
-            ),
+            child: Icon(Icons.arrow_back, size: 20, color: AppColors.slate900),
           ),
         ),
       ),

@@ -184,8 +184,7 @@ class _LoginPageState extends State<LoginPage> {
                                   horizontal: 8,
                                   vertical: 4,
                                 ),
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                               ),
                               child: const Text(
                                 'Lupa kata sandi',
@@ -243,9 +242,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _openRegister() async {
-    final registered = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(builder: (_) => const RegisterPage()),
-    );
+    final registered = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const RegisterPage()));
 
     if (!mounted || registered != true) {
       return;

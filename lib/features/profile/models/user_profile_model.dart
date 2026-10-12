@@ -23,7 +23,9 @@ class UserProfileModel {
   final String avatarAsset;
   final String password;
 
-  String get formattedBirthDate {
+  String get formattedBirthDate => formatBirthDate(birthDate);
+
+  static String formatBirthDate(DateTime date) {
     const months = [
       'Januari',
       'Februari',
@@ -38,8 +40,8 @@ class UserProfileModel {
       'November',
       'Desember',
     ];
-    final monthName = months[birthDate.month - 1];
-    return '${birthDate.day} $monthName ${birthDate.year}';
+    final monthName = months[date.month - 1];
+    return '${date.day} $monthName ${date.year}';
   }
 
   UserProfileModel copyWith({
@@ -93,9 +95,11 @@ class UserProfileModel {
       email: json['email'] as String? ?? 'krisna.pratama@email.com',
       gender: json['gender'] as String? ?? 'Laki-laki',
       birthDate: json['birthDate'] != null
-          ? DateTime.tryParse(json['birthDate'] as String) ?? DateTime(1995, 5, 14)
+          ? DateTime.tryParse(json['birthDate'] as String) ??
+                DateTime(1995, 5, 14)
           : DateTime(1995, 5, 14),
-      avatarAsset: json['avatarAsset'] as String? ?? 'assets/images/user_profile.jpeg',
+      avatarAsset:
+          json['avatarAsset'] as String? ?? 'assets/images/user_profile.jpeg',
       password: json['password'] as String? ?? '321321',
     );
   }

@@ -29,6 +29,33 @@ class ServiceController extends ChangeNotifier {
     return null;
   }
 
+  ServiceModel findServiceForHistory(String historyServiceName) {
+    final normalizedName = historyServiceName.toLowerCase();
+
+    final targetId = switch (normalizedName) {
+      final name when name.contains('ac') || name.contains('cuci ac') =>
+        'ac-care',
+      final name when name.contains('kantor') || name.contains('usaha') =>
+        'office-cleaning',
+      final name when name.contains('harian') || name.contains('reguler') =>
+        'daily-cleaning',
+      final name when name.contains('sofa') || name.contains('kasur') =>
+        'sofa-mattress',
+      final name when name.contains('deep') || name.contains('cleaning') =>
+        'deep-cleaning',
+      _ => null,
+    };
+
+    if (targetId != null) {
+      return findServiceById(targetId) ?? _allServices.first;
+    }
+
+    return _allServices.firstWhere(
+      (service) => service.title.toLowerCase().contains(normalizedName),
+      orElse: () => _allServices.first,
+    );
+  }
+
   List<ServiceModel> get visibleServices {
     final normalizedQuery = _searchQuery.trim().toLowerCase();
 

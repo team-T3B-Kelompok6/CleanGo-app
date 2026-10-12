@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../controllers/review_sort.dart';
 import '../domain/models/service_model.dart';
 import '../widgets/review_card.dart';
 
@@ -16,28 +17,21 @@ class AllReviewsPage extends StatefulWidget {
 }
 
 class _AllReviewsPageState extends State<AllReviewsPage> {
-  static const _filters = ['Semua', 'Terbaru', 'Tertinggi', 'Terendah'];
+  static const _filters = ReviewSort.filters;
 
   String _selectedFilter = _filters.first;
 
   List<ServiceReviewModel> get _visibleReviews {
-    final reviews = List<ServiceReviewModel>.of(
+    return ReviewSort.apply(
       widget.service.detail?.reviews ?? const [],
+      _selectedFilter,
     );
-
-    switch (_selectedFilter) {
-      case 'Tertinggi':
-        reviews.sort((first, second) => second.rating.compareTo(first.rating));
-      case 'Terendah':
-        reviews.sort((first, second) => first.rating.compareTo(second.rating));
-    }
-
-    return reviews;
   }
 
   @override
   Widget build(BuildContext context) {
     final detail = widget.service.detail;
+    final visibleReviews = _visibleReviews;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -58,7 +52,7 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-                      itemCount: _visibleReviews.length + 3,
+                      itemCount: visibleReviews.length + 3,
                       itemBuilder: (context, index) {
                         if (index == 0) {
                           return _RatingSummary(
@@ -85,14 +79,14 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
                           );
                         }
 
-                        if (index == _visibleReviews.length + 2) {
+                        if (index == visibleReviews.length + 2) {
                           return const Padding(
                             padding: EdgeInsets.only(top: 2),
                             child: _LoadMoreButton(),
                           );
                         }
 
-                        final review = _visibleReviews[index - 2];
+                        final review = visibleReviews[index - 2];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: ServiceReviewCard(review: review),

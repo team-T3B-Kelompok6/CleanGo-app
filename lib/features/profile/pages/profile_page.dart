@@ -86,7 +86,8 @@ class ProfilePage extends StatelessWidget {
                           _ProfileMenuTile(
                             icon: Icons.person_outline_rounded,
                             title: 'Data Diri',
-                            onTap: onPersonalDataTap ??
+                            onTap:
+                                onPersonalDataTap ??
                                 () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
@@ -102,7 +103,8 @@ class ProfilePage extends StatelessWidget {
                                 icon: Icons.location_on_outlined,
                                 title: 'Alamat Tersimpan',
                                 subtitle: '$count Alamat aktif',
-                                onTap: onSavedAddressesTap ??
+                                onTap:
+                                    onSavedAddressesTap ??
                                     () {
                                       Navigator.of(context).push(
                                         MaterialPageRoute<void>(
@@ -126,7 +128,8 @@ class ProfilePage extends StatelessWidget {
                             icon: Icons.help_outline_rounded,
                             title: 'Bantuan',
                             subtitle: 'FAQ & Kontak Dukungan',
-                            onTap: onHelpTap ??
+                            onTap:
+                                onHelpTap ??
                                 () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
@@ -138,11 +141,13 @@ class ProfilePage extends StatelessWidget {
                           _ProfileMenuTile(
                             icon: Icons.lock_outline_rounded,
                             title: 'Ubah Kata Sandi',
-                            onTap: onChangePasswordTap ??
+                            onTap:
+                                onChangePasswordTap ??
                                 () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute<void>(
-                                      builder: (_) => const ChangePasswordPage(),
+                                      builder: (_) =>
+                                          const ChangePasswordPage(),
                                     ),
                                   );
                                 },
@@ -150,9 +155,7 @@ class ProfilePage extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      _LogoutButton(
-                        onTap: onLogout ?? () => _logout(context),
-                      ),
+                      _LogoutButton(onTap: onLogout ?? () => _logout(context)),
                     ],
                   ),
                 ),
@@ -198,9 +201,8 @@ class ProfilePage extends StatelessWidget {
   }
 
   void _openChatbot(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ChatbotPage()),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const ChatbotPage()));
   }
 }
 

@@ -1,17 +1,24 @@
 abstract final class ProfileFormValidator {
   static String? fullName(String? value) {
-    if (value == null || value.trim().isEmpty) {
+    final name = value?.trim() ?? '';
+    if (name.isEmpty) {
       return 'Nama lengkap wajib diisi.';
     }
-    if (value.trim().length < 3) {
+    if (name.length < 3 ||
+        !RegExp(r"^[a-zA-ZÀ-ÖØ-öø-ÿ.' -]+$").hasMatch(name) ||
+        !RegExp(r'[a-zA-ZÀ-ÖØ-öø-ÿ]').hasMatch(name)) {
       return 'Masukkan nama lengkap yang valid.';
     }
     return null;
   }
 
   static String? phone(String? value) {
-    final digits = (value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return 'Nomor telepon wajib diisi.';
+    final phone = value?.trim() ?? '';
+    if (phone.isEmpty) return 'Nomor telepon wajib diisi.';
+    if (!RegExp(r'^\d+$').hasMatch(phone)) {
+      return 'Masukkan nomor telepon yang valid.';
+    }
+    final digits = phone;
     final local = digits.startsWith('62')
         ? digits.substring(2)
         : digits.startsWith('0')

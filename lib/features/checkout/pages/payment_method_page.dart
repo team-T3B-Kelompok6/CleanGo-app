@@ -106,8 +106,7 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(22, 6, 22, 32),
                       itemCount: paymentMethods.length,
-                      separatorBuilder: (_, _) =>
-                          const SizedBox(height: 22),
+                      separatorBuilder: (_, _) => const SizedBox(height: 22),
                       itemBuilder: (context, index) {
                         final method = paymentMethods[index];
 

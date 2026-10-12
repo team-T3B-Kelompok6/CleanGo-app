@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../../core/theme/app_theme.dart';
 import '../domain/models/address_model.dart';
 
@@ -92,7 +93,9 @@ class AddressCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : const Color(0xFFCBD5E1),
+                        color: isSelected
+                            ? AppColors.primary
+                            : const Color(0xFFCBD5E1),
                         width: isSelected ? 6.5 : 2.0,
                       ),
                       color: Colors.white,
@@ -178,7 +181,9 @@ class AddressCard extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: const Color(0xFFE8FAF7),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.primaryBorder),
+                              border: Border.all(
+                                color: AppColors.primaryBorder,
+                              ),
                             ),
                             child: const Text(
                               'Utama',

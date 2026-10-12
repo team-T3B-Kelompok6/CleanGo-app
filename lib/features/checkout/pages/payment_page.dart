@@ -10,6 +10,7 @@ import '../../order/controllers/order_controller.dart';
 import '../../order/pages/order_status_page.dart';
 import '../../order/pages/orders_page.dart';
 import '../controllers/payment_countdown_controller.dart';
+import '../controllers/payment_flow_controller.dart';
 import '../domain/models/payment_method_model.dart';
 import '../widgets/payment_method_icon.dart';
 
@@ -34,6 +35,8 @@ class PaymentPage extends StatefulWidget {
 }
 
 class _PaymentPageState extends State<PaymentPage> {
+  static const _paymentFlowController = PaymentFlowController();
+
   late final PaymentCountdownController _countdownController;
 
   @override
@@ -130,44 +133,15 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Future<void> _showPaymentInformation(BuildContext context) async {
-    final booking = context.read<BookingController>();
-    final addressController = context.read<AddressController>();
-    final selectedAddr = addressController.selectedAddress;
-    final formattedAddress = selectedAddr != null
-        ? selectedAddr.fullAddress
-        : '${booking.address.street}, ${booking.address.city}';
-
-    final scheduledAt = DateTime(
-      booking.selectedDate.year,
-      booking.selectedDate.month,
-      booking.selectedDate.day,
-      int.tryParse(booking.selectedTime.split(':').first) ?? 8,
-      int.tryParse(booking.selectedTime.split(':').last) ?? 0,
-    );
-    final today = DateTime.now();
-    final isSameDay =
-        scheduledAt.year == today.year &&
-        scheduledAt.month == today.month &&
-        scheduledAt.day == today.day;
-
-    // Daftarkan/update pesanan di OrderController.
-    context.read<OrderController>().createOrderFromBooking(
-      serviceName: booking.service?.title ?? 'Deep Cleaning',
-      serviceImagePath:
-          booking.service?.imagePath ??
-          'assets/images/service_deep_cleaning.jpeg',
-      price: widget.totalPayment,
-      address: formattedAddress.trim().isNotEmpty
-          ? formattedAddress
-          : 'Jl. Sigura - Gura No. 12, Malang',
-      scheduledAt: scheduledAt,
-      note: booking.note.trim(),
-      paymentMethod: widget.method.name,
+    final isSameDay = _paymentFlowController.createOrder(
+      booking: context.read<BookingController>(),
+      addresses: context.read<AddressController>(),
+      orders: context.read<OrderController>(),
+      method: widget.method,
+      totalPayment: widget.totalPayment,
       servicePrice: widget.servicePrice,
       platformFee: widget.platformFee,
       discountAmount: widget.discountAmount,
-      customerName: booking.address.customerName,
-      customerPhone: booking.address.phoneNumber,
     );
 
     await showDialog<void>(

@@ -2,24 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show DateUtils;
 
 import '../../service/domain/models/service_model.dart';
-
-class CleaningAddress {
-  const CleaningAddress({
-    required this.label,
-    required this.street,
-    required this.city,
-    required this.landmark,
-    required this.customerName,
-    required this.phoneNumber,
-  });
-
-  final String label;
-  final String street;
-  final String city;
-  final String landmark;
-  final String customerName;
-  final String phoneNumber;
-}
+import '../domain/models/cleaning_address.dart';
 
 class BookingController extends ChangeNotifier {
   static DateTime get initialDate => DateUtils.dateOnly(DateTime.now());

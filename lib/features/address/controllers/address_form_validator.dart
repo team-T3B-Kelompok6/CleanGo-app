@@ -18,15 +18,21 @@ abstract final class AddressFormValidator {
   static String? contactName(String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return 'Nama kontak wajib diisi.';
-    if (text.length < 2 || !RegExp(r"^[a-zA-ZÀ-ÿ.' -]+$").hasMatch(text)) {
+    if (text.length < 2 ||
+        !RegExp(r"^[a-zA-ZÀ-ÖØ-öø-ÿ.' -]+$").hasMatch(text) ||
+        !RegExp(r'[a-zA-ZÀ-ÖØ-öø-ÿ]').hasMatch(text)) {
       return 'Masukkan nama kontak yang valid.';
     }
     return null;
   }
 
   static String? phone(String? value) {
-    final digits = normalizePhone(value ?? '');
-    if (digits.isEmpty) return 'Nomor telepon wajib diisi.';
+    final phone = value?.trim() ?? '';
+    if (phone.isEmpty) return 'Nomor telepon wajib diisi.';
+    if (!RegExp(r'^\d+$').hasMatch(phone)) {
+      return 'Masukkan nomor telepon yang valid setelah +62.';
+    }
+    final digits = normalizePhone(phone);
     if (!RegExp(r'^8[0-9]{8,12}$').hasMatch(digits)) {
       return 'Masukkan nomor telepon yang valid setelah +62.';
     }

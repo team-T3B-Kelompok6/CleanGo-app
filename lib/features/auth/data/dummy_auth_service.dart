@@ -15,7 +15,7 @@ abstract final class AuthValidators {
   }
 
   static String? requiredPassword(String? value) {
-    if (value == null || value.isEmpty) {
+    if (value == null || value.trim().isEmpty) {
       return 'Kata sandi wajib diisi.';
     }
     return null;
@@ -33,14 +33,19 @@ abstract final class AuthValidators {
   }
 
   static String? name(String? value) {
-    if (value == null || value.trim().isEmpty) {
+    final name = value?.trim() ?? '';
+    if (name.isEmpty) {
       return 'Nama wajib diisi.';
+    }
+    if (!RegExp(r"^[a-zA-ZÀ-ÖØ-öø-ÿ.' -]+$").hasMatch(name) ||
+        !RegExp(r'[a-zA-ZÀ-ÖØ-öø-ÿ]').hasMatch(name)) {
+      return 'Masukkan nama yang valid.';
     }
     return null;
   }
 
   static String? confirmPassword(String? value, String password) {
-    if (value == null || value.isEmpty) {
+    if (value == null || value.trim().isEmpty) {
       return 'Konfirmasi password wajib diisi.';
     }
     if (value != password) {
@@ -87,12 +92,8 @@ class DummyAuthService {
     }
 
     return LoginValidationResult(
-      phoneError: phoneMatches(phone)
-          ? null
-          : 'Nomor telepon tidak terdaftar.',
-      passwordError: passwordMatches(password)
-          ? null
-          : 'Kata sandi tidak sesuai. Coba lagi atau klik "Lupa Kata Sandi" untuk mengatur ulang.',
+      phoneError: phoneMatches(phone) ? null : 'Nomor telepon tidak terdaftar.',
+      passwordError: passwordMatches(password) ? null : 'Kata sandi tidak sesuai. Coba lagi atau klik "Lupa Kata Sandi" untuk mengatur ulang.',
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../models/user_profile_model.dart';
 
 class ProfileController extends ChangeNotifier {

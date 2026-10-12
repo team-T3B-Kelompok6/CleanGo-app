@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/chatbot_icon.dart';
+import '../controllers/chatbot_controller.dart';
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({super.key});
@@ -15,34 +16,25 @@ class ChatbotPage extends StatefulWidget {
 }
 
 class _ChatbotPageState extends State<ChatbotPage> {
+  final ChatbotController _chatbotController = ChatbotController();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<String> _messages = [];
-
-  bool _hasMessage = false;
 
   @override
   void dispose() {
+    _chatbotController.dispose();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
   void _handleMessageChanged(String value) {
-    final hasMessage = value.trim().isNotEmpty;
-    if (hasMessage == _hasMessage) return;
-    setState(() => _hasMessage = hasMessage);
+    _chatbotController.updateDraft(value);
   }
 
   void _sendMessage() {
-    final message = _messageController.text.trim();
-    if (message.isEmpty) return;
-
-    setState(() {
-      _messages.add(message);
-      _messageController.clear();
-      _hasMessage = false;
-    });
+    if (!_chatbotController.sendMessage(_messageController.text)) return;
+    _messageController.clear();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
@@ -56,39 +48,42 @@ class _ChatbotPageState extends State<ChatbotPage> {
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Column(
-                children: [
-                  const _ChatbotHeader(),
-                  Expanded(
-                    child: _messages.isEmpty
-                        ? const _ChatbotWelcome()
-                        : _MessageList(
-                            controller: _scrollController,
-                            messages: _messages,
-                          ),
-                  ),
-                  _ChatInput(
-                    controller: _messageController,
-                    hasMessage: _hasMessage,
-                    onChanged: _handleMessageChanged,
-                    onSend: _sendMessage,
-                  ),
-                ],
+    return AnimatedBuilder(
+      animation: _chatbotController,
+      builder: (context, _) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.white,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Column(
+                  children: [
+                    const _ChatbotHeader(),
+                    Expanded(
+                      child: _chatbotController.messages.isEmpty
+                          ? const _ChatbotWelcome()
+                          : _MessageList(
+                              controller: _scrollController,
+                              messages: _chatbotController.messages,
+                            ),
+                    ),
+                    _ChatInput(
+                      controller: _messageController,
+                      hasMessage: _chatbotController.hasMessage,
+                      onChanged: _handleMessageChanged,
+                      onSend: _sendMessage,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -191,8 +186,7 @@ class _ChatbotWelcome extends StatelessWidget {
                   constraints: const BoxConstraints(maxWidth: 310),
                   child: const Text.rich(
                     TextSpan(
-                      text:
-                          'Hai, saya adalah Boo, asisten rumah pribadi Anda dari ',
+                      text: 'Hai, saya adalah Boo, asisten rumah pribadi Anda dari ',
                       children: [
                         TextSpan(
                           text: 'CleanGo',

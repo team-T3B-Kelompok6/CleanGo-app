@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/address_controller.dart';
+import '../controllers/address_form_controller.dart';
 import '../controllers/address_form_validator.dart';
 import '../domain/models/address_model.dart';
 import '../widgets/address_type_dropdown.dart';
@@ -23,77 +24,47 @@ class EditAddressPage extends StatefulWidget {
 class _EditAddressPageState extends State<EditAddressPage> {
   static const double _sidePadding = 20.0;
   final _formKey = GlobalKey<FormState>();
+  bool _hasSubmitted = false;
 
-  late final TextEditingController _addressTitleController;
-  late final TextEditingController _fullAddressController;
-  late final TextEditingController _noteController;
-  late final TextEditingController _contactNameController;
-  late final TextEditingController _phoneController;
+  late final AddressFormController _addressForm;
 
-  late String _selectedType;
-  final List<String> _typeOptions = [
-    'Rumah',
-    'Kantor',
-    'Apartemen',
-    'Kost',
-    'Lainnya',
-  ];
-
-  late bool _isPrimary;
-  bool _isSaving = false;
-  double? _selectedLatitude;
-  double? _selectedLongitude;
+  TextEditingController get _addressTitleController =>
+      _addressForm.addressTitle;
+  TextEditingController get _fullAddressController => _addressForm.fullAddress;
+  TextEditingController get _noteController => _addressForm.note;
+  TextEditingController get _contactNameController => _addressForm.contactName;
+  TextEditingController get _phoneController => _addressForm.phone;
+  String get _selectedType => _addressForm.selectedType;
+  List<String> get _typeOptions => AddressFormController.typeOptions;
+  bool get _isPrimary => _addressForm.isPrimary;
+  bool get _isSaving => _addressForm.isSaving;
 
   @override
   void initState() {
     super.initState();
-    final addr = widget.address;
-
-    _addressTitleController = TextEditingController(text: addr.title);
-    _fullAddressController = TextEditingController(text: addr.fullAddress);
-    _noteController = TextEditingController(text: addr.note);
-    _contactNameController = TextEditingController(text: addr.contactName);
-
-    // Hilangkan prefix (+62) jika ada untuk field input
-    final phoneClean = addr.phoneNumber.replaceAll(RegExp(r'^\(\+62\)\s*'), '');
-    _phoneController = TextEditingController(text: phoneClean);
-
-    _selectedType = _typeOptions.contains(addr.type) ? addr.type : 'Rumah';
-    _isPrimary = addr.isPrimary;
-    _selectedLatitude = addr.latitude;
-    _selectedLongitude = addr.longitude;
+    _addressForm = AddressFormController.forEdit(widget.address);
   }
 
   @override
   void dispose() {
-    _addressTitleController.dispose();
-    _fullAddressController.dispose();
-    _noteController.dispose();
-    _contactNameController.dispose();
-    _phoneController.dispose();
+    _addressForm.dispose();
     super.dispose();
   }
 
   Future<void> _handleSave() async {
     FocusScope.of(context).unfocus();
 
+    if (!_hasSubmitted) {
+      setState(() => _hasSubmitted = true);
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() => _addressForm.setSaving(true));
 
-    final updated = widget.address.copyWith(
-      title: _addressTitleController.text.trim(),
-      fullAddress: _fullAddressController.text.trim(),
-      note: _noteController.text.trim(),
-      type: _selectedType,
-      contactName: _contactNameController.text.trim(),
-      phoneNumber: AddressFormValidator.formatPhone(_phoneController.text),
-      isPrimary: _isPrimary,
-      latitude: _selectedLatitude,
-      longitude: _selectedLongitude,
-    );
+    final updated = _addressForm.updateAddress(widget.address);
 
     final addressController = context.read<AddressController>();
     addressController.updateAddress(updated);
@@ -126,12 +97,16 @@ class _EditAddressPageState extends State<EditAddressPage> {
     );
     if (selection == null || !mounted) return;
     setState(() {
-      _selectedLatitude = selection.position.latitude;
-      _selectedLongitude = selection.position.longitude;
-      _addressTitleController.text = selection.shortLabel;
-      _fullAddressController.text = selection.addressText;
+      _addressForm.applyMapSelection(
+        selectedLatitude: selection.position.latitude,
+        selectedLongitude: selection.position.longitude,
+        shortLabel: selection.shortLabel,
+        addressText: selection.addressText,
+      );
     });
-    _formKey.currentState?.validate();
+    if (_hasSubmitted) {
+      _formKey.currentState?.validate();
+    }
   }
 
   void _handleDelete() {
@@ -221,6 +196,9 @@ class _EditAddressPageState extends State<EditAddressPage> {
                     sliver: SliverToBoxAdapter(
                       child: Form(
                         key: _formKey,
+                        autovalidateMode: _hasSubmitted
+                            ? AutovalidateMode.onUserInteraction
+                            : AutovalidateMode.disabled,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -328,8 +306,9 @@ class _EditAddressPageState extends State<EditAddressPage> {
                             AddressTypeDropdown(
                               value: _selectedType,
                               options: _typeOptions,
-                              onChanged: (value) =>
-                                  setState(() => _selectedType = value),
+                              onChanged: (value) => setState(
+                                () => _addressForm.selectType(value),
+                              ),
                             ),
                             const SizedBox(height: 20),
 
@@ -394,6 +373,10 @@ class _EditAddressPageState extends State<EditAddressPage> {
                                     child: TextFormField(
                                       controller: _phoneController,
                                       keyboardType: TextInputType.phone,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(13),
+                                      ],
                                       style: const TextStyle(
                                         fontFamily: AppTheme.fontFamily,
                                         fontSize: 14,
@@ -439,9 +422,9 @@ class _EditAddressPageState extends State<EditAddressPage> {
                                   Switch.adaptive(
                                     value: _isPrimary,
                                     activeTrackColor: AppColors.primary,
-                                    onChanged: (val) {
-                                      setState(() => _isPrimary = val);
-                                    },
+                                    onChanged: (value) => setState(
+                                      () => _addressForm.setPrimary(value),
+                                    ),
                                   ),
                                 ],
                               ),

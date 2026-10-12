@@ -1,8 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/domain/models/order_model.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
-import 'package:cleango_app/features/service/domain/models/service_model.dart';
+import 'package:cleango_app/features/service/controllers/service_controller.dart';
 
 void main() {
   group('OrderController Tests', () {
@@ -95,7 +94,9 @@ void main() {
     });
 
     test('submitReview records review data and sets canReview to false on matching history item', () {
-      final initialReviewable = controller.historyOrders.firstWhere((o) => o.canReview);
+      final initialReviewable = controller.historyOrders.firstWhere(
+        (o) => o.canReview,
+      );
       expect(initialReviewable.canReview, true);
 
       controller.submitReview(
@@ -106,7 +107,9 @@ void main() {
       );
 
       final updatedOrders = controller.historyOrders;
-      final target = updatedOrders.firstWhere((o) => o.serviceName == initialReviewable.serviceName);
+      final target = updatedOrders.firstWhere(
+        (o) => o.serviceName == initialReviewable.serviceName,
+      );
       expect(target.canReview, false);
       expect(target.rating, 5.0);
       expect(target.review, isNotNull);
@@ -116,7 +119,9 @@ void main() {
     });
 
     test('Cuci AC history item is initially unreviewed (canReview == true, rating == null)', () {
-      final cuciAc = controller.historyOrders.firstWhere((o) => o.serviceName == 'Cuci AC');
+      final cuciAc = controller.historyOrders.firstWhere(
+        (o) => o.serviceName == 'Cuci AC',
+      );
       expect(cuciAc.canReview, true);
       expect(cuciAc.rating, isNull);
       expect(cuciAc.orderId, '#CG-99012');
@@ -130,57 +135,54 @@ void main() {
         comment: 'Deep cleaning luar biasa!',
       );
 
-      final cuciAc = controller.historyOrders.firstWhere((o) => o.serviceName == 'Cuci AC');
+      final cuciAc = controller.historyOrders.firstWhere(
+        (o) => o.serviceName == 'Cuci AC',
+      );
       expect(cuciAc.canReview, true);
       expect(cuciAc.rating, isNull);
 
-      final scheduledHistory = controller.historyOrders.firstWhere((o) => o.orderId == '#CG-82910');
+      final scheduledHistory = controller.historyOrders.firstWhere(
+        (o) => o.orderId == '#CG-82910',
+      );
       expect(scheduledHistory.canReview, false);
       expect(scheduledHistory.rating, 5.0);
     });
   });
 
   group('Service Mapping for Reorder Tests', () {
-    ServiceModel findServiceForHistory(String historyServiceName) {
-      final cleanName = historyServiceName.toLowerCase();
-      if (cleanName.contains('ac') || cleanName.contains('cuci ac')) {
-        return ServiceData.services.firstWhere(
-          (s) => s.id == 'ac-care',
-          orElse: () => ServiceData.services.first,
-        );
-      } else if (cleanName.contains('deep') || cleanName.contains('cleaning')) {
-        return ServiceData.services.firstWhere(
-          (s) => s.id == 'deep-cleaning',
-          orElse: () => ServiceData.services.first,
-        );
-      } else if (cleanName.contains('sofa') || cleanName.contains('kasur')) {
-        return ServiceData.services.firstWhere(
-          (s) => s.id == 'sofa-mattress',
-          orElse: () => ServiceData.services.first,
-        );
-      } else if (cleanName.contains('kantor') || cleanName.contains('usaha')) {
-        return ServiceData.services.firstWhere(
-          (s) => s.id == 'office-cleaning',
-          orElse: () => ServiceData.services.first,
-        );
-      }
-      return ServiceData.services.firstWhere(
-        (s) => s.title.toLowerCase().contains(cleanName),
-        orElse: () => ServiceData.services.first,
-      );
-    }
+    late ServiceController serviceController;
 
-    test('Maps history "Cuci AC" correctly to "Cuci & Perawatan AC" (ac-care)', () {
-      final mappedService = findServiceForHistory('Cuci AC');
-      expect(mappedService.id, 'ac-care');
-      expect(mappedService.title, 'Cuci & Perawatan AC');
-      expect(mappedService.category, 'AC');
-    });
+    setUp(() => serviceController = ServiceController());
+
+    test(
+      'Maps history "Cuci AC" correctly to "Cuci & Perawatan AC" (ac-care)',
+      () {
+        final mappedService = serviceController.findServiceForHistory(
+          'Cuci AC',
+        );
+        expect(mappedService.id, 'ac-care');
+        expect(mappedService.title, 'Cuci & Perawatan AC');
+        expect(mappedService.category, 'AC');
+      },
+    );
 
     test('Maps history "Deep Cleaning" correctly to "Deep Cleaning" (deep-cleaning)', () {
-      final mappedService = findServiceForHistory('Deep Cleaning');
+      final mappedService = serviceController.findServiceForHistory(
+        'Deep Cleaning',
+      );
       expect(mappedService.id, 'deep-cleaning');
       expect(mappedService.title, 'Deep Cleaning');
+    });
+
+    test('maps office and daily cleaning to their matching services', () {
+      expect(
+        serviceController.findServiceForHistory('Cleaning Kantor & Usaha').id,
+        'office-cleaning',
+      );
+      expect(
+        serviceController.findServiceForHistory('Cleaning Harian (Reguler)').id,
+        'daily-cleaning',
+      );
     });
   });
 }

@@ -6,10 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../chatbot/pages/chatbot_page.dart';
-import '../data/message_data.dart';
+import '../controllers/message_controller.dart';
 import '../domain/models/message_notification_model.dart';
-
-enum _MessageTab { all, orders, promo }
 
 class MessagesPage extends StatefulWidget {
   const MessagesPage({this.onMessageTap, super.key});
@@ -21,36 +19,18 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
-  _MessageTab _selectedTab = _MessageTab.all;
-  late List<MessageNotificationModel> _messages;
+  late final MessageController _controller;
 
   @override
   void initState() {
     super.initState();
-    _messages = List<MessageNotificationModel>.from(MessageData.notifications);
+    _controller = MessageController();
   }
 
-  int get _unreadCount => _messages.where((m) => m.isUnread).length;
-
-  List<MessageNotificationModel> get _visibleMessages {
-    return switch (_selectedTab) {
-      _MessageTab.all => _messages,
-      _MessageTab.orders => _messages
-          .where((message) => message.category == MessageCategory.order)
-          .toList(growable: false),
-      _MessageTab.promo => _messages
-          .where((message) => message.category == MessageCategory.promo)
-          .toList(growable: false),
-    };
-  }
-
-  void _markAsRead(String id) {
-    setState(() {
-      final index = _messages.indexWhere((m) => m.id == id);
-      if (index != -1 && _messages[index].isUnread) {
-        _messages[index] = _messages[index].copyWith(isUnread: false);
-      }
-    });
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -63,86 +43,88 @@ class _MessagesPageState extends State<MessagesPage> {
     final bottomSpacing =
         BottomNavigation.contentHeight + mediaQuery.viewPadding.bottom + 88;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: AppColors.screenBackground,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        extendBody: true,
-        backgroundColor: AppColors.screenBackground,
-        body: Stack(
-          children: [
-            Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: SafeArea(
-                  bottom: false,
-                  child: Column(
-                    children: [
-                      _MessagesHeader(
-                        unreadCount: _unreadCount,
-                      ),
-                      _MessageTabs(
-                        selectedTab: _selectedTab,
-                        onSelected: (tab) {
-                          if (tab == _selectedTab) return;
-                          setState(() => _selectedTab = tab);
-                        },
-                      ),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeIn,
-                          child: ListView.separated(
-                            key: ValueKey(_selectedTab),
-                            padding: EdgeInsets.fromLTRB(
-                              16,
-                              16,
-                              16,
-                              bottomSpacing,
-                            ),
-                            itemCount: _visibleMessages.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 12),
-                            itemBuilder: (context, index) {
-                              final message = _visibleMessages[index];
-                              return _MessageNotificationCard(
-                                message: message,
-                                onTap: () {
-                                  _markAsRead(message.id);
-                                  widget.onMessageTap?.call(message);
-                                },
-                              );
-                            },
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final visibleMessages = _controller.visibleMessages;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            statusBarColor: AppColors.screenBackground,
+            statusBarIconBrightness: Brightness.dark,
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          ),
+          child: Scaffold(
+            extendBody: true,
+            backgroundColor: AppColors.screenBackground,
+            body: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Column(
+                        children: [
+                          _MessagesHeader(unreadCount: _controller.unreadCount),
+                          _MessageTabs(
+                            selectedTab: _controller.selectedTab,
+                            onSelected: _controller.selectTab,
                           ),
-                        ),
+                          Expanded(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              child: ListView.separated(
+                                key: ValueKey(_controller.selectedTab),
+                                padding: EdgeInsets.fromLTRB(
+                                  16,
+                                  16,
+                                  16,
+                                  bottomSpacing,
+                                ),
+                                itemCount: visibleMessages.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  final message = visibleMessages[index];
+                                  return _MessageNotificationCard(
+                                    message: message,
+                                    onTap: () {
+                                      _controller.markAsRead(message.id);
+                                      widget.onMessageTap?.call(message);
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+                Positioned(
+                  right: contentSideInset,
+                  bottom:
+                      BottomNavigation.contentHeight +
+                      mediaQuery.viewPadding.bottom +
+                      12,
+                  child: ChatbotButton(onTap: () => _openChatbot(context)),
+                ),
+              ],
             ),
-            Positioned(
-              right: contentSideInset,
-              bottom:
-                  BottomNavigation.contentHeight +
-                  mediaQuery.viewPadding.bottom +
-                  12,
-              child: ChatbotButton(onTap: () => _openChatbot(context)),
+            bottomNavigationBar: BottomNavigation(
+              currentIndex: 3,
+              showOrderBadge: false,
+              onDestinationSelected: (index) =>
+                  _handleNavigation(context, index),
             ),
-          ],
-        ),
-        bottomNavigationBar: BottomNavigation(
-          currentIndex: 3,
-          showOrderBadge: false,
-          onDestinationSelected: (index) => _handleNavigation(context, index),
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -159,9 +141,8 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   void _openChatbot(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const ChatbotPage()),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const ChatbotPage()));
   }
 }
 
@@ -195,7 +176,10 @@ class _MessagesHeader extends StatelessWidget {
                 borderRadius: BorderRadius.all(Radius.circular(999)),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 child: Text(
                   '$unreadCount Baru',
                   style: const TextStyle(
@@ -217,8 +201,8 @@ class _MessagesHeader extends StatelessWidget {
 class _MessageTabs extends StatelessWidget {
   const _MessageTabs({required this.selectedTab, required this.onSelected});
 
-  final _MessageTab selectedTab;
-  final ValueChanged<_MessageTab> onSelected;
+  final MessageTab selectedTab;
+  final ValueChanged<MessageTab> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -231,18 +215,18 @@ class _MessageTabs extends StatelessWidget {
         children: [
           _MessageTabButton(
             label: 'Semua',
-            selected: selectedTab == _MessageTab.all,
-            onTap: () => onSelected(_MessageTab.all),
+            selected: selectedTab == MessageTab.all,
+            onTap: () => onSelected(MessageTab.all),
           ),
           _MessageTabButton(
             label: 'Pesanan',
-            selected: selectedTab == _MessageTab.orders,
-            onTap: () => onSelected(_MessageTab.orders),
+            selected: selectedTab == MessageTab.orders,
+            onTap: () => onSelected(MessageTab.orders),
           ),
           _MessageTabButton(
             label: 'Promo',
-            selected: selectedTab == _MessageTab.promo,
-            onTap: () => onSelected(_MessageTab.promo),
+            selected: selectedTab == MessageTab.promo,
+            onTap: () => onSelected(MessageTab.promo),
           ),
         ],
       ),
@@ -312,10 +296,7 @@ class _MessageTabButton extends StatelessWidget {
 }
 
 class _MessageNotificationCard extends StatelessWidget {
-  const _MessageNotificationCard({
-    required this.message,
-    required this.onTap,
-  });
+  const _MessageNotificationCard({required this.message, required this.onTap});
 
   final MessageNotificationModel message;
   final VoidCallback? onTap;
@@ -434,7 +415,8 @@ class _MessageIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWarm = message.iconType == MessageIconType.delayed ||
+    final isWarm =
+        message.iconType == MessageIconType.delayed ||
         message.iconType == MessageIconType.promo;
     final background = isWarm
         ? const Color(0xFFFFF1C7)

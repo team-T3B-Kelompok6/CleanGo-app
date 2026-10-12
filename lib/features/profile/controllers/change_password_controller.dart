@@ -106,11 +106,10 @@ class ChangePasswordController extends ChangeNotifier {
     _newPasswordError = null;
     _confirmPasswordError = null;
 
-    final trimmedCurrent = _currentPassword.trim();
-    if (trimmedCurrent.isEmpty) {
+    if (_currentPassword.trim().isEmpty) {
       _currentPasswordError = 'Kata sandi saat ini wajib diisi.';
       isValid = false;
-    } else if (trimmedCurrent != activePassword) {
+    } else if (_currentPassword != activePassword) {
       _failedCurrentPasswordAttempts++;
       _currentPasswordError = _failedCurrentPasswordAttempts >= 3
           ? 'Kata sandi tidak sesuai. Coba lagi atau klik "Lupa Kata Sandi" untuk mengatur ulang.'
@@ -120,19 +119,19 @@ class ChangePasswordController extends ChangeNotifier {
       _failedCurrentPasswordAttempts = 0;
     }
 
-    if (_newPassword.isEmpty) {
+    if (_newPassword.trim().isEmpty) {
       _newPasswordError = 'Kata sandi baru wajib diisi.';
       isValid = false;
     } else if (!hasMinLength || !hasUpperAndLower || !hasNumber) {
       _newPasswordError = 'Kata sandi baru belum memenuhi semua kriteria.';
       isValid = false;
-    } else if (_newPassword == trimmedCurrent) {
+    } else if (_newPassword == _currentPassword) {
       _newPasswordError =
           'Kata sandi baru tidak boleh sama dengan kata sandi saat ini.';
       isValid = false;
     }
 
-    if (_confirmPassword.isEmpty) {
+    if (_confirmPassword.trim().isEmpty) {
       _confirmPasswordError = 'Konfirmasi kata sandi wajib diisi.';
       isValid = false;
     } else if (_confirmPassword != _newPassword) {

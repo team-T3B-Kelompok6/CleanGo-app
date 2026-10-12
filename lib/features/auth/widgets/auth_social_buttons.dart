@@ -11,10 +11,7 @@ class AuthSocialButtons extends StatelessWidget {
     return const Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _SocialButton(
-          label: 'Facebook',
-          svgSource: _facebookSvg,
-        ),
+        _SocialButton(label: 'Facebook', svgSource: _facebookSvg),
         SizedBox(width: 16),
         _SocialButton(label: 'Google', svgSource: _googleSvg),
       ],
@@ -35,9 +32,7 @@ class _SocialButton extends StatelessWidget {
       label: 'Masuk dengan $label',
       child: Material(
         color: Colors.white,
-        shape: CircleBorder(
-          side: BorderSide(color: AppColors.slate200),
-        ),
+        shape: CircleBorder(side: BorderSide(color: AppColors.slate200)),
         child: InkWell(
           onTap: () {},
           customBorder: const CircleBorder(),

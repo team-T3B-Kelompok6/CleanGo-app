@@ -44,51 +44,12 @@ class OrderController extends ChangeNotifier {
 
   void setStage(OrderStatusStage stage) {
     _activeStage = stage;
-    double progress = 0.2;
-    String status = 'DIKONFIRMASI';
-    String arrival = 'Tiba ~09:30 WIB';
-    String travelDesc = 'Pesanan terkonfirmasi, menunggu penugasan staf.';
-
-    switch (stage) {
-      case OrderStatusStage.dikonfirmasi:
-        progress = 0.2;
-        status = 'PESANAN DIKONFIRMASI';
-        arrival = 'Tiba ~09:30 WIB';
-        travelDesc = 'Pesanan diterima & diverifikasi sistem CleanGo.';
-        break;
-      case OrderStatusStage.ditugaskan:
-        progress = 0.4;
-        status = 'CLEANER DITUGASKAN';
-        arrival = 'Tiba ~09:20 WIB';
-        travelDesc = 'Cleaner Siti Rahmawati ditugaskan dan bersiap berangkat.';
-        break;
-      case OrderStatusStage.dalamPerjalanan:
-        progress = 0.66;
-        status = 'CLEANER MENUJU LOKASI';
-        arrival = 'Tiba ~09:10 WIB';
-        travelDesc = 'Estimasi waktu perjalanan sekitar 15 menit.';
-        break;
-      case OrderStatusStage.sedangDikerjakan:
-        progress = 0.85;
-        status = 'SEDANG DIKERJAKAN';
-        arrival = 'Estimasi selesai 12:15 WIB';
-        travelDesc = 'Pembersihan Deep Cleaning sedang berlangsung.';
-        break;
-      case OrderStatusStage.selesai:
-        progress = 1.0;
-        status = 'PESANAN SELESAI';
-        arrival = 'Pengerjaan Selesai 12:15 WIB';
-        travelDesc =
-            'Pembersihan telah selesai dikerjakan dengan hasil optimal.';
-        break;
-    }
-
     _scheduledOrder = _scheduledOrder.copyWith(
       stage: stage,
-      progress: progress,
-      status: status,
-      arrivalEstimate: arrival,
-      travelDescription: travelDesc,
+      progress: stage.progress,
+      status: stage.statusLabel,
+      arrivalEstimate: stage.arrivalEstimate,
+      travelDescription: stage.travelDescription,
     );
 
     notifyListeners();
@@ -208,8 +169,10 @@ class OrderController extends ChangeNotifier {
       orderNumber:
           '#CG-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
       stage: OrderStatusStage.dikonfirmasi,
-      progress: 0.2,
-      status: 'PESANAN DIKONFIRMASI',
+      progress: OrderStatusStage.dikonfirmasi.progress,
+      status: OrderStatusStage.dikonfirmasi.statusLabel,
+      arrivalEstimate: OrderStatusStage.dikonfirmasi.arrivalEstimate,
+      travelDescription: OrderStatusStage.dikonfirmasi.travelDescription,
       scheduledAt: scheduledAt,
       note: note,
       paymentMethod: paymentMethod,

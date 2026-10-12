@@ -24,9 +24,7 @@ class CheckoutController {
 
   bool updatePromoInput(String _) {
     final hasStateChanged =
-        _isPromoApplied ||
-        _promoError != null ||
-        _promoSuccessMessage != null;
+        _isPromoApplied || _promoError != null || _promoSuccessMessage != null;
 
     _isPromoApplied = false;
     _promoError = null;

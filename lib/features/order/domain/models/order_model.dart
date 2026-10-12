@@ -9,6 +9,43 @@ enum OrderStatusStage {
 extension OrderStatusStageExtension on OrderStatusStage {
   int get stepNumber => index + 1;
 
+  double get progress => switch (this) {
+    OrderStatusStage.dikonfirmasi => 0.2,
+    OrderStatusStage.ditugaskan => 0.4,
+    OrderStatusStage.dalamPerjalanan => 0.66,
+    OrderStatusStage.sedangDikerjakan => 0.85,
+    OrderStatusStage.selesai => 1.0,
+  };
+
+  String get statusLabel => switch (this) {
+    OrderStatusStage.dikonfirmasi => 'PESANAN DIKONFIRMASI',
+    OrderStatusStage.ditugaskan => 'CLEANER DITUGASKAN',
+    OrderStatusStage.dalamPerjalanan => 'CLEANER MENUJU LOKASI',
+    OrderStatusStage.sedangDikerjakan => 'SEDANG DIKERJAKAN',
+    OrderStatusStage.selesai => 'PESANAN SELESAI',
+  };
+
+  String get arrivalEstimate => switch (this) {
+    OrderStatusStage.dikonfirmasi => 'Tiba ~09:30 WIB',
+    OrderStatusStage.ditugaskan => 'Tiba ~09:20 WIB',
+    OrderStatusStage.dalamPerjalanan => 'Tiba ~09:10 WIB',
+    OrderStatusStage.sedangDikerjakan => 'Estimasi selesai 12:15 WIB',
+    OrderStatusStage.selesai => 'Pengerjaan Selesai 12:15 WIB',
+  };
+
+  String get travelDescription => switch (this) {
+    OrderStatusStage.dikonfirmasi =>
+      'Pesanan diterima & diverifikasi sistem CleanGo.',
+    OrderStatusStage.ditugaskan =>
+      'Cleaner Siti Rahmawati ditugaskan dan bersiap berangkat.',
+    OrderStatusStage.dalamPerjalanan =>
+      'Estimasi waktu perjalanan sekitar 15 menit.',
+    OrderStatusStage.sedangDikerjakan =>
+      'Pembersihan Deep Cleaning sedang berlangsung.',
+    OrderStatusStage.selesai =>
+      'Pembersihan telah selesai dikerjakan dengan hasil optimal.',
+  };
+
   String get title {
     switch (this) {
       case OrderStatusStage.dikonfirmasi:

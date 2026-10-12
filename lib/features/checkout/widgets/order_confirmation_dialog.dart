@@ -267,9 +267,7 @@ class _ConfirmationRow extends StatelessWidget {
             value,
             textAlign: TextAlign.left,
             style: TextStyle(
-              color: emphasized
-                  ? AppColors.primaryAction
-                  : AppColors.slate900,
+              color: emphasized ? AppColors.primaryAction : AppColors.slate900,
               fontFamily: AppTheme.fontFamily,
               fontSize: emphasized ? 15 : 12,
               fontWeight: emphasized ? FontWeight.w700 : FontWeight.w600,

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../booking/controllers/booking_controller.dart';
+import '../../../booking/domain/models/cleaning_address.dart';
 
 @immutable
 class AddressModel {

@@ -23,6 +23,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
+  bool _hasSubmitted = false;
 
   @override
   void dispose() {
@@ -59,6 +60,9 @@ class _RegisterPageState extends State<RegisterPage> {
                 constraints: const BoxConstraints(maxWidth: 440),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: _hasSubmitted
+                      ? AutovalidateMode.onUserInteraction
+                      : AutovalidateMode.disabled,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -150,8 +154,7 @@ class _RegisterPageState extends State<RegisterPage> {
                               ? 'Tampilkan konfirmasi kata sandi'
                               : 'Sembunyikan konfirmasi kata sandi',
                           onPressed: () => setState(
-                            () => _obscureConfirmation =
-                                !_obscureConfirmation,
+                            () => _obscureConfirmation = !_obscureConfirmation,
                           ),
                           icon: Icon(
                             _obscureConfirmation
@@ -228,6 +231,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void _submit() {
     FocusScope.of(context).unfocus();
+    if (!_hasSubmitted) {
+      setState(() => _hasSubmitted = true);
+    }
     if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }

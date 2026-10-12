@@ -62,6 +62,18 @@ void main() {
       );
     });
 
+    test('Validation compares the current password exactly', () {
+      controller.setCurrentPassword(' 321321 ');
+      controller.setNewPassword('CleanGo123');
+      controller.setConfirmPassword('CleanGo123');
+
+      expect(controller.validate('321321'), isFalse);
+      expect(
+        controller.currentPasswordError,
+        'Kata sandi saat ini tidak sesuai.',
+      );
+    });
+
     test('Third wrong current password attempt shows recovery guidance', () {
       controller.setCurrentPassword('wrongpass');
       controller.setNewPassword('CleanGo123');

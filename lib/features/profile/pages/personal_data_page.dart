@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../controllers/personal_data_form_controller.dart';
 import '../controllers/profile_controller.dart';
 import '../controllers/profile_form_validator.dart';
 
@@ -15,62 +16,30 @@ class PersonalDataPage extends StatefulWidget {
 
 class _PersonalDataPageState extends State<PersonalDataPage> {
   final _formKey = GlobalKey<FormState>();
+  bool _hasSubmitted = false;
 
-  late final TextEditingController _nameController;
-  late final TextEditingController _phoneController;
-  late final TextEditingController _emailController;
-
-  late String _selectedGender;
-  late DateTime _selectedBirthDate;
-  bool _isPhoneEditable = false;
+  late final PersonalDataFormController _personalDataForm;
   final FocusNode _phoneFocusNode = FocusNode();
+
+  TextEditingController get _nameController => _personalDataForm.name;
+  TextEditingController get _phoneController => _personalDataForm.phone;
+  TextEditingController get _emailController => _personalDataForm.email;
+  String get _selectedGender => _personalDataForm.selectedGender;
+  DateTime get _selectedBirthDate => _personalDataForm.selectedBirthDate;
+  bool get _isPhoneEditable => _personalDataForm.isPhoneEditable;
 
   @override
   void initState() {
     super.initState();
     final profileController = context.read<ProfileController>();
-    _nameController = TextEditingController(text: profileController.fullName);
-    _phoneController = TextEditingController(
-      text: _localPhoneDigits(profileController.phoneNumber),
-    );
-    _emailController = TextEditingController(text: profileController.email);
-    _selectedGender = profileController.gender;
-    _selectedBirthDate = profileController.birthDate;
+    _personalDataForm = PersonalDataFormController(profileController.profile);
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _emailController.dispose();
+    _personalDataForm.dispose();
     _phoneFocusNode.dispose();
     super.dispose();
-  }
-
-  String _formatDate(DateTime date) {
-    const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
-    ];
-    final monthName = months[date.month - 1];
-    return '${date.day} $monthName ${date.year}';
-  }
-
-  String _localPhoneDigits(String value) {
-    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.startsWith('62')) return digits.substring(2);
-    if (digits.startsWith('0')) return digits.substring(1);
-    return digits;
   }
 
   Future<void> _pickDate() async {
@@ -94,27 +63,23 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     );
 
     if (picked != null && picked != _selectedBirthDate) {
-      setState(() {
-        _selectedBirthDate = picked;
-      });
+      setState(() => _personalDataForm.selectBirthDate(picked));
     }
   }
 
   void _handleSave() {
     FocusScope.of(context).unfocus();
 
+    if (!_hasSubmitted) {
+      setState(() => _hasSubmitted = true);
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     final profileController = context.read<ProfileController>();
-    profileController.updateProfile(
-      fullName: _nameController.text.trim(),
-      phoneNumber: '+62 ${_phoneController.text.trim()}',
-      email: _emailController.text.trim(),
-      gender: _selectedGender,
-      birthDate: _selectedBirthDate,
-    );
+    _personalDataForm.saveTo(profileController);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -168,6 +133,9 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
               Expanded(
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: _hasSubmitted
+                      ? AutovalidateMode.onUserInteraction
+                      : AutovalidateMode.disabled,
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
                     children: [
@@ -557,7 +525,7 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
         ),
         suffixIcon: TextButton(
           onPressed: () {
-            setState(() => _isPhoneEditable = !_isPhoneEditable);
+            setState(_personalDataForm.togglePhoneEditing);
             if (_isPhoneEditable) {
               _phoneFocusNode.requestFocus();
             } else {
@@ -604,9 +572,8 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
           child: _buildGenderOption(
             title: 'Laki-laki',
             isSelected: _selectedGender == 'Laki-laki',
-            onTap: () {
-              setState(() => _selectedGender = 'Laki-laki');
-            },
+            onTap: () =>
+                setState(() => _personalDataForm.selectGender('Laki-laki')),
           ),
         ),
         const SizedBox(width: 12),
@@ -614,9 +581,8 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
           child: _buildGenderOption(
             title: 'Perempuan',
             isSelected: _selectedGender == 'Perempuan',
-            onTap: () {
-              setState(() => _selectedGender = 'Perempuan');
-            },
+            onTap: () =>
+                setState(() => _personalDataForm.selectGender('Perempuan')),
           ),
         ),
       ],
@@ -718,7 +684,7 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
             ),
             const SizedBox(width: 12),
             Text(
-              _formatDate(_selectedBirthDate),
+              _personalDataForm.formattedBirthDate,
               style: const TextStyle(
                 color: Color(0xFF1E293B),
                 fontFamily: AppTheme.fontFamily,

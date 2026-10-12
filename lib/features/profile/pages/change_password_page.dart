@@ -47,8 +47,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     }
 
     final success = profileController.changePassword(
-      currentPassword: _passwordController.currentPassword.trim(),
-      newPassword: _passwordController.newPassword.trim(),
+      currentPassword: _passwordController.currentPassword,
+      newPassword: _passwordController.newPassword,
     );
 
     if (success) {

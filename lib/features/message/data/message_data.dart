@@ -24,8 +24,7 @@ abstract final class MessageData {
     MessageNotificationModel(
       id: 'delay-detected',
       title: 'Keterlambatan Terdeteksi',
-      description:
-          'Cleaner Anda mungkin terlambat sekitar 5–10 menit karena pengalihan lalu lintas.',
+      description: 'Cleaner Anda mungkin terlambat sekitar 5–10 menit karena pengalihan lalu lintas.',
       timeLabel: '3 menit lalu',
       category: MessageCategory.order,
       iconType: MessageIconType.delayed,
@@ -35,8 +34,7 @@ abstract final class MessageData {
     MessageNotificationModel(
       id: 'qris-payment-success',
       title: 'Pembayaran QRIS Berhasil',
-      description:
-          'Pesanan Deep Cleaning telah dibayar Rp305.000. Cleaner telah dijadwalkan.',
+      description: 'Pesanan Deep Cleaning telah dibayar Rp305.000. Cleaner telah dijadwalkan.',
       timeLabel: '45 menit lalu',
       category: MessageCategory.order,
       iconType: MessageIconType.payment,
@@ -44,8 +42,7 @@ abstract final class MessageData {
     MessageNotificationModel(
       id: 'special-promo',
       title: 'Promo Spesial!',
-      description:
-          'Diskon 35% untuk semua jenis layanan pertama dengan kode CLEANHEMAT.',
+      description: 'Diskon 35% untuk semua jenis layanan pertama dengan kode CLEANHEMAT.',
       timeLabel: '1 hari lalu',
       category: MessageCategory.promo,
       iconType: MessageIconType.promo,

@@ -10,6 +10,7 @@ import '../../address/pages/address_list_page.dart';
 import '../../checkout/pages/checkout_page.dart';
 import '../../service/domain/models/service_model.dart';
 import '../controllers/booking_controller.dart';
+import '../domain/models/cleaning_address.dart';
 import '../widgets/booking_widgets.dart';
 
 class BookingPage extends StatefulWidget {

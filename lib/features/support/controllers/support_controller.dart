@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+
 import '../data/faq_data.dart';
 import '../models/faq_item_model.dart';
 
@@ -23,7 +24,8 @@ class SupportController extends ChangeNotifier {
     return _faqs.where((faq) {
       final matchQuestion = faq.question.toLowerCase().contains(query);
       final matchAnswer = faq.answer.toLowerCase().contains(query);
-      final matchHighlight = faq.highlight?.toLowerCase().contains(query) ?? false;
+      final matchHighlight =
+          faq.highlight?.toLowerCase().contains(query) ?? false;
       return matchQuestion || matchAnswer || matchHighlight;
     }).toList();
   }

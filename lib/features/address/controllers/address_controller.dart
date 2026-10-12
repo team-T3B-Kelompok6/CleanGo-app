@@ -1,18 +1,20 @@
 import 'package:flutter/foundation.dart';
+
 import '../domain/models/address_model.dart';
 
 class AddressController extends ChangeNotifier {
   AddressController() {
     _addresses = List<AddressModel>.from(_initialAddresses);
-    _selectedAddressId = _addresses.firstWhere((a) => a.isPrimary, orElse: () => _addresses.first).id;
+    _selectedAddressId = _addresses
+        .firstWhere((a) => a.isPrimary, orElse: () => _addresses.first)
+        .id;
   }
 
   static const List<AddressModel> _initialAddresses = [
     AddressModel(
       id: 'addr-1',
       title: 'Blk. N No.521, Mojolangu, Kec. Lowokwaru',
-      fullAddress:
-          'Blk. N No.521, Mojolangu, Kec. Lowokwaru, Kota Malang, Jawa Timur 65141, Indonesia',
+      fullAddress: 'Blk. N No.521, Mojolangu, Kec. Lowokwaru, Kota Malang, Jawa Timur 65141, Indonesia',
       note: 'Patokan pagar hitam sebelah minimarket',
       type: 'Rumah',
       contactName: 'krisna',
@@ -22,8 +24,7 @@ class AddressController extends ChangeNotifier {
     AddressModel(
       id: 'addr-2',
       title: 'Jl. Sudirman No. 123, Lantai 4',
-      fullAddress:
-          'Jl. Sudirman No. 123, Lantai 4, Gedung Equity Tower, Jakarta Selatan, DKI Jakarta 12190, Indonesia',
+      fullAddress: 'Jl. Sudirman No. 123, Lantai 4, Gedung Equity Tower, Jakarta Selatan, DKI Jakarta 12190, Indonesia',
       note: '',
       type: 'Kantor',
       contactName: 'krisna',
@@ -64,6 +65,8 @@ class AddressController extends ChangeNotifier {
   }
 
   void setPrimaryAddress(String id) {
+    if (!_addresses.any((address) => address.id == id)) return;
+
     _addresses = _addresses.map((address) {
       if (address.id == id) {
         return address.copyWith(isPrimary: true);
@@ -117,7 +120,10 @@ class AddressController extends ChangeNotifier {
   }
 
   void deleteAddress(String id) {
-    final toDelete = _addresses.firstWhere((a) => a.id == id, orElse: () => _addresses.first);
+    final index = _addresses.indexWhere((address) => address.id == id);
+    if (index == -1) return;
+
+    final toDelete = _addresses[index];
     final wasPrimary = toDelete.isPrimary;
     final wasSelected = _selectedAddressId == id;
 
@@ -131,7 +137,9 @@ class AddressController extends ChangeNotifier {
         ];
       }
       if (wasSelected) {
-        _selectedAddressId = _addresses.firstWhere((a) => a.isPrimary, orElse: () => _addresses.first).id;
+        _selectedAddressId = _addresses
+            .firstWhere((a) => a.isPrimary, orElse: () => _addresses.first)
+            .id;
       }
     } else {
       _selectedAddressId = '';

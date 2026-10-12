@@ -117,18 +117,21 @@ void main() {
       expect(controller.avatarAsset, 'assets/images/custom_avatar.png');
     });
 
-    test('verifyPassword and changePassword operate on current password 321321', () {
-      expect(controller.password, '321321');
-      expect(controller.verifyPassword('321321'), true);
-      expect(controller.verifyPassword('wrong'), false);
+    test(
+      'verifyPassword and changePassword operate on current password 321321',
+      () {
+        expect(controller.password, '321321');
+        expect(controller.verifyPassword('321321'), true);
+        expect(controller.verifyPassword('wrong'), false);
 
-      final changed = controller.changePassword(
-        currentPassword: '321321',
-        newPassword: 'NewPassword123',
-      );
-      expect(changed, true);
-      expect(controller.password, 'NewPassword123');
-      expect(controller.verifyPassword('NewPassword123'), true);
-    });
+        final changed = controller.changePassword(
+          currentPassword: '321321',
+          newPassword: 'NewPassword123',
+        );
+        expect(changed, true);
+        expect(controller.password, 'NewPassword123');
+        expect(controller.verifyPassword('NewPassword123'), true);
+      },
+    );
   });
 }

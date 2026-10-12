@@ -4,44 +4,50 @@ import 'package:cleango_app/features/address/controllers/address_controller.dart
 
 void main() {
   group('AddressModel Tests', () {
-    test('toCleaningAddress converts correctly with (Utama) label if primary', () {
-      const model = AddressModel(
-        id: 'test-1',
-        title: 'Jl. Melati No. 1',
-        fullAddress: 'Jl. Melati No. 1, Malang',
-        type: 'Rumah',
-        contactName: 'Krisna',
-        phoneNumber: '08123456789',
-        note: 'Pagar Hijau',
-        isPrimary: true,
-      );
+    test(
+      'toCleaningAddress converts correctly with (Utama) label if primary',
+      () {
+        const model = AddressModel(
+          id: 'test-1',
+          title: 'Jl. Melati No. 1',
+          fullAddress: 'Jl. Melati No. 1, Malang',
+          type: 'Rumah',
+          contactName: 'Krisna',
+          phoneNumber: '08123456789',
+          note: 'Pagar Hijau',
+          isPrimary: true,
+        );
 
-      final cleaningAddress = model.toCleaningAddress();
+        final cleaningAddress = model.toCleaningAddress();
 
-      expect(cleaningAddress.label, 'Rumah (Utama)');
-      expect(cleaningAddress.street, 'Jl. Melati No. 1');
-      expect(cleaningAddress.city, 'Jl. Melati No. 1, Malang');
-      expect(cleaningAddress.landmark, 'Pagar Hijau');
-      expect(cleaningAddress.customerName, 'Krisna');
-      expect(cleaningAddress.phoneNumber, '08123456789');
-    });
+        expect(cleaningAddress.label, 'Rumah (Utama)');
+        expect(cleaningAddress.street, 'Jl. Melati No. 1');
+        expect(cleaningAddress.city, 'Jl. Melati No. 1, Malang');
+        expect(cleaningAddress.landmark, 'Pagar Hijau');
+        expect(cleaningAddress.customerName, 'Krisna');
+        expect(cleaningAddress.phoneNumber, '08123456789');
+      },
+    );
 
-    test('toCleaningAddress converts correctly without (Utama) if not primary', () {
-      const model = AddressModel(
-        id: 'test-2',
-        title: 'Jl. Mawar No. 2',
-        fullAddress: 'Jl. Mawar No. 2, Surabaya',
-        type: 'Kantor',
-        contactName: 'Budi',
-        phoneNumber: '08987654321',
-        isPrimary: false,
-      );
+    test(
+      'toCleaningAddress converts correctly without (Utama) if not primary',
+      () {
+        const model = AddressModel(
+          id: 'test-2',
+          title: 'Jl. Mawar No. 2',
+          fullAddress: 'Jl. Mawar No. 2, Surabaya',
+          type: 'Kantor',
+          contactName: 'Budi',
+          phoneNumber: '08987654321',
+          isPrimary: false,
+        );
 
-      final cleaningAddress = model.toCleaningAddress();
+        final cleaningAddress = model.toCleaningAddress();
 
-      expect(cleaningAddress.label, 'Kantor');
-      expect(cleaningAddress.city, 'Jl. Mawar No. 2, Surabaya');
-    });
+        expect(cleaningAddress.label, 'Kantor');
+        expect(cleaningAddress.city, 'Jl. Mawar No. 2, Surabaya');
+      },
+    );
   });
 
   group('AddressController Tests', () {
@@ -73,6 +79,20 @@ void main() {
       expect(controller.primaryAddress?.id, secondId);
       expect(controller.addresses[0].isPrimary, false);
       expect(controller.addresses[1].isPrimary, true);
+    });
+
+    test('setPrimaryAddress ignores an unknown id', () {
+      final primaryBefore = controller.primaryAddress;
+      final selectedBefore = controller.selectedAddressId;
+
+      controller.setPrimaryAddress('missing-address');
+
+      expect(controller.primaryAddress?.id, primaryBefore?.id);
+      expect(
+        controller.addresses.where((address) => address.isPrimary),
+        hasLength(1),
+      );
+      expect(controller.selectedAddressId, selectedBefore);
     });
 
     test('addAddress appends to list and updates primary if specified', () {
@@ -110,6 +130,28 @@ void main() {
       expect(controller.addresses.length, 1);
       expect(controller.addresses.first.isPrimary, true);
       expect(controller.selectedAddressId, controller.addresses.first.id);
+    });
+
+    test('deleteAddress ignores an unknown id without changing data', () {
+      final before = controller.addresses;
+      final selectedBefore = controller.selectedAddressId;
+
+      controller.deleteAddress('missing-address');
+
+      expect(controller.addresses, orderedEquals(before));
+      expect(controller.selectedAddressId, selectedBefore);
+    });
+
+    test('deleteAddress safely ignores an unknown id when list is empty', () {
+      for (final address in List.of(controller.addresses)) {
+        controller.deleteAddress(address.id);
+      }
+
+      expect(
+        () => controller.deleteAddress('missing-address'),
+        returnsNormally,
+      );
+      expect(controller.addresses, isEmpty);
     });
   });
 }

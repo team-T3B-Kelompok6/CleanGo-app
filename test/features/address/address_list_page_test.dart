@@ -50,4 +50,43 @@ void main() {
     );
     expect(useButton.onPressed, isNotNull);
   });
+
+  testWidgets('shows the address limit message instead of opening the form', (
+    tester,
+  ) async {
+    final addressController = AddressController();
+    for (
+      var index = addressController.addresses.length;
+      index < AddressController.maxAddresses;
+      index++
+    ) {
+      addressController.addAddress(
+        AddressModel(
+          id: 'address-$index',
+          title: 'Alamat $index',
+          fullAddress: 'Jl. Mawar No. $index, Kota Malang',
+          type: 'Rumah',
+          contactName: 'Krisna',
+          phoneNumber: '(+62) 81234567890',
+          isPrimary: false,
+        ),
+      );
+    }
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: addressController),
+          ChangeNotifierProvider(create: (_) => BookingController()),
+        ],
+        child: const MaterialApp(home: AddressListPage()),
+      ),
+    );
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Tambahkan alamat'));
+    await tester.pump();
+
+    expect(find.text('Maksimal 5 alamat tersimpan.'), findsOneWidget);
+    expect(find.byType(AddressListPage), findsOneWidget);
+  });
 }

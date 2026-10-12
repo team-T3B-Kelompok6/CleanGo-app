@@ -230,7 +230,7 @@ class _DetailContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionTitle('Termasuk:'),
+                const _SectionTitle('Yang Akan Dikerjakan:'),
                 const SizedBox(height: 14),
                 ...detail.benefits.indexed.map(
                   (entry) => Padding(

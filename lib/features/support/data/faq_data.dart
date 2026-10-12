@@ -16,7 +16,7 @@ class FaqData {
     FaqItemModel(
       id: 'faq-2',
       question: 'Metode pembayaran apa saja yang didukung?',
-      answer: 'CleanGo mendukung berbagai metode pembayaran resmi: QRIS (GoPay, OVO, DANA, ShopeePay), Virtual Account Bank (BCA, Mandiri, BNI, BRI), dan Transfer Bank.',
+      answer: 'CleanGo mendukung pembayaran melalui QRIS dan tunai.',
       icon: Icons.payments_outlined,
       isExpanded: false,
     ),

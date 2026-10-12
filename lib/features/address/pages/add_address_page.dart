@@ -69,7 +69,18 @@ class _AddAddressPageState extends State<AddAddressPage> {
     );
 
     final addressController = context.read<AddressController>();
-    addressController.addAddress(newAddress);
+    final wasAdded = addressController.addAddress(newAddress);
+
+    if (!wasAdded) {
+      setState(() => _addressForm.setSaving(false));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maksimal 5 alamat tersimpan.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     if (widget.autoSetPrimary) {
       context.read<BookingController>().updateAddress(

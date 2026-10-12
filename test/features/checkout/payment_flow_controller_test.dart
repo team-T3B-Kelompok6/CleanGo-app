@@ -8,6 +8,13 @@ import 'package:cleango_app/features/service/data/service_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('only exposes QRIS and cash payment methods', () {
+    expect(paymentMethods.map((method) => method.type), [
+      PaymentMethodType.qris,
+      PaymentMethodType.cash,
+    ]);
+  });
+
   group('PaymentFlowController', () {
     late BookingController booking;
     late AddressController addresses;

@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../domain/models/address_model.dart';
 
 class AddressController extends ChangeNotifier {
+  static const int maxAddresses = 5;
+
   AddressController() {
     _addresses = List<AddressModel>.from(_initialAddresses);
     _selectedAddressId = _addresses
@@ -37,6 +39,7 @@ class AddressController extends ChangeNotifier {
   late String _selectedAddressId;
 
   List<AddressModel> get addresses => List.unmodifiable(_addresses);
+  bool get canAddAddress => _addresses.length < maxAddresses;
   String get selectedAddressId => _selectedAddressId;
 
   AddressModel? get selectedAddress {
@@ -78,7 +81,9 @@ class AddressController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void addAddress(AddressModel address) {
+  bool addAddress(AddressModel address) {
+    if (!canAddAddress) return false;
+
     if (address.isPrimary || _addresses.isEmpty) {
       _addresses = _addresses.map((a) => a.copyWith(isPrimary: false)).toList();
     }
@@ -88,6 +93,7 @@ class AddressController extends ChangeNotifier {
       _selectedAddressId = address.id;
     }
     notifyListeners();
+    return true;
   }
 
   void updateAddress(AddressModel updatedAddress) {

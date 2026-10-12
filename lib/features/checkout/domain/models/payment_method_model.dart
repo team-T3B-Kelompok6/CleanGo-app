@@ -1,4 +1,4 @@
-enum PaymentMethodType { dana, gopay, qris, cash }
+enum PaymentMethodType { qris, cash }
 
 class PaymentMethodModel {
   const PaymentMethodModel({
@@ -19,22 +19,6 @@ class PaymentMethodModel {
 }
 
 const paymentMethods = <PaymentMethodModel>[
-  PaymentMethodModel(
-    type: PaymentMethodType.dana,
-    name: 'DANA',
-    assetPath: 'assets/icons/payment_dana.svg',
-    description: 'Bayar instan melalui DANA',
-    iconWidth: 30,
-    iconHeight: 32,
-  ),
-  PaymentMethodModel(
-    type: PaymentMethodType.gopay,
-    name: 'GoPay',
-    assetPath: 'assets/icons/payment_gopay.svg',
-    description: 'Bayar instan melalui GoPay',
-    iconWidth: 30,
-    iconHeight: 32,
-  ),
   PaymentMethodModel(
     type: PaymentMethodType.qris,
     name: 'QRIS',

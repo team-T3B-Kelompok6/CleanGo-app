@@ -114,6 +114,42 @@ void main() {
       expect(controller.addresses.where((a) => a.isPrimary).length, 1);
     });
 
+    test('addAddress rejects addresses after the fifth saved address', () {
+      for (var index = controller.addresses.length; index < 5; index++) {
+        expect(
+          controller.addAddress(
+            AddressModel(
+              id: 'addr-$index',
+              title: 'Alamat $index',
+              fullAddress: 'Jl. Mawar No. $index, Kota Malang',
+              type: 'Rumah',
+              contactName: 'Krisna',
+              phoneNumber: '08122334455',
+              isPrimary: false,
+            ),
+          ),
+          isTrue,
+        );
+      }
+
+      expect(controller.addresses, hasLength(5));
+      expect(
+        controller.addAddress(
+          const AddressModel(
+            id: 'addr-over-limit',
+            title: 'Alamat keenam',
+            fullAddress: 'Jl. Melati No. 6, Kota Malang',
+            type: 'Rumah',
+            contactName: 'Krisna',
+            phoneNumber: '08122334455',
+            isPrimary: false,
+          ),
+        ),
+        isFalse,
+      );
+      expect(controller.addresses, hasLength(5));
+    });
+
     test('updateAddress updates matching address', () {
       final target = controller.addresses.first;
       final updated = target.copyWith(fullAddress: 'Alamat Baru No. 99');

@@ -207,6 +207,16 @@ class _AddressListPageState extends State<AddressListPage> {
                     height: 48,
                     child: OutlinedButton(
                       onPressed: () {
+                        if (!addressController.canAddAddress) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Maksimal 5 alamat tersimpan.'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+
                         Navigator.of(context).push(
                           MaterialPageRoute<AddressModel?>(
                             builder: (_) => AddAddressPage(

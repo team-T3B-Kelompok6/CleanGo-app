@@ -1,15 +1,26 @@
 import 'package:cleango_app/core/constants/app_routes.dart';
+import 'package:cleango_app/core/storage/token_storage.dart';
 import 'package:cleango_app/core/theme/app_theme.dart';
+import 'package:cleango_app/features/auth/controllers/auth_session_controller.dart';
 import 'package:cleango_app/features/auth/pages/login_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 void main() {
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
   Widget buildLogin() {
-    return MaterialApp(
-      theme: AppTheme.light,
-      home: const LoginPage(),
-      routes: {AppRoutes.home: (_) => const Scaffold(body: Text('Beranda'))},
+    return ChangeNotifierProvider(
+      create: (_) => AuthSessionController(SecureTokenStorage()),
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: const LoginPage(),
+        routes: {AppRoutes.home: (_) => const Scaffold(body: Text('Beranda'))},
+      ),
     );
   }
 

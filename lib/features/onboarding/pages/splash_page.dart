@@ -1,9 +1,12 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/storage/app_preferences.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../auth/controllers/auth_session_controller.dart';
+import '../../auth/pages/login_page.dart';
+import '../../home/pages/home_page.dart';
 import 'onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -16,7 +19,6 @@ class SplashPage extends StatefulWidget {
 class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _loadingController;
-  Timer? _navigationTimer;
 
   @override
   void initState() {
@@ -25,18 +27,30 @@ class _SplashPageState extends State<SplashPage>
       vsync: this,
       duration: const Duration(milliseconds: 1050),
     )..repeat();
-    _navigationTimer = Timer(
-      const Duration(milliseconds: 2600),
-      _openOnboarding,
-    );
+    _resolveInitialPage();
   }
 
-  void _openOnboarding() {
+  Future<void> _resolveInitialPage() async {
+    await Future<void>.delayed(const Duration(milliseconds: 2600));
     if (!mounted) return;
+
+    final preferences = context.read<AppPreferences>();
+    final hasSession = await context.read<AuthSessionController>().hasSession();
+    if (!mounted) return;
+
+    final Widget destination;
+    if (!preferences.hasCompletedOnboarding) {
+      destination = const OnboardingPage();
+    } else if (hasSession) {
+      destination = const HomePage();
+    } else {
+      destination = const LoginPage();
+    }
+
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 380),
-        pageBuilder: (_, animation, _) => const OnboardingPage(),
+        pageBuilder: (_, animation, _) => destination,
         transitionsBuilder: (_, animation, _, child) => FadeTransition(
           opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
           child: child,
@@ -47,7 +61,6 @@ class _SplashPageState extends State<SplashPage>
 
   @override
   void dispose() {
-    _navigationTimer?.cancel();
     _loadingController.dispose();
     super.dispose();
   }

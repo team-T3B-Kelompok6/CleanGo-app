@@ -1,18 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../data/address_repository.dart';
 import '../domain/models/address_model.dart';
 
 class AddressController extends ChangeNotifier {
   static const int maxAddresses = 5;
 
-  AddressController() {
-    _addresses = List<AddressModel>.from(_initialAddresses);
+  AddressController({this.repository, List<AddressModel>? initialAddresses}) {
+    _addresses = List<AddressModel>.from(initialAddresses ?? defaultAddresses);
     _selectedAddressId = _addresses
         .firstWhere((a) => a.isPrimary, orElse: () => _addresses.first)
         .id;
+    _subscription = repository?.watchAddresses().listen(_applySnapshot);
   }
 
-  static const List<AddressModel> _initialAddresses = [
+  static const List<AddressModel> defaultAddresses = [
     AddressModel(
       id: 'addr-1',
       title: 'Blk. N No.521, Mojolangu, Kec. Lowokwaru',
@@ -37,6 +41,8 @@ class AddressController extends ChangeNotifier {
 
   late List<AddressModel> _addresses;
   late String _selectedAddressId;
+  final AddressRepository? repository;
+  StreamSubscription<AddressSnapshot>? _subscription;
 
   List<AddressModel> get addresses => List.unmodifiable(_addresses);
   bool get canAddAddress => _addresses.length < maxAddresses;
@@ -64,6 +70,7 @@ class AddressController extends ChangeNotifier {
     if (exists) {
       _selectedAddressId = id;
       notifyListeners();
+      _persist();
     }
   }
 
@@ -79,6 +86,7 @@ class AddressController extends ChangeNotifier {
 
     _selectedAddressId = id;
     notifyListeners();
+    _persist();
   }
 
   bool addAddress(AddressModel address) {
@@ -93,6 +101,7 @@ class AddressController extends ChangeNotifier {
       _selectedAddressId = address.id;
     }
     notifyListeners();
+    _persist();
     return true;
   }
 
@@ -123,6 +132,7 @@ class AddressController extends ChangeNotifier {
     }
 
     notifyListeners();
+    _persist();
   }
 
   void deleteAddress(String id) {
@@ -152,5 +162,33 @@ class AddressController extends ChangeNotifier {
     }
 
     notifyListeners();
+    _persist();
+  }
+
+  void _applySnapshot(AddressSnapshot snapshot) {
+    _addresses = List<AddressModel>.from(snapshot.addresses);
+    _selectedAddressId = snapshot.selectedAddressId;
+    notifyListeners();
+  }
+
+  Future<void> _persist() async {
+    final storage = repository;
+    if (storage == null) return;
+    try {
+      await storage.saveSnapshot(
+        AddressSnapshot(
+          addresses: _addresses,
+          selectedAddressId: _selectedAddressId,
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Gagal menyimpan alamat lokal: $error\n$stackTrace');
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_subscription?.cancel());
+    super.dispose();
   }
 }

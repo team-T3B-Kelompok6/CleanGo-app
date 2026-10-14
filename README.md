@@ -10,6 +10,21 @@ jadwal, melakukan pemesanan, serta memantau status pesanan secara real-time.
 Pengembangannya dilakukan sesuai pada design CleanGo di Figma:
 [Link Desain Figma](https://www.figma.com/design/ymMzgCxXWLUncDBzi1e4Oq/Cleango?node-id=0-1&t=4yxoYg0SISypIbv1-1)
 
+## Penyimpanan lokal
+
+CleanGo menggunakan tiga jenis penyimpanan sesuai karakter datanya:
+
+- **Drift** menyimpan data alamat yang terstruktur dan dapat dipantau secara
+  reaktif. Perubahan beberapa alamat disimpan dalam satu transaksi.
+- **SharedPreferences** menyimpan pengaturan sederhana berupa status bahwa
+  onboarding sudah diselesaikan.
+- **Flutter Secure Storage** menyimpan access token sesi lokal agar data rahasia
+  tidak diletakkan di penyimpanan biasa.
+
+Implementasi dipisahkan antara database/storage, repository, controller, dan UI.
+Saat ini autentikasi dan data aplikasi lainnya masih berupa simulasi lokal;
+struktur penyimpanan ini disiapkan tanpa menambahkan backend.
+
 
 ## Struktur project
 

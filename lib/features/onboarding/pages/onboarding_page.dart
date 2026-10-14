@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/storage/app_preferences.dart';
 import '../../../core/theme/app_theme.dart';
 import '../data/onboarding_data.dart';
 import '../domain/models/onboarding_item.dart';
@@ -25,7 +27,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
     super.dispose();
   }
 
-  void _openLogin() {
+  Future<void> _openLogin() async {
+    await context.read<AppPreferences>().completeOnboarding();
+    if (!mounted) return;
     Navigator.of(context)
         .pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
   }

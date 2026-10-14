@@ -1,13 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/constants/app_routes.dart';
+import 'core/database/app_database.dart';
+import 'core/storage/app_preferences.dart';
+import 'core/storage/token_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/address/controllers/address_controller.dart';
+import 'features/address/data/address_repository.dart';
+import 'features/address/domain/models/address_model.dart';
 import 'features/address/pages/address_list_page.dart';
 import 'features/address/pages/add_address_page.dart';
 import 'features/auth/pages/login_page.dart';
 import 'features/auth/pages/register_page.dart';
+import 'features/auth/controllers/auth_session_controller.dart';
 import 'features/booking/controllers/booking_controller.dart';
 import 'features/home/pages/home_page.dart';
 import 'features/message/pages/messages_page.dart';
@@ -26,16 +34,49 @@ import 'features/service/pages/service_list_page.dart';
 import 'features/support/controllers/support_controller.dart';
 import 'features/support/pages/help_center_page.dart';
 
-class CleanGoApp extends StatelessWidget {
-  const CleanGoApp({super.key});
+class CleanGoApp extends StatefulWidget {
+  const CleanGoApp({
+    required this.database,
+    required this.addressRepository,
+    required this.initialAddresses,
+    required this.preferences,
+    required this.tokenStorage,
+    super.key,
+  });
+
+  final AppDatabase database;
+  final AddressRepository addressRepository;
+  final List<AddressModel> initialAddresses;
+  final AppPreferences preferences;
+  final TokenStorage tokenStorage;
+
+  @override
+  State<CleanGoApp> createState() => _CleanGoAppState();
+}
+
+class _CleanGoAppState extends State<CleanGoApp> {
+  @override
+  void dispose() {
+    unawaited(widget.database.close());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<AppPreferences>.value(value: widget.preferences),
+        ChangeNotifierProvider(
+          create: (_) => AuthSessionController(widget.tokenStorage),
+        ),
         ChangeNotifierProvider(create: (_) => ServiceController()),
         ChangeNotifierProvider(create: (_) => BookingController()),
-        ChangeNotifierProvider(create: (_) => AddressController()),
+        ChangeNotifierProvider(
+          create: (_) => AddressController(
+            repository: widget.addressRepository,
+            initialAddresses: widget.initialAddresses,
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => ProfileController()),
         ChangeNotifierProvider(create: (_) => SupportController()),
         ChangeNotifierProvider(create: (_) => OrderController()),

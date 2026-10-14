@@ -8,6 +8,7 @@ import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../address/controllers/address_controller.dart';
 import '../../address/pages/address_list_page.dart';
+import '../../auth/controllers/auth_session_controller.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../../support/pages/help_center_page.dart';
 import '../controllers/profile_controller.dart';
@@ -192,7 +193,9 @@ class ProfilePage extends StatelessWidget {
     }
   }
 
-  void _logout(BuildContext context) {
+  Future<void> _logout(BuildContext context) async {
+    await context.read<AuthSessionController>().signOut();
+    if (!context.mounted) return;
     Navigator.pushNamedAndRemoveUntil(
       context,
       AppRoutes.login,

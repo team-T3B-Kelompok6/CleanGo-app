@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../controllers/auth_session_controller.dart';
 import '../data/dummy_auth_service.dart';
 import 'register_page.dart';
 import '../widgets/auth_social_buttons.dart';
@@ -222,7 +224,7 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     final result = _authService.validateLogin(
       phone: _phoneController.text,
@@ -238,6 +240,8 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    await context.read<AuthSessionController>().createLocalSession();
+    if (!mounted) return;
     Navigator.of(context).pushReplacementNamed(AppRoutes.home);
   }
 

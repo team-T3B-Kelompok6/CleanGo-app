@@ -4,26 +4,48 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_theme.dart';
 
 class AuthSocialButtons extends StatelessWidget {
-  const AuthSocialButtons({super.key});
+  const AuthSocialButtons({
+    super.key,
+    this.onFacebookTap,
+    this.onGoogleTap,
+    this.isLoading = false,
+  });
+
+  final VoidCallback? onFacebookTap;
+  final VoidCallback? onGoogleTap;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _SocialButton(label: 'Facebook', svgSource: _facebookSvg),
-        SizedBox(width: 16),
-        _SocialButton(label: 'Google', svgSource: _googleSvg),
+        _SocialButton(
+          label: 'Facebook',
+          svgSource: _facebookSvg,
+          onTap: isLoading ? null : onFacebookTap,
+        ),
+        const SizedBox(width: 16),
+        _SocialButton(
+          label: 'Google',
+          svgSource: _googleSvg,
+          onTap: isLoading ? null : onGoogleTap,
+        ),
       ],
     );
   }
 }
 
 class _SocialButton extends StatelessWidget {
-  const _SocialButton({required this.label, required this.svgSource});
+  const _SocialButton({
+    required this.label,
+    required this.svgSource,
+    this.onTap,
+  });
 
   final String label;
   final String svgSource;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -32,9 +54,9 @@ class _SocialButton extends StatelessWidget {
       label: 'Masuk dengan $label',
       child: Material(
         color: Colors.white,
-        shape: CircleBorder(side: BorderSide(color: AppColors.slate200)),
+        shape: const CircleBorder(side: BorderSide(color: AppColors.slate200)),
         child: InkWell(
-          onTap: () {},
+          onTap: onTap,
           customBorder: const CircleBorder(),
           child: SizedBox.square(
             dimension: 48,

@@ -1,7 +1,23 @@
 import 'package:cleango_app/core/theme/app_theme.dart';
+import 'package:cleango_app/features/auth/data/api_auth_service.dart';
 import 'package:cleango_app/features/auth/pages/register_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _StubAuthService extends ApiAuthService {
+  @override
+  Future<AuthResult> register({
+    required String name,
+    required String phone,
+    required String password,
+    String? email,
+  }) async {
+    return AuthResult(
+      token: 'test-token',
+      user: User(id: 1, name: name, email: email ?? '', role: 'customer'),
+    );
+  }
+}
 
 void main() {
   Widget buildRegister() {
@@ -15,7 +31,9 @@ void main() {
         builder: (context) => Scaffold(
           body: FilledButton(
             onPressed: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => const RegisterPage()),
+              MaterialPageRoute(
+                builder: (_) => RegisterPage(authService: _StubAuthService()),
+              ),
             ),
             child: const Text('Buka Register'),
           ),

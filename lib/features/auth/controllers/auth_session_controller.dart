@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/token_storage.dart';
@@ -15,10 +12,7 @@ class AuthSessionController extends ChangeNotifier {
     return token != null && token.isNotEmpty;
   }
 
-  Future<void> createLocalSession() {
-    final random = Random.secure();
-    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
-    final token = base64UrlEncode(bytes).replaceAll('=', '');
+  Future<void> createSession(String token) {
     return _tokenStorage.writeAccessToken(token);
   }
 

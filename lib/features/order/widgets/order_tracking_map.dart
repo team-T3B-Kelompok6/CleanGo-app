@@ -46,7 +46,10 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
     ), // 9: Blk. N No.521 Mojolangu (Rumah Anda)
   ];
 
-  static final LatLng _destinationPoint = _malangRoutePoints.last;
+  LatLng get _destinationPoint => LatLng(
+    widget.order.destinationLatitude,
+    widget.order.destinationLongitude,
+  );
 
   late LatLng _currentCleanerPosition;
   double _routeFraction = 0.45; // Default: dalamPerjalanan (tengah rute)
@@ -63,6 +66,15 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
   @override
   void didUpdateWidget(covariant OrderTrackingMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!_isSimulating &&
+        (oldWidget.order.cleanerLatitude != widget.order.cleanerLatitude ||
+            oldWidget.order.cleanerLongitude !=
+                widget.order.cleanerLongitude)) {
+      _currentCleanerPosition = LatLng(
+        widget.order.cleanerLatitude,
+        widget.order.cleanerLongitude,
+      );
+    }
     if (oldWidget.order.stage != widget.order.stage && !_isSimulating) {
       setState(() {
         _updatePositionFromStage(widget.order.stage);

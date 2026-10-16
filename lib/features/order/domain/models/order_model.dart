@@ -115,6 +115,12 @@ class ScheduledOrderModel {
     this.distanceKm = '2.4 km lagi',
     this.estimatedMinutes = '±15 menit',
     this.estimatedArrivalTime = '09:10 WIB',
+    this.cleanerLatitude = -7.95565,
+    this.cleanerLongitude = 112.61785,
+    this.destinationLatitude = -7.93980,
+    this.destinationLongitude = 112.62650,
+    this.etaSource = 'Data contoh',
+    this.etaUpdatedAt,
     this.scheduledAt,
     this.note = '',
     this.paymentMethod = 'QRIS',
@@ -146,6 +152,12 @@ class ScheduledOrderModel {
   final String distanceKm;
   final String estimatedMinutes;
   final String estimatedArrivalTime;
+  final double cleanerLatitude;
+  final double cleanerLongitude;
+  final double destinationLatitude;
+  final double destinationLongitude;
+  final String etaSource;
+  final DateTime? etaUpdatedAt;
   final DateTime? scheduledAt;
   final String note;
   final String paymentMethod;
@@ -177,6 +189,12 @@ class ScheduledOrderModel {
     String? distanceKm,
     String? estimatedMinutes,
     String? estimatedArrivalTime,
+    double? cleanerLatitude,
+    double? cleanerLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
+    String? etaSource,
+    DateTime? etaUpdatedAt,
     DateTime? scheduledAt,
     String? note,
     String? paymentMethod,
@@ -210,6 +228,12 @@ class ScheduledOrderModel {
       distanceKm: distanceKm ?? this.distanceKm,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       estimatedArrivalTime: estimatedArrivalTime ?? this.estimatedArrivalTime,
+      cleanerLatitude: cleanerLatitude ?? this.cleanerLatitude,
+      cleanerLongitude: cleanerLongitude ?? this.cleanerLongitude,
+      destinationLatitude: destinationLatitude ?? this.destinationLatitude,
+      destinationLongitude: destinationLongitude ?? this.destinationLongitude,
+      etaSource: etaSource ?? this.etaSource,
+      etaUpdatedAt: etaUpdatedAt ?? this.etaUpdatedAt,
       scheduledAt: scheduledAt ?? this.scheduledAt,
       note: note ?? this.note,
       paymentMethod: paymentMethod ?? this.paymentMethod,

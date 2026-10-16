@@ -1,1 +1,40 @@
+import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+
+import 'api_endpoints.dart';
+import 'api_exception.dart';
+
+class ApiClient {
+  ApiClient({http.Client? client, String? baseUrl})
+    : _client = client ?? http.Client(),
+      _baseUrl = baseUrl ?? ApiEndpoints.baseUrl;
+
+  final http.Client _client;
+  final String _baseUrl;
+
+  Future<Map<String, dynamic>> post(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _client
+        .post(
+          Uri.parse('${_baseUrl.replaceAll(RegExp(r'/$'), '')}$path'),
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 15));
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const ApiException('Respons server tidak valid.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(
+        decoded['message']?.toString() ?? 'Permintaan gagal diproses.',
+      );
+    }
+    return decoded;
+  }
+
+  void close() => _client.close();
+}

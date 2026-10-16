@@ -29,6 +29,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   void initState() {
     super.initState();
     _sheetController.addListener(_syncMapControlsWithSheet);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<OrderController>().refreshEta();
+    });
   }
 
   void _syncMapControlsWithSheet() {
@@ -175,7 +178,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        _buildEstimatedArrivalCard(order),
+                        _buildEstimatedArrivalCard(order, orderController),
                         const SizedBox(height: 14),
                         _buildCleanerCard(context, order),
                         const SizedBox(height: 14),
@@ -410,7 +413,10 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
-  Widget _buildEstimatedArrivalCard(ScheduledOrderModel order) {
+  Widget _buildEstimatedArrivalCard(
+    ScheduledOrderModel order,
+    OrderController controller,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -475,29 +481,42 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 3),
+                Text(
+                  controller.etaError ??
+                      (order.etaUpdatedAt == null
+                          ? order.etaSource
+                          : '${order.etaSource} · diperbarui ${order.etaUpdatedAt!.hour.toString().padLeft(2, '0')}:${order.etaUpdatedAt!.minute.toString().padLeft(2, '0')}:${order.etaUpdatedAt!.second.toString().padLeft(2, '0')}'),
+                  style: TextStyle(
+                    color: controller.etaError == null
+                        ? const Color(0xFF64748B)
+                        : const Color(0xFFB45309),
+                    fontFamily: 'Inter',
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE6FAF7),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFCCFBF1)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  '• ',
-                  style: TextStyle(
-                    color: Color(0xFF00685F),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
                 ),
-                Text(
-                  order.estimatedMinutes,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6FAF7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCCFBF1)),
+                ),
+                child: Text(
+                  controller.etaLoading
+                      ? 'Menghitung…'
+                      : order.estimatedMinutes,
                   style: const TextStyle(
                     color: Color(0xFF00685F),
                     fontFamily: 'Inter',
@@ -505,8 +524,17 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              ],
-            ),
+              ),
+              IconButton(
+                tooltip: 'Perbarui ETA',
+                visualDensity: VisualDensity.compact,
+                onPressed: controller.etaLoading ? null : controller.refreshEta,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  color: Color(0xFF00685F),
+                ),
+              ),
+            ],
           ),
         ],
       ),

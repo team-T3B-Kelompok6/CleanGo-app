@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 
 import '../data/order_data.dart';
+import '../data/eta_repository.dart';
 import '../domain/models/order_model.dart';
 
 class OrderController extends ChangeNotifier {
-  OrderController() {
+  OrderController({EtaRepository? etaRepository})
+    : _etaRepository = etaRepository ?? EtaRepository() {
     _scheduledOrder = OrderData.scheduledOrder.copyWith(
       scheduledAt: DateTime.now().add(const Duration(days: 3)),
     );
@@ -16,6 +18,9 @@ class OrderController extends ChangeNotifier {
   late List<OrderHistoryModel> _history;
   late OrderStatusStage _activeStage;
   bool _hasScheduledOrder = true;
+  final EtaRepository _etaRepository;
+  bool _etaLoading = false;
+  String? _etaError;
 
   ScheduledOrderModel get scheduledOrder =>
       _scheduledOrder.copyWith(stage: _activeStage);
@@ -24,6 +29,59 @@ class OrderController extends ChangeNotifier {
   String get currentStepLabel => 'Langkah $currentStepNumber dari 5';
   List<OrderHistoryModel> get historyOrders => List.unmodifiable(_history);
   bool get hasScheduledOrder => _hasScheduledOrder;
+  bool get etaLoading => _etaLoading;
+  String? get etaError => _etaError;
+
+  Future<void> refreshEta() async {
+    if (_etaLoading ||
+        _activeStage.index >= OrderStatusStage.sedangDikerjakan.index) {
+      return;
+    }
+    _etaLoading = true;
+    _etaError = null;
+    notifyListeners();
+    try {
+      final estimate = await _etaRepository.calculate(
+        cleanerLatitude: _scheduledOrder.cleanerLatitude,
+        cleanerLongitude: _scheduledOrder.cleanerLongitude,
+        destinationLatitude: _scheduledOrder.destinationLatitude,
+        destinationLongitude: _scheduledOrder.destinationLongitude,
+        initialDistanceM: 6500,
+        elapsedSeconds: _activeStage.index * 420,
+        stoppedDurationSeconds: 0,
+        rollingSpeedMps: 5.8,
+      );
+      final arrival = DateTime.now().add(
+        Duration(seconds: estimate.etaSeconds),
+      );
+      _scheduledOrder = _scheduledOrder.copyWith(
+        distanceKm:
+            '${(estimate.distanceMeters / 1000).toStringAsFixed(1)} km lagi',
+        estimatedMinutes: '±${estimate.etaMinutes} menit',
+        estimatedArrivalTime:
+            '${arrival.hour.toString().padLeft(2, '0')}:${arrival.minute.toString().padLeft(2, '0')} WIB',
+        etaSource: estimate.source == 'ml'
+            ? 'ML ${estimate.modelVersion ?? ''}'.trim()
+            : 'Fallback OSRM',
+        etaUpdatedAt: estimate.updatedAt,
+      );
+    } catch (_) {
+      _etaError =
+          'ETA belum dapat diperbarui. Data terakhir tetap ditampilkan.';
+    } finally {
+      _etaLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateCleanerLocation(double latitude, double longitude) async {
+    _scheduledOrder = _scheduledOrder.copyWith(
+      cleanerLatitude: latitude,
+      cleanerLongitude: longitude,
+    );
+    await refreshEta();
+  }
+
   bool get canModifyScheduledOrder {
     final schedule = _scheduledOrder.scheduledAt;
     if (!_hasScheduledOrder || schedule == null) return false;
@@ -241,5 +299,11 @@ class OrderController extends ChangeNotifier {
     final hour = value.hour.toString().padLeft(2, '0');
     final minute = value.minute.toString().padLeft(2, '0');
     return '${days[value.weekday - 1]}, ${value.day} ${months[value.month - 1]} ${value.year} • $hour:$minute';
+  }
+
+  @override
+  void dispose() {
+    _etaRepository.dispose();
+    super.dispose();
   }
 }

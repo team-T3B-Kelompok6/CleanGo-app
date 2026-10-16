@@ -133,7 +133,7 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Future<void> _showPaymentInformation(BuildContext context) async {
-    final isSameDay = _paymentFlowController.createOrder(
+    final isSameDay = await _paymentFlowController.createOrder(
       booking: context.read<BookingController>(),
       addresses: context.read<AddressController>(),
       orders: context.read<OrderController>(),
@@ -143,6 +143,7 @@ class _PaymentPageState extends State<PaymentPage> {
       platformFee: widget.platformFee,
       discountAmount: widget.discountAmount,
     );
+    if (!context.mounted) return;
 
     await showDialog<void>(
       context: context,

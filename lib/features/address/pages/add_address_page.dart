@@ -85,6 +85,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
     if (widget.autoSetPrimary) {
       context.read<BookingController>().updateAddress(
         newAddress.toCleaningAddress(),
+        addressId: newAddress.id,
       );
     }
 

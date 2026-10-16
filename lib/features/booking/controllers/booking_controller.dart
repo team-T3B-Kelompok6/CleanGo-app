@@ -1,10 +1,26 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show DateUtils;
 
 import '../../service/domain/models/service_model.dart';
+import '../data/booking_draft_repository.dart';
 import '../domain/models/cleaning_address.dart';
+import '../domain/models/booking_draft.dart';
 
 class BookingController extends ChangeNotifier {
+  BookingController({
+    this.repository,
+    BookingDraft? initialDraft,
+    ServiceModel? initialService,
+    CleaningAddress? initialAddress,
+  }) : _service = initialService,
+       _selectedDate = initialDraft?.selectedDate ?? initialDate,
+       _selectedTime = initialDraft?.selectedTime ?? '12:00',
+       _address = initialAddress ?? BookingController.initialAddress,
+       _addressId = initialDraft?.addressId,
+       _note = initialDraft?.note ?? initialNote;
+
   static DateTime get initialDate => DateUtils.dateOnly(DateTime.now());
 
   static const int platformFee = 5000;
@@ -22,11 +38,13 @@ class BookingController extends ChangeNotifier {
 
   static const String initialNote = '';
 
+  final BookingDraftRepository? repository;
   ServiceModel? _service;
-  DateTime _selectedDate = initialDate;
-  String _selectedTime = '12:00';
-  CleaningAddress _address = initialAddress;
-  String _note = initialNote;
+  DateTime _selectedDate;
+  String _selectedTime;
+  CleaningAddress _address;
+  String? _addressId;
+  String _note;
 
   ServiceModel? get service => _service;
   DateTime get selectedDate => _selectedDate;
@@ -76,6 +94,7 @@ class BookingController extends ChangeNotifier {
       if (_selectedDate.isBefore(today)) {
         _selectedDate = today;
         notifyListeners();
+        _persistDraft();
       }
       return;
     }
@@ -84,8 +103,10 @@ class BookingController extends ChangeNotifier {
     _selectedDate = initialDate;
     _selectedTime = '12:00';
     _address = initialAddress;
+    _addressId = null;
     _note = initialNote;
     notifyListeners();
+    _persistDraft();
   }
 
   void selectDate(DateTime date) {
@@ -95,6 +116,7 @@ class BookingController extends ChangeNotifier {
 
     _selectedDate = date;
     notifyListeners();
+    _persistDraft();
   }
 
   void selectTime(String time) {
@@ -104,15 +126,18 @@ class BookingController extends ChangeNotifier {
 
     _selectedTime = time;
     notifyListeners();
+    _persistDraft();
   }
 
-  void updateAddress(CleaningAddress address) {
-    if (identical(address, _address)) {
+  void updateAddress(CleaningAddress address, {String? addressId}) {
+    if (identical(address, _address) && addressId == _addressId) {
       return;
     }
 
     _address = address;
+    _addressId = addressId;
     notifyListeners();
+    _persistDraft();
   }
 
   void updateNote(String note) {
@@ -122,6 +147,33 @@ class BookingController extends ChangeNotifier {
 
     _note = note;
     notifyListeners();
+    _persistDraft();
+  }
+
+  Future<void> clearDraft() async {
+    await repository?.clearDraft();
+  }
+
+  void _persistDraft() {
+    final storage = repository;
+    final service = _service;
+    if (storage == null || service == null) return;
+    unawaited(
+      storage
+          .saveDraft(
+            BookingDraft(
+              serviceId: service.id,
+              selectedDate: _selectedDate,
+              selectedTime: _selectedTime,
+              addressId: _addressId,
+              note: _note,
+              updatedAt: DateTime.now().toUtc(),
+            ),
+          )
+          .catchError((Object error, StackTrace stackTrace) {
+            debugPrint('Gagal menyimpan draft booking: $error\n$stackTrace');
+          }),
+    );
   }
 
   static int _parsePrice(String price) {

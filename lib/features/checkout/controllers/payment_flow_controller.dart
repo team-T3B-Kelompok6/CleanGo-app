@@ -6,7 +6,7 @@ import '../domain/models/payment_method_model.dart';
 class PaymentFlowController {
   const PaymentFlowController();
 
-  bool createOrder({
+  Future<bool> createOrder({
     required BookingController booking,
     required AddressController addresses,
     required OrderController orders,
@@ -16,7 +16,7 @@ class PaymentFlowController {
     required int platformFee,
     required int discountAmount,
     DateTime? now,
-  }) {
+  }) async {
     final selectedAddress = addresses.selectedAddress;
     final formattedAddress =
         selectedAddress?.fullAddress ??
@@ -53,6 +53,7 @@ class PaymentFlowController {
       customerName: booking.address.customerName,
       customerPhone: booking.address.phoneNumber,
     );
+    await booking.clearDraft();
 
     return isSameDay;
   }

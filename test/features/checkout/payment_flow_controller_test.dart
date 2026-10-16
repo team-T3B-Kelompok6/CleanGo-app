@@ -27,13 +27,13 @@ void main() {
       orders = OrderController();
     });
 
-    test('creates an order from the selected booking and address', () {
+    test('creates an order from the selected booking and address', () async {
       booking
         ..selectDate(DateTime(2030, 1, 3))
         ..selectTime('16:00')
         ..updateNote('Fokus area dapur');
 
-      final isSameDay = controller.createOrder(
+      final isSameDay = await controller.createOrder(
         booking: booking,
         addresses: addresses,
         orders: orders,
@@ -66,12 +66,12 @@ void main() {
       );
     });
 
-    test('marks a booking on the current date as same-day', () {
+    test('marks a booking on the current date as same-day', () async {
       booking
         ..selectDate(DateTime(2030, 1, 2))
         ..selectTime('08:00');
 
-      final isSameDay = controller.createOrder(
+      final isSameDay = await controller.createOrder(
         booking: booking,
         addresses: addresses,
         orders: orders,

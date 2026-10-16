@@ -72,6 +72,7 @@ class _EditAddressPageState extends State<EditAddressPage> {
     if (_isPrimary) {
       context.read<BookingController>().updateAddress(
         updated.toCleaningAddress(),
+        addressId: updated.id,
       );
     }
 

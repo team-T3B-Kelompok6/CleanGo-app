@@ -14,16 +14,19 @@ Pengembangannya dilakukan sesuai pada design CleanGo di Figma:
 
 CleanGo menggunakan tiga jenis penyimpanan sesuai karakter datanya:
 
-- **Drift** menyimpan data alamat yang terstruktur dan dapat dipantau secara
-  reaktif. Perubahan beberapa alamat disimpan dalam satu transaksi.
-- **SharedPreferences** menyimpan pengaturan sederhana berupa status bahwa
-  onboarding sudah diselesaikan.
-- **Flutter Secure Storage** menyimpan access token sesi lokal agar data rahasia
-  tidak diletakkan di penyimpanan biasa.
+- **Drift** menyimpan alamat, draft booking, dan cache layanan secara
+  terstruktur. Data dapat dipantau secara reaktif, pembaruan banyak baris
+  memakai transaksi, dan migrasi schema menjaga data lama saat database naik
+  dari versi 1 ke versi 2.
+- **SharedPreferencesAsync** menyimpan pengaturan kecil yang tidak sensitif,
+  yaitu status onboarding dan filter layanan terakhir.
+- **Flutter Secure Storage** menyimpan access token, refresh token, dan waktu
+  kedaluwarsa sesi agar data rahasia tidak diletakkan di penyimpanan biasa.
 
 Implementasi dipisahkan antara database/storage, repository, controller, dan UI.
-Saat ini autentikasi dan data aplikasi lainnya masih berupa simulasi lokal;
-struktur penyimpanan ini disiapkan tanpa menambahkan backend.
+Saat ini autentikasi dan data remote masih berupa simulasi lokal. Repository
+layanan sudah memakai cache lokal dan menyediakan kontrak sumber data remote,
+tetapi implementasi API Express baru akan dipasang saat endpoint backend siap.
 
 
 ## Struktur project

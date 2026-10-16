@@ -266,6 +266,7 @@ class _AddressListPageState extends State<AddressListPage> {
                                   addresses.first;
                               context.read<BookingController>().updateAddress(
                                 active.toCleaningAddress(),
+                                addressId: active.id,
                               );
                               Navigator.of(context).pop(active);
                             }

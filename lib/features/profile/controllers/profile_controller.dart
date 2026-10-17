@@ -1,10 +1,51 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/storage/token_storage.dart';
+import '../data/customer_profile_service.dart';
 import '../models/user_profile_model.dart';
 
 class ProfileController extends ChangeNotifier {
-  ProfileController() {
+  ProfileController({TokenStorage? tokenStorage, CustomerProfileService? service})
+      : _tokenStorage = tokenStorage,
+        _service = service ?? CustomerProfileService() {
     _profile = _initialProfile;
+  }
+
+  final TokenStorage? _tokenStorage;
+  final CustomerProfileService _service;
+  String? _error;
+  bool _loading = false;
+  String? get error => _error;
+  bool get loading => _loading;
+
+  Future<void> loadFromApi() async {
+    final token = await _tokenStorage?.readAccessToken();
+    if (token == null || token.isEmpty) return;
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      _profile = await _service.fetchProfile(token);
+    } catch (e) { _error = e.toString(); } finally { _loading = false; notifyListeners(); }
+  }
+
+  Future<bool> updateProfileRemote({String? fullName, String? email, String? phoneNumber}) async {
+    final token = await _tokenStorage?.readAccessToken();
+    if (token == null || token.isEmpty) { updateProfile(fullName: fullName, email: email, phoneNumber: phoneNumber); return true; }
+    try {
+      _profile = await _service.updateProfile(token, fullName: fullName, email: email, phoneNumber: phoneNumber);
+      notifyListeners();
+      return true;
+    } catch (e) { _error = e.toString(); notifyListeners(); return false; }
+  }
+
+  Future<bool> changePasswordRemote({required String currentPassword, required String newPassword}) async {
+    final token = await _tokenStorage?.readAccessToken();
+    if (token == null || token.isEmpty) return changePassword(currentPassword: currentPassword, newPassword: newPassword);
+    try {
+      await _service.changePassword(token, currentPassword: currentPassword, newPassword: newPassword);
+      return true;
+    } catch (e) { _error = e.toString(); notifyListeners(); return false; }
   }
 
   static final UserProfileModel _initialProfile = UserProfileModel(

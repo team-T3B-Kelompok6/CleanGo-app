@@ -75,9 +75,10 @@ class _CleanGoAppState extends State<CleanGoApp> {
           create: (_) => AddressController(
             repository: widget.addressRepository,
             initialAddresses: widget.initialAddresses,
+            tokenStorage: widget.tokenStorage,
           ),
         ),
-        ChangeNotifierProvider(create: (_) => ProfileController()),
+        ChangeNotifierProvider(create: (_) => ProfileController(tokenStorage: widget.tokenStorage)),
         ChangeNotifierProvider(create: (_) => SupportController()),
         ChangeNotifierProvider(create: (_) => OrderController()),
       ],

@@ -10,4 +10,6 @@ class ApiConfig {
 
   static const String apiPrefix = '/api';
   static String get customerAuth => '$apiPrefix/customer/auth';
+  static String get customerProfile => '$apiPrefix/customer/profile';
+  static String get customerAddresses => '$apiPrefix/customer/addresses';
 }

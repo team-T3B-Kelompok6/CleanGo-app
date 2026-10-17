@@ -44,6 +44,28 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
+    final response = await _client.patch(uri, headers: headers, body: body == null ? null : jsonEncode(body));
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> delete(String path, {String? token}) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (token != null && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
+    return _handleResponse(await _client.delete(uri, headers: headers));
+  }
+
   Map<String, dynamic> _handleResponse(http.Response response) {
     final body = _decodeBody(response);
 

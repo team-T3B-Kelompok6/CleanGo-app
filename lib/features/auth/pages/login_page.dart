@@ -13,6 +13,8 @@ import 'register_page.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/facebook_dummy_dialog.dart';
+import '../../profile/controllers/profile_controller.dart';
+import '../../address/controllers/address_controller.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, this.authService});
@@ -274,6 +276,12 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
       await context.read<AuthSessionController>().createSession(result.token);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) await context.read<AddressController>().loadFromApi();
+      } catch (_) {}
 
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
@@ -305,6 +313,12 @@ class _LoginPageState extends State<LoginPage> {
       );
       if (!mounted) return;
       await context.read<AuthSessionController>().createSession(result.token);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) await context.read<AddressController>().loadFromApi();
+      } catch (_) {}
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on ApiException catch (e) {
@@ -362,6 +376,12 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
       await context.read<AuthSessionController>().createSession(result.token);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) await context.read<AddressController>().loadFromApi();
+      } catch (_) {}
 
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);

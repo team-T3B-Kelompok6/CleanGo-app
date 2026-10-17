@@ -7,7 +7,7 @@ class PersonalDataFormController {
   PersonalDataFormController(UserProfileModel profile)
     : name = TextEditingController(text: profile.fullName),
       phone = TextEditingController(
-        text: _localPhoneDigits(profile.phoneNumber),
+        text: localPhoneDigits(profile.phoneNumber),
       ),
       email = TextEditingController(text: profile.email),
       selectedGender = profile.gender,
@@ -35,7 +35,7 @@ class PersonalDataFormController {
   void saveTo(ProfileController profileController) {
     profileController.updateProfile(
       fullName: name.text.trim(),
-      phoneNumber: '+62 ${_localPhoneDigits(phone.text)}',
+      phoneNumber: '+62 ${localPhoneDigits(phone.text)}',
       email: email.text.trim(),
       gender: selectedGender,
       birthDate: selectedBirthDate,
@@ -48,7 +48,7 @@ class PersonalDataFormController {
     email.dispose();
   }
 
-  static String _localPhoneDigits(String value) {
+  static String localPhoneDigits(String value) {
     final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.startsWith('62')) return digits.substring(2);
     if (digits.startsWith('0')) return digits.substring(1);

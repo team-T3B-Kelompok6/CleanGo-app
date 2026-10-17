@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/token_storage.dart';
+import '../data/api_auth_service.dart';
 
 class AuthSessionController extends ChangeNotifier {
   AuthSessionController(this._tokenStorage);
@@ -16,7 +17,13 @@ class AuthSessionController extends ChangeNotifier {
     return _tokenStorage.writeAccessToken(token);
   }
 
-  Future<void> signOut() {
-    return _tokenStorage.deleteAccessToken();
+  Future<void> signOut() async {
+    final token = await _tokenStorage.readAccessToken();
+    if (token != null && token.isNotEmpty) {
+      try {
+        await ApiAuthService().logout(token);
+      } catch (_) {}
+    }
+    await _tokenStorage.deleteAccessToken();
   }
 }

@@ -35,6 +35,10 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProfileController>().loadFromApi();
+      context.read<AddressController>().loadFromApi();
+    });
     final mediaQuery = MediaQuery.of(context);
     final contentSideInset = ((mediaQuery.size.width - 480) / 2 + 16).clamp(
       16.0,

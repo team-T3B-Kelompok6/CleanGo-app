@@ -44,6 +44,7 @@ class ApiAuthService {
     required String email,
     required String name,
     String? idToken,
+    String? accessToken,
   }) async {
     final body = <String, dynamic>{
       'provider': provider,
@@ -53,11 +54,18 @@ class ApiAuthService {
     if (idToken != null && idToken.isNotEmpty) {
       body['idToken'] = idToken;
     }
+    if (accessToken != null && accessToken.isNotEmpty) {
+      body['accessToken'] = accessToken;
+    }
     final response = await _client.post(
       '${ApiConfig.customerAuth}/social-login',
       body: body,
     );
     return _parseAuthResult(response);
+  }
+
+  Future<void> logout(String token) {
+    return _client.post('${ApiConfig.customerAuth}/logout', token: token);
   }
 
   AuthResult _parseAuthResult(Map<String, dynamic> response) {

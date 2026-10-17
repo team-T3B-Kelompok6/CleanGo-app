@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../auth/controllers/auth_session_controller.dart';
 import '../../auth/pages/login_page.dart';
 import '../../home/pages/home_page.dart';
+import '../../profile/controllers/profile_controller.dart';
 import 'onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -42,6 +43,8 @@ class _SplashPageState extends State<SplashPage>
     if (!preferences.hasCompletedOnboarding) {
       destination = const OnboardingPage();
     } else if (hasSession) {
+      await context.read<ProfileController>().loadFromApi();
+      if (!mounted) return;
       destination = const HomePage();
     } else {
       destination = const LoginPage();

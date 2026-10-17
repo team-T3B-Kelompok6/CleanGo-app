@@ -28,6 +28,32 @@ class AddressModel {
   final double? latitude;
   final double? longitude;
 
+  factory AddressModel.fromApiJson(Map<String, dynamic> j) => AddressModel(
+        id: j['id']?.toString() ?? '',
+        title: j['label'] as String? ?? j['type'] as String? ?? '',
+        fullAddress: j['street_address'] as String? ?? j['streetAddress'] as String? ?? j['fullAddress'] as String? ?? '',
+        note: j['landmark'] as String? ?? j['note'] as String? ?? '',
+        type: j['label'] as String? ?? j['type'] as String? ?? 'Lainnya',
+        contactName: j['recipient_name'] as String? ?? j['recipientName'] as String? ?? j['contactName'] as String? ?? '',
+        phoneNumber: j['recipient_phone'] as String? ?? j['recipientPhone'] as String? ?? j['phoneNumber'] as String? ?? '',
+        isPrimary: j['is_primary'] == true || j['isPrimary'] == true,
+        latitude: (j['latitude'] as num?)?.toDouble(),
+        longitude: (j['longitude'] as num?)?.toDouble(),
+      );
+
+  Map<String, dynamic> toApiPayload() => {
+        'label': type,
+        'recipient_name': contactName,
+        'recipient_phone': phoneNumber,
+        'street_address': fullAddress.isNotEmpty ? fullAddress : title,
+        'city': 'Malang',
+        'province': 'Jawa Timur',
+        'landmark': note,
+        'latitude': latitude,
+        'longitude': longitude,
+        'is_primary': isPrimary,
+      };
+
   // Backward compatibility getters
   String get label => type;
   String get streetAddress => fullAddress;

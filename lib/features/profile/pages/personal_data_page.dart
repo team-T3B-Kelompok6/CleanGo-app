@@ -67,7 +67,7 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     }
   }
 
-  void _handleSave() {
+  Future<void> _handleSave() async {
     FocusScope.of(context).unfocus();
 
     if (!_hasSubmitted) {
@@ -79,6 +79,18 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     }
 
     final profileController = context.read<ProfileController>();
+    final token = await profileController.updateProfileRemote(
+      fullName: _personalDataForm.name.text.trim(),
+      phoneNumber: '+62 ${PersonalDataFormController.localPhoneDigits(_personalDataForm.phone.text)}',
+      email: _personalDataForm.email.text.trim(),
+    );
+    if (!mounted) return;
+    if (!token) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal menyimpan data ke server.')),
+      );
+      return;
+    }
     _personalDataForm.saveTo(profileController);
 
     ScaffoldMessenger.of(context).showSnackBar(

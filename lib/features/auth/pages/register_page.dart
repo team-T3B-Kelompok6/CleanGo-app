@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/constants/app_routes.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../address/controllers/address_controller.dart';
+import '../../profile/controllers/profile_controller.dart';
+import '../controllers/auth_session_controller.dart';
 import '../data/api_auth_service.dart';
 import '../data/dummy_auth_service.dart';
+import '../data/google_sign_in_service.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
 
@@ -25,6 +31,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmationController = TextEditingController();
   late final ApiAuthService _authService = widget.authService ?? ApiAuthService();
+  final _googleSignInService = GoogleSignInService();
 
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
@@ -251,7 +258,9 @@ class _RegisterPageState extends State<RegisterPage> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      const AuthSocialButtons(),
+                      AuthSocialButtons(
+                        onGoogleTap: _handleGoogleRegister,
+                      ),
                     ],
                   ),
                 ),
@@ -261,6 +270,44 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleGoogleRegister() async {
+    setState(() {
+      _isLoading = true;
+      _serverError = null;
+    });
+
+    try {
+      final googleUser = await _googleSignInService.signIn();
+      if (googleUser == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final result = await _authService.socialLogin(
+        provider: 'google',
+        email: googleUser.email,
+        name: googleUser.name,
+        idToken: googleUser.idToken,
+      );
+      if (!mounted) return;
+      await context.read<AuthSessionController>().createSession(result.token);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) await context.read<AddressController>().loadFromApi();
+      } catch (_) {}
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _serverError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _serverError = 'Gagal daftar dengan Google: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _submit() async {

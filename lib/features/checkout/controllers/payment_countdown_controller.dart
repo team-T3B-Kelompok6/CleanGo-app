@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 class PaymentCountdownController extends ChangeNotifier {
-  PaymentCountdownController({this.duration = const Duration(minutes: 15)}) {
+  PaymentCountdownController({this.duration = const Duration(minutes: 15)})
+    : _remaining = duration {
     _deadline = DateTime.now().add(duration);
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
@@ -11,7 +12,7 @@ class PaymentCountdownController extends ChangeNotifier {
   final Duration duration;
   late final DateTime _deadline;
   Timer? _timer;
-  Duration _remaining = const Duration(minutes: 15);
+  Duration _remaining;
 
   Duration get remaining => _remaining;
   bool get isExpired => _remaining == Duration.zero;

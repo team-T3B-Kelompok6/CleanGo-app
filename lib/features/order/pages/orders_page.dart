@@ -645,7 +645,7 @@ class _ScheduledOrdersView extends StatelessWidget {
   }
 }
 
-class _ScheduledOrderCard extends StatefulWidget {
+class _ScheduledOrderCard extends StatelessWidget {
   const _ScheduledOrderCard({
     required this.order,
     required this.address,
@@ -661,47 +661,20 @@ class _ScheduledOrderCard extends StatefulWidget {
   final VoidCallback onDetail;
 
   @override
-  State<_ScheduledOrderCard> createState() => _ScheduledOrderCardState();
-}
-
-class _ScheduledOrderCardState extends State<_ScheduledOrderCard>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _progressController;
-
-  ScheduledOrderModel get order => widget.order;
-  String get address => widget.address;
-  VoidCallback get onTrackOrder => widget.onTrackOrder;
-  VoidCallback get onReschedule => widget.onReschedule;
-  VoidCallback get onDetail => widget.onDetail;
-
-  @override
-  void initState() {
-    super.initState();
-    _progressController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 6),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _progressController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final schedule = order.scheduledAt;
-    final isSameDay =
-        schedule != null &&
-        schedule.year == now.year &&
-        schedule.month == now.month &&
-        schedule.day == now.day;
-    final isScheduledBooking = schedule != null && !isSameDay;
+    final today = DateTime(now.year, now.month, now.day);
+    final serviceDay = schedule == null
+        ? null
+        : DateTime(schedule.year, schedule.month, schedule.day);
+    final isScheduledBooking =
+        order.stage == OrderStatusStage.dikonfirmasi &&
+        serviceDay != null &&
+        serviceDay.isAfter(today);
     final statusLabel = isScheduledBooking ? 'BOOKING TERJADWAL' : order.status;
     final headline = isScheduledBooking
-        ? _formatOrderSchedule(schedule)
+        ? _formatOrderSchedule(schedule!)
         : order.arrivalEstimate;
     final description = isScheduledBooking
         ? 'Pesanan sudah dikonfirmasi dan menunggu hari layanan.'
@@ -775,9 +748,14 @@ class _ScheduledOrderCardState extends State<_ScheduledOrderCard>
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isScheduledBooking
+                  isScheduledBooking ||
+                          order.stage == OrderStatusStage.dikonfirmasi
                       ? Icons.event_available_outlined
-                      : Icons.directions_bike_outlined,
+                      : order.stage == OrderStatusStage.dalamPerjalanan
+                      ? Icons.directions_bike_outlined
+                      : order.stage == OrderStatusStage.sedangDikerjakan
+                      ? Icons.cleaning_services_outlined
+                      : Icons.person_pin_circle_outlined,
                   color: AppColors.primaryAction,
                   size: 24,
                 ),
@@ -800,18 +778,11 @@ class _ScheduledOrderCardState extends State<_ScheduledOrderCard>
                     const Positioned.fill(
                       child: ColoredBox(color: Color(0xFFD9EFED)),
                     ),
-                    AnimatedBuilder(
-                      animation: _progressController,
-                      builder: (context, _) => FractionallySizedBox(
-                        widthFactor:
-                            order.progress.clamp(0.0, 1.0) *
-                            Curves.easeInOut.transform(
-                              _progressController.value,
-                            ),
-                        alignment: Alignment.centerLeft,
-                        child: const SizedBox.expand(
-                          child: ColoredBox(color: Color(0xFF00685F)),
-                        ),
+                    FractionallySizedBox(
+                      widthFactor: order.progress.clamp(0.0, 1.0),
+                      alignment: Alignment.centerLeft,
+                      child: const SizedBox.expand(
+                        child: ColoredBox(color: Color(0xFF00685F)),
                       ),
                     ),
                   ],

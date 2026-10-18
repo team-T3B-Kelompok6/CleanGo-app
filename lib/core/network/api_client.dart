@@ -24,7 +24,12 @@ class ApiClient {
           body: jsonEncode(body),
         )
         .timeout(const Duration(seconds: 15));
-    final decoded = jsonDecode(response.body);
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on FormatException {
+      throw const ApiException('Respons server tidak valid.');
+    }
     if (decoded is! Map<String, dynamic>) {
       throw const ApiException('Respons server tidak valid.');
     }

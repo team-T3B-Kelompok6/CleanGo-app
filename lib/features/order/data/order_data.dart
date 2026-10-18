@@ -2,15 +2,16 @@ import '../domain/models/order_model.dart';
 
 abstract final class OrderData {
   static const ScheduledOrderModel scheduledOrder = ScheduledOrderModel(
-    status: 'CLEANER MENUJU LOKASI',
-    arrivalEstimate: 'Tiba ~09:10 WIB',
-    travelDescription: 'Estimasi waktu perjalanan sekitar 15 menit',
-    progress: 0.66,
+    status: 'PESANAN DIKONFIRMASI',
+    arrivalEstimate: 'Menunggu jadwal layanan',
+    travelDescription: 'Pesanan diterima dan menunggu penugasan cleaner.',
+    progress: 0.2,
     serviceName: 'Deep Cleaning',
     serviceImagePath: 'assets/images/deep_cleaning.jpeg',
     orderNumber: '#CG-82910',
     price: 'Rp305.000',
     paymentStatus: 'QRIS Terbayar',
+    stage: OrderStatusStage.dikonfirmasi,
   );
 
   static const List<OrderHistoryModel> history = [

@@ -12,6 +12,7 @@ class OrderTrackingMap extends StatefulWidget {
     this.height = 250,
     this.borderRadius = 18,
     this.controlsBottomInset = 12,
+    this.onCleanerPositionChanged,
     super.key,
   });
 
@@ -19,6 +20,8 @@ class OrderTrackingMap extends StatefulWidget {
   final double height;
   final double borderRadius;
   final double controlsBottomInset;
+  final Future<void> Function(double latitude, double longitude)?
+  onCleanerPositionChanged;
 
   @override
   State<OrderTrackingMap> createState() => _OrderTrackingMapState();
@@ -28,31 +31,32 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
     with SingleTickerProviderStateMixin {
   late final MapController _mapController;
 
-  // Koordinat Rute Nyata Malang (Malang City Point ke Mojolangu / Sigura-Gura)
-  // MCP -> Jl. Terusan Dieng -> Jl. Galunggung -> Jl. Sigura-gura -> Jl. Gajayana -> Mojolangu
-  static final List<LatLng> _malangRoutePoints = [
-    const LatLng(-7.97342, 112.61521), // 0: Malang City Point (MCP) / Start
-    const LatLng(-7.96985, 112.61385), // 1: Jl. Terusan Dieng
-    const LatLng(-7.96620, 112.61240), // 2: Simpang Galunggung
-    const LatLng(-7.96150, 112.61460), // 3: Jl. Bendungan Sigura-gura Barat
-    const LatLng(-7.95750, 112.61680), // 4: Jl. Bendungan Sigura-gura
-    const LatLng(-7.95380, 112.61890), // 5: Kampus UB / Jl. Gajayana
-    const LatLng(-7.94950, 112.62250), // 6: Jl. MT Haryono / Dinoyo
-    const LatLng(-7.94520, 112.62450), // 7: Jl. Candi Mendut
-    const LatLng(-7.94180, 112.62610), // 8: Jl. Simpang Mojolangu
-    const LatLng(
-      -7.93980,
-      112.62650,
-    ), // 9: Blk. N No.521 Mojolangu (Rumah Anda)
-  ];
-
   LatLng get _destinationPoint => LatLng(
     widget.order.destinationLatitude,
     widget.order.destinationLongitude,
   );
 
+  bool get _isTravelStage =>
+      widget.order.stage == OrderStatusStage.ditugaskan ||
+      widget.order.stage == OrderStatusStage.dalamPerjalanan;
+
+  bool get _isTravelActive =>
+      _isTravelStage && widget.order.hasDestinationCoordinates;
+
+  List<LatLng> get _remainingRoutePoints {
+    final points = widget.order.routePoints
+        .map((point) => LatLng(point.latitude, point.longitude))
+        .toList(growable: false);
+    if (points.length >= 2) return points;
+    return [_currentCleanerPosition, _destinationPoint];
+  }
+
+  List<LatLng> get _displayRoutePoints =>
+      _isSimulating ? _simulationRoutePoints : _remainingRoutePoints;
+
   late LatLng _currentCleanerPosition;
-  double _routeFraction = 0.45; // Default: dalamPerjalanan (tengah rute)
+  double _routeFraction = 0;
+  List<LatLng> _simulationRoutePoints = const [];
   Timer? _simulationTimer;
   bool _isSimulating = false;
 
@@ -60,7 +64,10 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
   void initState() {
     super.initState();
     _mapController = MapController();
-    _updatePositionFromStage(widget.order.stage);
+    _currentCleanerPosition = LatLng(
+      widget.order.cleanerLatitude,
+      widget.order.cleanerLongitude,
+    );
   }
 
   @override
@@ -75,10 +82,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
         widget.order.cleanerLongitude,
       );
     }
-    if (oldWidget.order.stage != widget.order.stage && !_isSimulating) {
-      setState(() {
-        _updatePositionFromStage(widget.order.stage);
-      });
+    if (!_isTravelActive && _isSimulating) {
+      _simulationTimer?.cancel();
+      _isSimulating = false;
     }
   }
 
@@ -89,34 +95,17 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
     super.dispose();
   }
 
-  void _updatePositionFromStage(OrderStatusStage stage) {
-    switch (stage) {
-      case OrderStatusStage.dikonfirmasi:
-        _routeFraction = 0.05;
-        break;
-      case OrderStatusStage.ditugaskan:
-        _routeFraction = 0.20;
-        break;
-      case OrderStatusStage.dalamPerjalanan:
-        _routeFraction = 0.50;
-        break;
-      case OrderStatusStage.sedangDikerjakan:
-      case OrderStatusStage.selesai:
-        _routeFraction = 1.0;
-        break;
-    }
-    _currentCleanerPosition = _interpolatePointOnRoute(_routeFraction);
-  }
-
   LatLng _interpolatePointOnRoute(double fraction) {
+    final routePoints = _simulationRoutePoints;
+    if (routePoints.length < 2) return _destinationPoint;
     final clamped = fraction.clamp(0.0, 1.0);
-    final totalSegments = _malangRoutePoints.length - 1;
+    final totalSegments = routePoints.length - 1;
     final targetSegmentFloat = clamped * totalSegments;
     final segmentIndex = targetSegmentFloat.floor().clamp(0, totalSegments - 1);
     final segmentFraction = targetSegmentFloat - segmentIndex;
 
-    final p1 = _malangRoutePoints[segmentIndex];
-    final p2 = _malangRoutePoints[segmentIndex + 1];
+    final p1 = routePoints[segmentIndex];
+    final p2 = routePoints[segmentIndex + 1];
 
     final lat = p1.latitude + (p2.latitude - p1.latitude) * segmentFraction;
     final lng = p1.longitude + (p2.longitude - p1.longitude) * segmentFraction;
@@ -124,6 +113,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
   }
 
   void _toggleSimulation() {
+    if (!_isTravelActive) return;
     if (_isSimulating) {
       _simulationTimer?.cancel();
       setState(() {
@@ -134,21 +124,18 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
 
     setState(() {
       _isSimulating = true;
-      if (_routeFraction >= 0.98) {
-        _routeFraction = 0.05;
-      }
+      _routeFraction = 0;
+      _simulationRoutePoints = List<LatLng>.from(_remainingRoutePoints);
     });
 
-    _simulationTimer = Timer.periodic(const Duration(milliseconds: 300), (
-      timer,
-    ) {
+    _simulationTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (!mounted) {
         timer.cancel();
         return;
       }
 
       setState(() {
-        _routeFraction += 0.035;
+        _routeFraction += 0.1;
         if (_routeFraction >= 1.0) {
           _routeFraction = 1.0;
           _isSimulating = false;
@@ -156,33 +143,57 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
         }
         _currentCleanerPosition = _interpolatePointOnRoute(_routeFraction);
       });
+      final callback = widget.onCleanerPositionChanged;
+      if (callback != null) {
+        unawaited(
+          callback(
+            _currentCleanerPosition.latitude,
+            _currentCleanerPosition.longitude,
+          ),
+        );
+      }
     });
   }
 
   void _recenterMap() {
     _mapController.move(
-      LatLng(
-        (_currentCleanerPosition.latitude + _destinationPoint.latitude) / 2,
-        (_currentCleanerPosition.longitude + _destinationPoint.longitude) / 2,
-      ),
+      _isTravelActive
+          ? LatLng(
+              (_currentCleanerPosition.latitude + _destinationPoint.latitude) /
+                  2,
+              (_currentCleanerPosition.longitude +
+                      _destinationPoint.longitude) /
+                  2,
+            )
+          : _isTravelStage || !widget.order.hasDestinationCoordinates
+          ? _currentCleanerPosition
+          : _destinationPoint,
       14.3,
     );
   }
 
   String get _remainingDistanceLabel {
-    if (_routeFraction >= 0.95) {
-      return 'Tiba di lokasi';
+    if (!widget.order.hasDestinationCoordinates) {
+      return 'Titik tujuan belum tersedia';
     }
-    final distanceKm = ((1.0 - _routeFraction) * 4.2).clamp(0.3, 4.2);
-    return '${distanceKm.toStringAsFixed(1)} km lagi';
+    if (widget.order.stage == OrderStatusStage.dikonfirmasi) {
+      return 'Menunggu cleaner berangkat';
+    }
+    if (!_isTravelActive) return 'Cleaner sudah tiba';
+    return widget.order.distanceKm;
   }
 
   @override
   Widget build(BuildContext context) {
-    final centerPoint = LatLng(
-      (_currentCleanerPosition.latitude + _destinationPoint.latitude) / 2,
-      (_currentCleanerPosition.longitude + _destinationPoint.longitude) / 2,
-    );
+    final centerPoint = _isTravelActive
+        ? LatLng(
+            (_currentCleanerPosition.latitude + _destinationPoint.latitude) / 2,
+            (_currentCleanerPosition.longitude + _destinationPoint.longitude) /
+                2,
+          )
+        : _isTravelStage || !widget.order.hasDestinationCoordinates
+        ? _currentCleanerPosition
+        : _destinationPoint;
 
     return Container(
       height: widget.height,
@@ -220,39 +231,43 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.cleango_app',
                 ),
-                // Garis Polyline Rute Nyata Malang
-                PolylineLayer(
-                  polylines: [
-                    // Outer border jalur rute (putih)
-                    Polyline(
-                      points: _malangRoutePoints,
-                      strokeWidth: 7.0,
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
-                    // Garis rute utama teal
-                    Polyline(
-                      points: _malangRoutePoints,
-                      strokeWidth: 4.5,
-                      color: const Color(0xFF00685F),
-                    ),
-                  ],
-                ),
+                if (_isTravelActive)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: _displayRoutePoints,
+                        strokeWidth: 7.0,
+                        color: Colors.white.withValues(alpha: 0.85),
+                      ),
+                      Polyline(
+                        points: _displayRoutePoints,
+                        strokeWidth: 4.5,
+                        color: const Color(0xFF00685F),
+                      ),
+                    ],
+                  ),
                 MarkerLayer(
                   markers: [
                     // 1. Marker Tujuan (Rumah Anda)
-                    Marker(
-                      point: _destinationPoint,
-                      width: 110,
-                      height: 70,
-                      child: _buildDestinationMarker(),
-                    ),
-                    // 2. Marker Cleaner Siti yang Bergerak
-                    Marker(
-                      point: _currentCleanerPosition,
-                      width: 120,
-                      height: 72,
-                      child: _buildCleanerMarker(),
-                    ),
+                    if (widget.order.hasDestinationCoordinates)
+                      Marker(
+                        point: _destinationPoint,
+                        width: 110,
+                        height: 70,
+                        child: _buildDestinationMarker(),
+                      ),
+                    if (_isTravelStage)
+                      Marker(
+                        point: _currentCleanerPosition,
+                        width: 120,
+                        height: 72,
+                        child: _buildCleanerMarker(),
+                      ),
+                  ],
+                ),
+                const RichAttributionWidget(
+                  attributions: [
+                    TextSourceAttribution('OpenStreetMap contributors'),
                   ],
                 ),
               ],
@@ -264,15 +279,17 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
               bottom: widget.controlsBottomInset,
               child: Row(
                 children: [
-                  _buildMapActionPill(
-                    icon: _isSimulating
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    label: _isSimulating ? 'Pause' : 'Simulasi',
-                    onTap: _toggleSimulation,
-                    isHighlighted: _isSimulating,
-                  ),
-                  const SizedBox(width: 7),
+                  if (_isTravelActive) ...[
+                    _buildMapActionPill(
+                      icon: _isSimulating
+                          ? Icons.pause_rounded
+                          : Icons.play_arrow_rounded,
+                      label: _isSimulating ? 'Pause' : 'Simulasi',
+                      onTap: _toggleSimulation,
+                      isHighlighted: _isSimulating,
+                    ),
+                    const SizedBox(width: 7),
+                  ],
                   _buildMiniCircleButton(
                     icon: Icons.my_location_rounded,
                     onTap: _recenterMap,
@@ -317,9 +334,13 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'MCP ➔ Sigura-Gura',
-                          style: TextStyle(
+                        Text(
+                          !widget.order.hasDestinationCoordinates
+                              ? 'Alamat belum memiliki titik'
+                              : _isTravelActive
+                              ? '${widget.order.originLocation} ➔ Tujuan'
+                              : 'Status perjalanan',
+                          style: const TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,

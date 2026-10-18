@@ -20,6 +20,10 @@ void main() {
             'source': 'ml',
             'modelVersion': 'eta-v1',
             'updatedAt': '2026-10-16T02:00:00.000Z',
+            'path': [
+              [-7.97, 112.61],
+              [-7.94, 112.62],
+            ],
           },
         }),
         200,
@@ -43,6 +47,9 @@ void main() {
 
     expect(result.etaMinutes, 12);
     expect(result.source, 'ml');
+    expect(result.path, hasLength(2));
+    expect(result.path.last.latitude, -7.94);
+    expect(result.path.last.longitude, 112.62);
     repository.dispose();
   });
 }

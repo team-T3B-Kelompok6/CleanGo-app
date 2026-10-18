@@ -17,10 +17,12 @@ class PaymentFlowController {
     required int discountAmount,
     DateTime? now,
   }) async {
-    final selectedAddress = addresses.selectedAddress;
+    final selectedAddress =
+        addresses.findById(booking.addressId) ?? addresses.selectedAddress;
+    final bookingAddress = booking.address;
     final formattedAddress =
         selectedAddress?.fullAddress ??
-        '${booking.address.street}, ${booking.address.city}';
+        '${bookingAddress.street}, ${bookingAddress.city}';
     final selectedTimeParts = booking.selectedTime.split(':');
     final scheduledAt = DateTime(
       booking.selectedDate.year,
@@ -44,14 +46,17 @@ class PaymentFlowController {
       address: formattedAddress.trim().isNotEmpty
           ? formattedAddress
           : 'Jl. Sigura - Gura No. 12, Malang',
+      destinationSubAddress: selectedAddress?.note ?? bookingAddress.landmark,
+      destinationLatitude: selectedAddress?.latitude,
+      destinationLongitude: selectedAddress?.longitude,
       scheduledAt: scheduledAt,
       note: booking.note.trim(),
       paymentMethod: method.name,
       servicePrice: servicePrice,
       platformFee: platformFee,
       discountAmount: discountAmount,
-      customerName: booking.address.customerName,
-      customerPhone: booking.address.phoneNumber,
+      customerName: selectedAddress?.contactName ?? bookingAddress.customerName,
+      customerPhone: selectedAddress?.phoneNumber ?? bookingAddress.phoneNumber,
     );
     await booking.clearDraft();
 

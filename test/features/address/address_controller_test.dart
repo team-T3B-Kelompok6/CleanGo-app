@@ -64,6 +64,14 @@ void main() {
       expect(controller.selectedAddressId, controller.primaryAddress!.id);
     });
 
+    test('empty initial snapshot safely falls back to seeded addresses', () {
+      final emptyController = AddressController(initialAddresses: const []);
+
+      expect(emptyController.addresses, isNotEmpty);
+      expect(emptyController.selectedAddress, isNotNull);
+      emptyController.dispose();
+    });
+
     test('selectAddress updates selectedAddressId', () {
       final secondId = controller.addresses[1].id;
       controller.selectAddress(secondId);

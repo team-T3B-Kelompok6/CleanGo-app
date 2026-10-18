@@ -1,7 +1,46 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
+import 'package:cleango_app/features/order/data/eta_repository.dart';
 import 'package:cleango_app/features/order/domain/models/order_model.dart';
 import 'package:cleango_app/features/service/controllers/service_controller.dart';
+
+class FakeEtaRepository extends EtaRepository {
+  int calls = 0;
+  double? lastInitialDistanceM;
+  double? lastElapsedSeconds;
+
+  @override
+  Future<EtaEstimate> calculate({
+    required double cleanerLatitude,
+    required double cleanerLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+    required double initialDistanceM,
+    required double elapsedSeconds,
+    required double stoppedDurationSeconds,
+    required double rollingSpeedMps,
+  }) async {
+    calls += 1;
+    lastInitialDistanceM = initialDistanceM;
+    lastElapsedSeconds = elapsedSeconds;
+    return EtaEstimate(
+      distanceMeters: calls == 1 ? 4200 : 2100,
+      baselineEtaSeconds: calls == 1 ? 900 : 450,
+      etaSeconds: calls == 1 ? 720 : 360,
+      etaMinutes: calls == 1 ? 12 : 6,
+      source: 'ml',
+      modelVersion: 'eta-v1',
+      updatedAt: DateTime(2026, 10, 16, 9),
+      path: const [
+        RoutePoint(latitude: -7.97, longitude: 112.61),
+        RoutePoint(latitude: -7.94, longitude: 112.62),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {}
+}
 
 void main() {
   group('OrderController Tests', () {
@@ -11,12 +50,18 @@ void main() {
       controller = OrderController();
     });
 
-    test('Initial stage is dalamPerjalanan and step number is 3 of 5', () {
-      expect(controller.currentStage, OrderStatusStage.dalamPerjalanan);
-      expect(controller.currentStepNumber, 3);
-      expect(controller.currentStepLabel, 'Langkah 3 dari 5');
+    test('initial scheduled order waits for departure without a dummy ETA', () {
+      expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
+      expect(controller.currentStepNumber, 1);
+      expect(controller.currentStepLabel, 'Langkah 1 dari 5');
       expect(controller.scheduledOrder.orderNumber, '#CG-82910');
       expect(controller.scheduledOrder.cleanerName, 'Siti Rahmawati');
+      expect(controller.etaAvailable, isFalse);
+      expect(controller.scheduledOrder.estimatedMinutes, 'Belum tersedia');
+      expect(
+        controller.stageTimeLabel(OrderStatusStage.ditugaskan),
+        'Menunggu',
+      );
     });
 
     test('setStage updates progress, status text, and step label correctly across all 5 stages', () {
@@ -52,6 +97,10 @@ void main() {
       expect(controller.currentStepNumber, 5);
       expect(controller.currentStepLabel, 'Langkah 5 dari 5');
       expect(controller.scheduledOrder.progress, 1.0);
+      expect(
+        controller.stageTimeLabel(OrderStatusStage.selesai),
+        startsWith('Selesai '),
+      );
     });
 
     test('nextStage advances step sequentially and stops at selesai', () {
@@ -92,6 +141,63 @@ void main() {
       expect(order.stage, OrderStatusStage.dikonfirmasi);
       expect(controller.currentStepNumber, 1);
     });
+
+    test(
+      'ETA starts only after departure and updates from cleaner coordinates',
+      () async {
+        final repository = FakeEtaRepository();
+        final trackingController = OrderController(etaRepository: repository);
+
+        trackingController.setStage(OrderStatusStage.dikonfirmasi);
+        await trackingController.refreshEta();
+        expect(repository.calls, 0);
+        expect(trackingController.etaAvailable, isFalse);
+        expect(
+          trackingController.etaHeadline,
+          'ETA tersedia setelah cleaner berangkat',
+        );
+
+        trackingController.setStage(OrderStatusStage.ditugaskan);
+        await trackingController.refreshEta();
+        expect(repository.calls, 1);
+        expect(repository.lastInitialDistanceM, 1);
+        expect(repository.lastElapsedSeconds, lessThan(2));
+        expect(trackingController.etaAvailable, isTrue);
+        expect(trackingController.scheduledOrder.routePoints, hasLength(2));
+
+        await trackingController.updateCleanerLocation(-7.95, 112.62);
+        expect(repository.calls, 2);
+        expect(trackingController.scheduledOrder.estimatedMinutes, '±6 menit');
+        expect(trackingController.scheduledOrder.cleanerLatitude, -7.95);
+        trackingController.dispose();
+      },
+    );
+
+    test(
+      'ETA stays unavailable when the selected address has no map point',
+      () async {
+        final repository = FakeEtaRepository();
+        final trackingController = OrderController(etaRepository: repository);
+        trackingController.createOrderFromBooking(
+          serviceName: 'Deep Cleaning',
+          serviceImagePath: 'assets/images/deep_cleaning.jpeg',
+          price: 'Rp155.000',
+          address: 'Alamat tanpa titik peta',
+        );
+
+        trackingController.setStage(OrderStatusStage.ditugaskan);
+        await trackingController.refreshEta();
+
+        expect(
+          trackingController.scheduledOrder.hasDestinationCoordinates,
+          isFalse,
+        );
+        expect(trackingController.canCalculateEta, isFalse);
+        expect(repository.calls, 0);
+        expect(trackingController.etaHeadline, 'Titik tujuan belum tersedia');
+        trackingController.dispose();
+      },
+    );
 
     test('submitReview records review data and sets canReview to false on matching history item', () {
       final initialReviewable = controller.historyOrders.firstWhere(

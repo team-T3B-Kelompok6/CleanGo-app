@@ -50,6 +50,7 @@ class BookingController extends ChangeNotifier {
   DateTime get selectedDate => _selectedDate;
   String get selectedTime => _selectedTime;
   CleaningAddress get address => _address;
+  String? get addressId => _addressId;
   String get note => _note;
   int get servicePriceValue => _parsePrice(_service?.price ?? '');
   int get totalPayment => servicePriceValue + platformFee;

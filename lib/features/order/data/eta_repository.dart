@@ -1,5 +1,6 @@
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../domain/models/order_model.dart';
 
 class EtaEstimate {
   const EtaEstimate({
@@ -10,6 +11,7 @@ class EtaEstimate {
     required this.source,
     required this.modelVersion,
     required this.updatedAt,
+    required this.path,
   });
 
   final int distanceMeters;
@@ -19,6 +21,7 @@ class EtaEstimate {
   final String source;
   final String? modelVersion;
   final DateTime updatedAt;
+  final List<RoutePoint> path;
 
   factory EtaEstimate.fromJson(Map<String, dynamic> json) {
     return EtaEstimate(
@@ -29,6 +32,16 @@ class EtaEstimate {
       source: json['source'] as String,
       modelVersion: json['modelVersion'] as String?,
       updatedAt: DateTime.parse(json['updatedAt'] as String).toLocal(),
+      path: (json['path'] as List<dynamic>? ?? const [])
+          .whereType<List<dynamic>>()
+          .where((point) => point.length >= 2)
+          .map(
+            (point) => RoutePoint(
+              latitude: (point[0] as num).toDouble(),
+              longitude: (point[1] as num).toDouble(),
+            ),
+          )
+          .toList(growable: false),
     );
   }
 }

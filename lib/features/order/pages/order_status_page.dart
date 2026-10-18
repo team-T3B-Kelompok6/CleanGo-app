@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -146,6 +148,8 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   borderRadius: 0,
                   controlsBottomInset:
                       MediaQuery.sizeOf(context).height * _sheetSize + 12,
+                  onCleanerPositionChanged:
+                      orderController.updateCleanerLocation,
                 ),
               ),
               DraggableScrollableSheet(
@@ -178,9 +182,11 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        _buildEstimatedArrivalCard(order, orderController),
+                        _buildEstimatedArrivalCard(orderController),
                         const SizedBox(height: 14),
-                        _buildCleanerCard(context, order),
+                        currentStage == OrderStatusStage.dikonfirmasi
+                            ? _buildWaitingCleanerCard()
+                            : _buildCleanerCard(context, order),
                         const SizedBox(height: 14),
                         _buildServiceStagesCard(
                           context,
@@ -413,10 +419,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
-  Widget _buildEstimatedArrivalCard(
-    ScheduledOrderModel order,
-    OrderController controller,
-  ) {
+  Widget _buildEstimatedArrivalCard(OrderController controller) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -451,9 +454,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Perkiraan Waktu Tiba',
-                  style: TextStyle(
+                Text(
+                  controller.etaCardTitle,
+                  style: const TextStyle(
                     color: Color(0xFF64748B),
                     fontFamily: 'Inter',
                     fontSize: 12.5,
@@ -461,32 +464,18 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text.rich(
-                  TextSpan(
-                    text: 'Cleaner tiba pukul ',
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    children: [
-                      TextSpan(
-                        text: order.estimatedArrivalTime,
-                        style: const TextStyle(
-                          color: Color(0xFF00685F),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
+                Text(
+                  controller.etaHeadline,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  controller.etaError ??
-                      (order.etaUpdatedAt == null
-                          ? order.etaSource
-                          : '${order.etaSource} · diperbarui ${order.etaUpdatedAt!.hour.toString().padLeft(2, '0')}:${order.etaUpdatedAt!.minute.toString().padLeft(2, '0')}:${order.etaUpdatedAt!.second.toString().padLeft(2, '0')}'),
+                  controller.etaDetail,
                   style: TextStyle(
                     color: controller.etaError == null
                         ? const Color(0xFF64748B)
@@ -514,9 +503,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   border: Border.all(color: const Color(0xFFCCFBF1)),
                 ),
                 child: Text(
-                  controller.etaLoading
-                      ? 'Menghitung…'
-                      : order.estimatedMinutes,
+                  controller.etaMinutesLabel,
                   style: const TextStyle(
                     color: Color(0xFF00685F),
                     fontFamily: 'Inter',
@@ -528,7 +515,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
               IconButton(
                 tooltip: 'Perbarui ETA',
                 visualDensity: VisualDensity.compact,
-                onPressed: controller.etaLoading ? null : controller.refreshEta,
+                onPressed: controller.etaLoading || !controller.canCalculateEta
+                    ? null
+                    : controller.refreshEta,
                 icon: const Icon(
                   Icons.refresh_rounded,
                   color: Color(0xFF00685F),
@@ -683,6 +672,57 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
+  Widget _buildWaitingCleanerCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: const Row(
+        children: [
+          CircleAvatar(
+            radius: 25,
+            backgroundColor: Color(0xFFE6FAF7),
+            child: Icon(
+              Icons.person_search_outlined,
+              color: Color(0xFF00685F),
+              size: 27,
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Menunggu penugasan cleaner',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontFamily: 'Inter',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'Profil cleaner akan tampil setelah admin melakukan penugasan.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontFamily: 'Inter',
+                    fontSize: 11.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildServiceStagesCard(
     BuildContext context,
     OrderController controller,
@@ -757,10 +797,15 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   controller.completeScheduledOrder();
                 } else {
                   controller.setStage(stage);
+                  if (controller.canCalculateEta) {
+                    unawaited(controller.refreshEta());
+                  }
                 }
               },
               child: _buildStageStepItem(
                 stage: stage,
+                description: controller.stageDescription(stage),
+                timeLabel: controller.stageTimeLabel(stage),
                 isCompleted: isCompleted,
                 isCurrent: isCurrent,
                 isLast: isLast,
@@ -774,6 +819,8 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
 
   Widget _buildStageStepItem({
     required OrderStatusStage stage,
+    required String description,
+    required String timeLabel,
     required bool isCompleted,
     required bool isCurrent,
     required bool isLast,
@@ -908,7 +955,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          stage.description,
+                          description,
                           style: const TextStyle(
                             color: Color(0xFF475569),
                             fontFamily: 'Inter',
@@ -939,7 +986,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                             ),
                           ),
                           Text(
-                            stage.timeLabel,
+                            timeLabel,
                             style: TextStyle(
                               color: isCompleted
                                   ? const Color(0xFF64748B)
@@ -953,7 +1000,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        stage.description,
+                        description,
                         style: TextStyle(
                           color: isCompleted
                               ? const Color(0xFF64748B)

@@ -14,6 +14,7 @@ import '../../chatbot/pages/chatbot_page.dart';
 import '../data/home_data.dart';
 import '../domain/models/popular_service_model.dart';
 import '../domain/models/service_category_model.dart';
+import '../../profile/controllers/profile_controller.dart';
 import '../../service/controllers/service_controller.dart';
 import '../../service/pages/service_detail_page.dart';
 import '../widgets/popular_service_card.dart';
@@ -55,7 +56,7 @@ class HomePage extends StatelessWidget {
                   child: CustomScrollView(
                     physics: const BouncingScrollPhysics(),
                     slivers: [
-                      const SliverToBoxAdapter(child: _HomeIntroSection()),
+                      SliverToBoxAdapter(child: _HomeIntroSection()),
                       SliverToBoxAdapter(
                         child: _ServiceCategoriesSection(
                           categories: HomeData.categories,
@@ -137,7 +138,7 @@ class HomePage extends StatelessWidget {
 }
 
 class _HomeIntroSection extends StatelessWidget {
-  const _HomeIntroSection();
+  _HomeIntroSection();
 
   @override
   Widget build(BuildContext context) {
@@ -230,12 +231,15 @@ class _ServiceCategoriesSection extends StatelessWidget {
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader();
+  _HomeHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    final profile = context.watch<ProfileController>().profile;
+    final greetingName = profile.fullName.isNotEmpty ? profile.fullName : 'Pengguna';
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
         children: [
           Expanded(
@@ -273,7 +277,7 @@ class _HomeHeader extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              'Halo, Krisna',
+                              'Halo, $greetingName',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -341,6 +345,7 @@ class _HomeHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
     );
   }
 }

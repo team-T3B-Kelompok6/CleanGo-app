@@ -20,13 +20,24 @@ class ProfileController extends ChangeNotifier {
 
   Future<void> loadFromApi() async {
     final token = await _tokenStorage?.readAccessToken();
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      _loading = false;
+      notifyListeners();
+      return;
+    }
     _loading = true;
     _error = null;
     notifyListeners();
     try {
       _profile = await _service.fetchProfile(token);
-    } catch (e) { _error = e.toString(); } finally { _loading = false; notifyListeners(); }
+    } catch (e) {
+      _error = 'Gagal memuat profil: ${e.toString()}';
+      // Fallback tetap gunakan dummy agar UI tidak kosong
+      _profile = _initialProfile;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> updateProfileRemote({String? fullName, String? email, String? phoneNumber}) async {

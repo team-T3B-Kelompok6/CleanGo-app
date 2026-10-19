@@ -324,12 +324,16 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.register(
+      final result = await _authService.register(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         password: _passwordController.text,
       );
-
+      if (!mounted) return;
+      await context.read<AuthSessionController>().createSession(result.token);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {

@@ -106,7 +106,10 @@ class _ServiceListPageState extends State<ServiceListPage> {
           showOrderBadge: false,
           onDestinationSelected: (index) {
             if (index == 0) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                AppRoutes.home,
+                (route) => false,
+              );
             } else if (index == 2) {
               Navigator.pushNamed(context, AppRoutes.orders);
             } else if (index == 3) {

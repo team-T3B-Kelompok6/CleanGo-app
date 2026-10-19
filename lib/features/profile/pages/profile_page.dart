@@ -187,7 +187,10 @@ class ProfilePage extends StatelessWidget {
 
   void _handleNavigation(BuildContext context, int index) {
     if (index == 0) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.home,
+        (route) => false,
+      );
     } else if (index == 1) {
       Navigator.pushReplacementNamed(context, AppRoutes.services);
     } else if (index == 2) {

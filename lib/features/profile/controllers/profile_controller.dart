@@ -1,13 +1,16 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/storage/token_storage.dart';
+import '../data/customer_profile_service.dart';
 import '../models/user_profile_model.dart';
 
 class ProfileController extends ChangeNotifier {
-  ProfileController() {
+  ProfileController({TokenStorage? tokenStorage, CustomerProfileService? service})
+      : _tokenStorage = tokenStorage,
+        _service = service ?? CustomerProfileService() {
     _profile = _initialProfile;
   }
 
-=======
   final TokenStorage? _tokenStorage;
   final CustomerProfileService _service;
   String? _error;
@@ -29,7 +32,6 @@ class ProfileController extends ChangeNotifier {
       _profile = await _service.fetchProfile(token);
     } catch (e) {
       _error = 'Gagal memuat profil: ${e.toString()}';
-      // Fallback tetap gunakan dummy agar UI tidak kosong
       _profile = _initialProfile;
     } finally {
       _loading = false;

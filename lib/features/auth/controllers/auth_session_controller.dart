@@ -6,20 +6,20 @@ import 'package:flutter/foundation.dart';
 import '../../../core/storage/token_storage.dart';
 
 class AuthSessionController extends ChangeNotifier {
-  AuthSessionController(this._tokenStorage);
+  AuthSessionController(this.tokenStorage);
 
-  final TokenStorage _tokenStorage;
+  final TokenStorage tokenStorage;
 
   Future<bool> hasSession() async {
-    final token = await _tokenStorage.readAccessToken();
-    final expiresAt = await _tokenStorage.readExpiresAt();
+    final token = await tokenStorage.readAccessToken();
+    final expiresAt = await tokenStorage.readExpiresAt();
     final isValid =
         token != null &&
         token.isNotEmpty &&
         expiresAt != null &&
         expiresAt.isAfter(DateTime.now().toUtc());
     if (!isValid) {
-      await _tokenStorage.clearSession();
+      await tokenStorage.clearSession();
     }
     return isValid;
   }
@@ -42,12 +42,16 @@ class AuthSessionController extends ChangeNotifier {
     required String refreshToken,
     required DateTime expiresAt,
   }) async {
-    await _tokenStorage.writeAccessToken(accessToken);
-    await _tokenStorage.writeRefreshToken(refreshToken);
-    await _tokenStorage.writeExpiresAt(expiresAt);
+    await tokenStorage.writeAccessToken(accessToken);
+    await tokenStorage.writeRefreshToken(refreshToken);
+    await tokenStorage.writeExpiresAt(expiresAt);
+  }
+
+  Future<void> createSession(String token) {
+    return tokenStorage.writeAccessToken(token);
   }
 
   Future<void> signOut() {
-    return _tokenStorage.clearSession();
+    return tokenStorage.clearSession();
   }
 }

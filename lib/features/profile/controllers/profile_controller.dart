@@ -1,16 +1,13 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../core/storage/token_storage.dart';
-import '../data/customer_profile_service.dart';
 import '../models/user_profile_model.dart';
 
 class ProfileController extends ChangeNotifier {
-  ProfileController({TokenStorage? tokenStorage, CustomerProfileService? service})
-      : _tokenStorage = tokenStorage,
-        _service = service ?? CustomerProfileService() {
+  ProfileController() {
     _profile = _initialProfile;
   }
 
+=======
   final TokenStorage? _tokenStorage;
   final CustomerProfileService _service;
   String? _error;

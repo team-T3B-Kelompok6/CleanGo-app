@@ -85,6 +85,20 @@ class UserProfileModel {
     };
   }
 
+  factory UserProfileModel.fromCustomerJson(Map<String, dynamic> json) {
+    return UserProfileModel(
+      id: json['id']?.toString() ?? json['customerId']?.toString() ?? 'usr-001',
+      customerId: json['id']?.toString() ?? json['customerId']?.toString() ?? 'CG-8829104',
+      fullName: json['name'] as String? ?? json['fullName'] as String? ?? 'Krisna Pratama',
+      phoneNumber: json['phone'] as String? ?? json['phoneNumber'] as String? ?? '+62 812-3456-7890',
+      isPhoneVerified: true,
+      email: json['email'] as String? ?? 'krisna.pratama@email.com',
+      gender: 'Laki-laki',
+      birthDate: DateTime(1995, 5, 14),
+      avatarAsset: 'assets/images/user_profile.jpeg',
+    );
+  }
+
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     return UserProfileModel(
       id: json['id'] as String? ?? 'usr-001',

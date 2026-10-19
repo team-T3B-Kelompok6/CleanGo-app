@@ -56,7 +56,7 @@ class HomePage extends StatelessWidget {
                   child: CustomScrollView(
                     physics: const BouncingScrollPhysics(),
                     slivers: [
-                      SliverToBoxAdapter(child: _HomeIntroSection()),
+                      const SliverToBoxAdapter(child: _HomeIntroSection()),
                       SliverToBoxAdapter(
                         child: _ServiceCategoriesSection(
                           categories: HomeData.categories,
@@ -138,7 +138,7 @@ class HomePage extends StatelessWidget {
 }
 
 class _HomeIntroSection extends StatelessWidget {
-  _HomeIntroSection();
+  const _HomeIntroSection();
 
   @override
   Widget build(BuildContext context) {
@@ -231,15 +231,14 @@ class _ServiceCategoriesSection extends StatelessWidget {
 }
 
 class _HomeHeader extends StatelessWidget {
-  _HomeHeader();
+  const _HomeHeader();
 
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileController>().profile;
     final greetingName = profile.fullName.isNotEmpty ? profile.fullName : 'Pengguna';
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
         children: [
           Expanded(
@@ -268,7 +267,7 @@ class _HomeHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -345,7 +344,6 @@ class _HomeHeader extends StatelessWidget {
           ),
         ],
       ),
-    );
     );
   }
 }

@@ -4,26 +4,35 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_theme.dart';
 
 class AuthSocialButtons extends StatelessWidget {
-  const AuthSocialButtons({super.key});
+  const AuthSocialButtons({super.key, this.onGoogleTap});
+
+  final VoidCallback? onGoogleTap;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _SocialButton(label: 'Facebook', svgSource: _facebookSvg),
-        SizedBox(width: 16),
-        _SocialButton(label: 'Google', svgSource: _googleSvg),
+        _SocialButton(
+          label: 'Google',
+          svgSource: _googleSvg,
+          onTap: onGoogleTap,
+        ),
       ],
     );
   }
 }
 
 class _SocialButton extends StatelessWidget {
-  const _SocialButton({required this.label, required this.svgSource});
+  const _SocialButton({
+    required this.label,
+    required this.svgSource,
+    this.onTap,
+  });
 
   final String label;
   final String svgSource;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +43,7 @@ class _SocialButton extends StatelessWidget {
         color: Colors.white,
         shape: CircleBorder(side: BorderSide(color: AppColors.slate200)),
         child: InkWell(
-          onTap: () {},
+          onTap: onTap,
           customBorder: const CircleBorder(),
           child: SizedBox.square(
             dimension: 48,
@@ -47,13 +56,6 @@ class _SocialButton extends StatelessWidget {
     );
   }
 }
-
-const String _facebookSvg = '''
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="12" cy="12" r="11" fill="#1877F2"/>
-  <path d="M13.55 20V13.15H15.85L16.2 10.48H13.55V8.78C13.55 8.01 13.76 7.48 14.88 7.48H16.3V5.09C16.05 5.06 15.21 5 14.23 5C12.18 5 10.78 6.25 10.78 8.55V10.48H8.46V13.15H10.78V20H13.55Z" fill="white"/>
-</svg>
-''';
 
 const String _googleSvg = '''
 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

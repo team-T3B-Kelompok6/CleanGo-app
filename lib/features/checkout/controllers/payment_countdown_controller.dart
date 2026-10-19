@@ -32,7 +32,9 @@ class PaymentCountdownController extends ChangeNotifier {
   void _tick() {
     final difference = _deadline.difference(DateTime.now());
     final next = difference.isNegative ? Duration.zero : difference;
-    if (next.inSeconds == _remaining.inSeconds) return;
+    if (next != Duration.zero && next.inSeconds == _remaining.inSeconds) {
+      return;
+    }
     _remaining = next;
     notifyListeners();
     if (isExpired) _timer?.cancel();

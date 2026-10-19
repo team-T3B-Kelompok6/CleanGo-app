@@ -24,9 +24,60 @@ void main() {
 
     setUp(() {
       booking = BookingController()..startBooking(ServiceData.services.first);
+      booking.selectDate(DateTime(2030, 1, 3));
       addresses = AddressController();
       orders = OrderController();
     });
+
+    tearDown(() {
+      booking.dispose();
+      addresses.dispose();
+      orders.dispose();
+    });
+
+    test(
+      'two completed payments preserve both bookings and their own costs',
+      () async {
+        orders.completeScheduledOrder();
+        booking.updateNote('Catatan pesanan pertama');
+        await controller.createOrder(
+          booking: booking,
+          addresses: addresses,
+          orders: orders,
+          method: paymentMethodByType(PaymentMethodType.qris),
+          totalPayment: 'Rp102.500',
+          servicePrice: 150000,
+          platformFee: 5000,
+          discountAmount: 52500,
+          now: DateTime(2030, 1, 2),
+        );
+        final firstId = orders.scheduledOrder.orderNumber;
+        booking
+          ..selectDate(DateTime(2030, 1, 4))
+          ..updateNote('Catatan pesanan kedua');
+        await controller.createOrder(
+          booking: booking,
+          addresses: addresses,
+          orders: orders,
+          method: paymentMethodByType(PaymentMethodType.cash),
+          totalPayment: 'Rp155.000',
+          servicePrice: 150000,
+          platformFee: 5000,
+          discountAmount: 0,
+          now: DateTime(2030, 1, 2),
+        );
+
+        expect(orders.scheduledOrders, hasLength(2));
+        expect(orders.scheduledOrder.price, 'Rp155.000');
+        expect(orders.scheduledOrder.paymentStatus, 'Tunai · Bayar di lokasi');
+        expect(orders.selectScheduledOrder(firstId), isTrue);
+        expect(orders.scheduledOrder.note, 'Catatan pesanan pertama');
+        expect(orders.scheduledOrder.price, 'Rp102.500');
+        expect(orders.scheduledOrder.discountAmount, 52500);
+        expect(orders.scheduledOrder.paymentMethod, 'QRIS');
+        expect(orders.scheduledOrder.scheduledAt?.day, 3);
+      },
+    );
 
     test('creates an order from the selected booking and address', () async {
       booking
@@ -82,7 +133,83 @@ void main() {
 
       expect(isSameDay, isTrue);
       expect(orders.scheduledOrder.paymentMethod, 'Tunai');
+      expect(orders.scheduledOrder.paymentStatus, 'Tunai · Bayar di lokasi');
     });
+
+    test(
+      'rejects a deleted booking address rather than using another address',
+      () async {
+        final address = addresses.selectedAddress!;
+        booking.updateAddress(
+          address.toCleaningAddress(),
+          addressId: address.id,
+        );
+        addresses.deleteAddress(address.id);
+        orders.completeScheduledOrder();
+        await expectLater(
+          controller.createOrder(
+            booking: booking,
+            addresses: addresses,
+            orders: orders,
+            method: paymentMethodByType(PaymentMethodType.qris),
+            totalPayment: 'Rp155.000',
+            servicePrice: 150000,
+            platformFee: 5000,
+            discountAmount: 0,
+            now: DateTime(2030, 1, 2),
+          ),
+          throwsStateError,
+        );
+        expect(orders.hasScheduledOrder, isFalse);
+      },
+    );
+
+    test(
+      'rejects an empty address book without falling back to a dummy address',
+      () async {
+        for (final address in addresses.addresses) {
+          addresses.deleteAddress(address.id);
+        }
+        orders.completeScheduledOrder();
+        await expectLater(
+          controller.createOrder(
+            booking: booking,
+            addresses: addresses,
+            orders: orders,
+            method: paymentMethodByType(PaymentMethodType.qris),
+            totalPayment: 'Rp155.000',
+            servicePrice: 150000,
+            platformFee: 5000,
+            discountAmount: 0,
+            now: DateTime(2030, 1, 2),
+          ),
+          throwsStateError,
+        );
+        expect(orders.hasScheduledOrder, isFalse);
+      },
+    );
+
+    test(
+      'rejects mismatched payment totals without creating an order',
+      () async {
+        orders.completeScheduledOrder();
+        await expectLater(
+          controller.createOrder(
+            booking: booking,
+            addresses: addresses,
+            orders: orders,
+            method: paymentMethodByType(PaymentMethodType.qris),
+            totalPayment: 'Rp1',
+            servicePrice: 150000,
+            platformFee: 5000,
+            discountAmount: 0,
+            now: DateTime(2030, 1, 2),
+          ),
+          throwsStateError,
+        );
+        expect(orders.hasScheduledOrder, isFalse);
+      },
+    );
 
     test(
       'keeps the address chosen for this booking on the order and map',

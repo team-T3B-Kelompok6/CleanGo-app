@@ -20,11 +20,19 @@ void main() {
     expect(await storage.readAccessToken(), 'token-rahasia');
     expect(await storage.readRefreshToken(), 'refresh-rahasia');
     expect(await storage.readExpiresAt(), expiresAt);
+    await const FlutterSecureStorage().write(
+      key: booChatHistoryStorageKey,
+      value: 'riwayat privat',
+    );
 
     await storage.clearSession();
     expect(await storage.readAccessToken(), isNull);
     expect(await storage.readRefreshToken(), isNull);
     expect(await storage.readExpiresAt(), isNull);
+    expect(
+      await const FlutterSecureStorage().read(key: booChatHistoryStorageKey),
+      isNull,
+    );
   });
 
   test('sesi kedaluwarsa ditolak dan dibersihkan', () async {

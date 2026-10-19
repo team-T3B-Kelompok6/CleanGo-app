@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_notice.dart';
+import '../../../shared/widgets/app_sheet.dart';
 import '../controllers/change_password_controller.dart';
 import '../controllers/profile_controller.dart';
 
@@ -43,6 +46,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     final isValid = _passwordController.validate(activePassword);
     if (!isValid) {
+      AppNotice.show(
+        context,
+        'Kata sandi belum dapat diperbarui. Periksa kembali isian Anda.',
+        type: AppNoticeType.error,
+      );
       return;
     }
 
@@ -52,34 +60,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     );
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(
-                Icons.check_circle_outline_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-              SizedBox(width: 10),
-              Text(
-                'Kata sandi berhasil diperbarui!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontFamily: AppTheme.fontFamily,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: AppColors.primary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-      );
+      AppNotice.show(context, 'Kata sandi berhasil diperbarui.');
       Navigator.of(context).pop();
     }
   }
@@ -89,92 +70,43 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            16,
-            24,
-            MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
+        return AppSheet(
+          title: 'Lupa kata sandi?',
+          actions: SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                AppNotice.show(
+                  context,
+                  'Tautan pemulihan dikirim ke email Anda.',
+                );
+              },
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                backgroundColor: AppColors.primaryAction,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              const Icon(
-                Icons.lock_reset_rounded,
-                size: 48,
-                color: Color(0xFF00685F),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Lupa Kata Sandi?',
+              child: const Text(
+                'Kirim Tautan Pemulihan',
                 style: TextStyle(
-                  color: Color(0xFF0F172A),
                   fontFamily: AppTheme.fontFamily,
-                  fontSize: 18,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Kode verifikasi pemulihan sandi dapat dikirimkan ke nomor terverifikasi ${profile.phoneNumber} atau email ${profile.email}.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Tautan pemulihan dikirim ke email Anda.',
-                        ),
-                        backgroundColor: AppColors.primary,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00685F),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Kirim Tautan Pemulihan',
-                    style: TextStyle(
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
+          ),
+          child: Text(
+            'Tautan pemulihan akan dikirim ke ${profile.email}. '
+            'Nomor telepon akun Anda: ${profile.phoneNumber}.',
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
         );
       },
@@ -185,51 +117,21 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     showDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Text(
-            'Reset Form?',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          content: const Text(
-            'Apakah Anda ingin mengosongkan seluruh isian kata sandi di layar ini?',
-            style: TextStyle(
-              color: Color(0xFF475569),
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 13.5,
-              height: 1.45,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal'),
-            ),
-            TextButton(
-              onPressed: () {
-                _currentPassTextController.clear();
-                _newPassTextController.clear();
-                _confirmPassTextController.clear();
-                _passwordController.reset();
-                Navigator.pop(context);
-              },
-              child: const Text(
-                'Kosongkan',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+        return AppDialog(
+          title: 'Kosongkan isian?',
+          message: 'Semua isian kata sandi di halaman ini akan dikosongkan.',
+          cancelLabel: 'Batal',
+          onCancel: () => Navigator.pop(context),
+          confirmLabel: 'Kosongkan',
+          isDestructive: true,
+          onConfirm: () {
+            _currentPassTextController.clear();
+            _newPassTextController.clear();
+            _confirmPassTextController.clear();
+            _passwordController.reset();
+            Navigator.pop(context);
+            AppNotice.show(this.context, 'Isian kata sandi sudah dikosongkan.');
+          },
         );
       },
     );
@@ -373,13 +275,16 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               padding: EdgeInsets.zero,
             ),
           ),
-          const Text(
-            'Ubah Kata Sandi',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+          const Expanded(
+            child: Text(
+              'Ubah Kata Sandi',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           GestureDetector(

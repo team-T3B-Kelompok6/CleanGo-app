@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/app_notice.dart';
 import '../../booking/pages/booking_page.dart';
 import '../../service/data/service_data.dart';
 import '../controllers/order_controller.dart';
@@ -87,32 +88,10 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   }
 
   void _openWhatsApp(BuildContext context, String target, String phone) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Image.asset(
-              'assets/icons/whatsapp.png',
-              width: 20,
-              height: 20,
-              errorBuilder: (_, _, _) => const Icon(
-                Icons.chat_bubble_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Membuka chat WhatsApp dengan $target ($phone)...',
-                style: const TextStyle(fontFamily: 'Inter'),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF159466),
-        behavior: SnackBarBehavior.floating,
-      ),
+    AppNotice.show(
+      context,
+      'Membuka chat WhatsApp dengan $target ($phone)...',
+      type: AppNoticeType.info,
     );
   }
 
@@ -143,6 +122,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
             children: [
               Positioned.fill(
                 child: OrderTrackingMap(
+                  key: ValueKey(order.orderNumber),
                   order: order,
                   height: MediaQuery.sizeOf(context).height,
                   borderRadius: 0,

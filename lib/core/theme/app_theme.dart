@@ -92,6 +92,26 @@ abstract final class AppTheme {
         brightness: Brightness.light,
       ),
       splashFactory: InkRipple.splashFactory,
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        headerBackgroundColor: Colors.white,
+        headerForegroundColor: AppColors.slate900,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.slate900,
+        contentTextStyle: const TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 14,
+          color: Colors.white,
+          height: 1.45,
+        ),
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
       appBarTheme: const AppBarTheme(
         titleTextStyle: TextStyle(
           color: AppColors.slate900,

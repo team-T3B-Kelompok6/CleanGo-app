@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../data/dummy_auth_service.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
@@ -235,6 +236,11 @@ class _RegisterPageState extends State<RegisterPage> {
       setState(() => _hasSubmitted = true);
     }
     if (!(_formKey.currentState?.validate() ?? false)) {
+      AppNotice.show(
+        context,
+        'Pendaftaran belum berhasil. Periksa kembali isian Anda.',
+        type: AppNoticeType.error,
+      );
       return;
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/app_notice.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/address_controller.dart';
@@ -59,6 +60,11 @@ class _EditAddressPageState extends State<EditAddressPage> {
     }
 
     if (!_formKey.currentState!.validate()) {
+      AppNotice.show(
+        context,
+        'Alamat belum dapat disimpan. Periksa kembali isian Anda.',
+        type: AppNoticeType.error,
+      );
       return;
     }
 
@@ -69,22 +75,15 @@ class _EditAddressPageState extends State<EditAddressPage> {
     final addressController = context.read<AddressController>();
     addressController.updateAddress(updated);
 
-    if (_isPrimary) {
-      context.read<BookingController>().updateAddress(
-        updated.toCleaningAddress(),
-        addressId: updated.id,
-      );
+    final booking = context.read<BookingController>();
+    if (booking.addressId == updated.id ||
+        (booking.addressId == null && _isPrimary)) {
+      booking.updateAddress(updated.toCleaningAddress(), addressId: updated.id);
     }
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Alamat berhasil diperbarui!'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotice.show(context, 'Alamat berhasil diperbarui.');
 
     Navigator.of(context).pop();
   }
@@ -116,12 +115,9 @@ class _EditAddressPageState extends State<EditAddressPage> {
       addressLabel: widget.address.title,
       onConfirm: () {
         context.read<AddressController>().deleteAddress(widget.address.id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Alamat "${widget.address.title}" berhasil dihapus.'),
-            backgroundColor: AppColors.slate900,
-            behavior: SnackBarBehavior.floating,
-          ),
+        AppNotice.show(
+          context,
+          'Alamat "${widget.address.title}" berhasil dihapus.',
         );
         Navigator.of(context).pop();
       },

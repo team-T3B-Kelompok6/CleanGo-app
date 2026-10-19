@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_notice.dart';
+import '../../../shared/widgets/app_sheet.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../chatbot/pages/chatbot_page.dart';
@@ -61,9 +64,7 @@ class _OrdersPageState extends State<OrdersPage> {
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final bookingAddress = context.watch<BookingController>().address;
-    final scheduledAddress =
-        '${bookingAddress.street}, ${bookingAddress.city} '
-        '(${bookingAddress.landmark})';
+    final scheduledAddress = bookingAddress.fullAddress;
     final contentSideInset = ((mediaQuery.size.width - 480) / 2 + 16).clamp(
       16.0,
       double.infinity,
@@ -330,28 +331,43 @@ class _ScheduledOrdersView extends StatelessWidget {
       );
     }
 
-    final scheduledOrder = controller.scheduledOrder;
-    final displayAddress = scheduledOrder.destinationAddress.isNotEmpty
-        ? scheduledOrder.destinationAddress
-        : address;
-
-    return ListView(
+    final orders = controller.scheduledOrders;
+    return ListView.separated(
       physics: const BouncingScrollPhysics(),
       padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
-      children: [
-        _ScheduledOrderCard(
+      itemCount: orders.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final scheduledOrder = orders[index];
+        final displayAddress = scheduledOrder.destinationAddress.isNotEmpty
+            ? scheduledOrder.destinationAddress
+            : address;
+        return _ScheduledOrderCard(
+          key: ValueKey(scheduledOrder.orderNumber),
           order: scheduledOrder,
           address: displayAddress,
-          onTrackOrder: onTrackOrder,
-          onReschedule: () => _pickNewSchedule(context, controller),
-          onDetail: () => _showScheduledDetail(
-            context,
-            controller,
-            scheduledOrder,
-            displayAddress,
-          ),
-        ),
-      ],
+          onTrackOrder: () {
+            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+              onTrackOrder();
+            }
+          },
+          onReschedule: () {
+            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+              _pickNewSchedule(context, controller);
+            }
+          },
+          onDetail: () {
+            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+              _showScheduledDetail(
+                context,
+                controller,
+                scheduledOrder,
+                displayAddress,
+              );
+            }
+          },
+        );
+      },
     );
   }
 
@@ -360,17 +376,15 @@ class _ScheduledOrdersView extends StatelessWidget {
     OrderController controller,
   ) async {
     if (!controller.canModifyScheduledOrder) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Jadwal tidak dapat diubah karena sudah melewati batas maksimal H-1.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppNotice.show(
+        context,
+        'Jadwal tidak dapat diubah karena sudah melewati batas maksimal H-1.',
+        type: AppNoticeType.error,
       );
       return;
     }
 
+    final orderNumber = controller.scheduledOrder.orderNumber;
     final current =
         controller.scheduledOrder.scheduledAt ??
         DateTime.now().add(const Duration(days: 2));
@@ -396,24 +410,23 @@ class _ScheduledOrdersView extends StatelessWidget {
       ),
     );
     if (picked == null || !context.mounted) return;
-    final result = controller.rescheduleOrder(
-      DateTime(
-        picked.year,
-        picked.month,
-        picked.day,
-        current.hour,
-        current.minute,
-      ),
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result
-              ? 'Jadwal pesanan berhasil diperbarui.'
-              : 'Jadwal tidak dapat diubah karena sudah melewati batas H-1.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
+    final result =
+        controller.selectScheduledOrder(orderNumber) &&
+        controller.rescheduleOrder(
+          DateTime(
+            picked.year,
+            picked.month,
+            picked.day,
+            current.hour,
+            current.minute,
+          ),
+        );
+    AppNotice.show(
+      context,
+      result
+          ? 'Jadwal pesanan berhasil diperbarui.'
+          : 'Jadwal tidak dapat diubah karena sudah melewati batas H-1.',
+      type: result ? AppNoticeType.success : AppNoticeType.error,
     );
   }
 
@@ -421,35 +434,30 @@ class _ScheduledOrdersView extends StatelessWidget {
     BuildContext context,
     OrderController controller,
   ) async {
+    final orderNumber = controller.scheduledOrder.orderNumber;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Batalkan pesanan?'),
-        content: const Text(
-          'Pesanan yang dibatalkan akan dipindahkan ke Riwayat. Pembatalan hanya tersedia maksimal H-1.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Kembali'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            child: const Text('Batalkan'),
-          ),
-        ],
+      builder: (context) => AppDialog(
+        title: 'Batalkan pesanan?',
+        message:
+            'Pesanan akan dipindahkan ke Riwayat. '
+            'Pembatalan hanya tersedia maksimal H-1.',
+        confirmLabel: 'Batalkan Pesanan',
+        onConfirm: () => Navigator.pop(context, true),
+        cancelLabel: 'Kembali',
+        isDestructive: true,
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    final result = controller.cancelScheduledOrder();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result ? 'Pesanan dibatalkan dan dipindahkan ke Riwayat.' : 'Pesanan tidak dapat dibatalkan karena sudah melewati batas H-1.',
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
+    final result =
+        controller.selectScheduledOrder(orderNumber) &&
+        controller.cancelScheduledOrder();
+    AppNotice.show(
+      context,
+      result
+          ? 'Pesanan dibatalkan dan dipindahkan ke Riwayat.'
+          : 'Pesanan tidak dapat dibatalkan karena sudah melewati batas H-1.',
+      type: result ? AppNoticeType.success : AppNoticeType.error,
     );
   }
 
@@ -471,174 +479,116 @@ class _ScheduledOrdersView extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.84,
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.slate200,
-                    borderRadius: BorderRadius.circular(99),
+      builder: (sheetContext) => AppSheet(
+        title: 'Detail Pesanan',
+        actions: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: controller.canModifyScheduledOrder
+                    ? () {
+                        Navigator.pop(sheetContext);
+                        _pickNewSchedule(context, controller);
+                      }
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  foregroundColor: AppColors.primaryAction,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
+                child: const Text('Ubah Jadwal'),
               ),
-              const SizedBox(height: 18),
-              const Text(
-                'Detail Pesanan',
-                style: TextStyle(
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: controller.canModifyScheduledOrder
+                    ? () {
+                        Navigator.pop(sheetContext);
+                        _confirmCancellation(context, controller);
+                      }
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  foregroundColor: AppColors.notification,
+                  side: const BorderSide(color: AppColors.slate200),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Batalkan Pesanan'),
+              ),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isSameDay ? 'Pesan Langsung Hari Ini' : 'Booking Terjadwal',
+              style: const TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.slate900,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              isSameDay
+                  ? 'Cleaner diproses untuk datang pada hari yang sama. Jadwal tidak dapat diubah setelah cleaner ditugaskan.'
+                  : controller.modificationDeadlineLabel,
+              style: const TextStyle(
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 14,
+                height: 1.45,
+                color: AppColors.slate500,
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(height: 1, color: AppColors.slate100),
+            ),
+            _ScheduledDetailRow(label: 'Layanan', value: order.serviceName),
+            _ScheduledDetailRow(label: 'No. Pesanan', value: order.orderNumber),
+            _ScheduledDetailRow(
+              label: 'Jadwal',
+              value: schedule == null
+                  ? 'Belum ditentukan'
+                  : _formatOrderSchedule(schedule),
+            ),
+            _ScheduledDetailRow(label: 'Alamat', value: address),
+            _ScheduledDetailRow(
+              label: 'Catatan',
+              value: order.note.trim().isEmpty
+                  ? 'Tidak ada catatan'
+                  : order.note,
+            ),
+            _ScheduledDetailRow(
+              label: 'Pembayaran',
+              value: order.paymentStatus,
+            ),
+            _ScheduledDetailRow(
+              label: 'Total',
+              value: order.price,
+              emphasized: true,
+            ),
+            const SizedBox(height: 12),
+            if (!controller.canModifyScheduledOrder)
+              Text(
+                isSameDay
+                    ? 'Pesanan hari ini tidak dapat dibatalkan atau diubah setelah diproses.'
+                    : 'Batas perubahan H-1 sudah lewat atau cleaner telah diberangkatkan.',
+                style: const TextStyle(
+                  color: Color(0xFFB91C1C),
                   fontFamily: AppTheme.fontFamily,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.slate900,
+                  fontSize: 12.5,
+                  height: 1.4,
                 ),
               ),
-              const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: isSameDay
-                      ? const Color(0xFFFFF7ED)
-                      : const Color(0xFFF0FDFA),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      isSameDay
-                          ? Icons.bolt_rounded
-                          : Icons.event_available_rounded,
-                      color: isSameDay
-                          ? const Color(0xFFEA580C)
-                          : AppColors.primaryAction,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            isSameDay
-                                ? 'Pesan Langsung Hari Ini'
-                                : 'Booking Terjadwal',
-                            style: const TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.slate900,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            isSameDay
-                                ? 'Cleaner diproses untuk datang pada hari yang sama. Jadwal tidak dapat diubah setelah cleaner ditugaskan.'
-                                : controller.modificationDeadlineLabel,
-                            style: const TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              fontSize: 12.5,
-                              height: 1.45,
-                              color: AppColors.slate500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              _ScheduledDetailRow(label: 'Layanan', value: order.serviceName),
-              _ScheduledDetailRow(
-                label: 'No. Pesanan',
-                value: order.orderNumber,
-              ),
-              _ScheduledDetailRow(
-                label: 'Jadwal',
-                value: schedule == null
-                    ? 'Belum ditentukan'
-                    : _formatOrderSchedule(schedule),
-              ),
-              _ScheduledDetailRow(label: 'Alamat', value: address),
-              _ScheduledDetailRow(
-                label: 'Catatan',
-                value: order.note.trim().isEmpty
-                    ? 'Tidak ada catatan'
-                    : order.note,
-              ),
-              _ScheduledDetailRow(
-                label: 'Pembayaran',
-                value: order.paymentStatus,
-              ),
-              _ScheduledDetailRow(
-                label: 'Total',
-                value: order.price,
-                emphasized: true,
-              ),
-              const SizedBox(height: 12),
-              if (!controller.canModifyScheduledOrder)
-                Text(
-                  isSameDay
-                      ? 'Pesanan hari ini tidak dapat dibatalkan atau diubah setelah diproses.'
-                      : 'Batas perubahan H-1 sudah lewat atau cleaner telah diberangkatkan.',
-                  style: const TextStyle(
-                    color: Color(0xFFB91C1C),
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 12.5,
-                    height: 1.4,
-                  ),
-                ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: controller.canModifyScheduledOrder
-                          ? () {
-                              Navigator.pop(sheetContext);
-                              _pickNewSchedule(context, controller);
-                            }
-                          : null,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
-                        foregroundColor: AppColors.primaryAction,
-                      ),
-                      child: const Text('Ubah Jadwal'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: controller.canModifyScheduledOrder
-                          ? () {
-                              Navigator.pop(sheetContext);
-                              _confirmCancellation(context, controller);
-                            }
-                          : null,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(46),
-                        foregroundColor: Colors.red.shade700,
-                        side: BorderSide(color: Colors.red.shade200),
-                      ),
-                      child: const Text('Batalkan Pesanan'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
@@ -647,6 +597,7 @@ class _ScheduledOrdersView extends StatelessWidget {
 
 class _ScheduledOrderCard extends StatelessWidget {
   const _ScheduledOrderCard({
+    super.key,
     required this.order,
     required this.address,
     required this.onTrackOrder,
@@ -946,7 +897,7 @@ class _ScheduledDetailRow extends StatelessWidget {
               label,
               style: const TextStyle(
                 fontFamily: AppTheme.fontFamily,
-                fontSize: 12.5,
+                fontSize: 14,
                 color: AppColors.slate500,
               ),
             ),
@@ -955,10 +906,10 @@ class _ScheduledDetailRow extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.left,
               style: TextStyle(
                 fontFamily: AppTheme.fontFamily,
-                fontSize: emphasized ? 15 : 13,
+                fontSize: emphasized ? 18 : 14,
                 fontWeight: emphasized ? FontWeight.w700 : FontWeight.w600,
                 color: emphasized
                     ? AppColors.primaryAction

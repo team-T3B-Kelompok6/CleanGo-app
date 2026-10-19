@@ -15,15 +15,17 @@ class ApiClient {
 
   Future<Map<String, dynamic>> post(
     String path,
-    Map<String, dynamic> body,
-  ) async {
+    Map<String, dynamic> body, {
+    Map<String, String> headers = const {},
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
     final response = await _client
         .post(
           Uri.parse('${_baseUrl.replaceAll(RegExp(r'/$'), '')}$path'),
-          headers: const {'Content-Type': 'application/json'},
+          headers: {'Content-Type': 'application/json', ...headers},
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 15));
+        .timeout(timeout);
     final Object? decoded;
     try {
       decoded = jsonDecode(response.body);

@@ -1,24 +1,45 @@
 import 'dart:math' as math;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/chatbot_icon.dart';
 import '../controllers/chatbot_controller.dart';
+import '../models/chat_message.dart';
+import '../data/chatbot_repository.dart';
+import '../data/chat_history_store.dart';
 
 class ChatbotPage extends StatefulWidget {
-  const ChatbotPage({super.key});
+  const ChatbotPage({super.key, this.repository, this.history});
+
+  final ChatbotGateway? repository;
+  final ChatHistoryStore? history;
 
   @override
   State<ChatbotPage> createState() => _ChatbotPageState();
 }
 
 class _ChatbotPageState extends State<ChatbotPage> {
-  final ChatbotController _chatbotController = ChatbotController();
+  late final ChatbotController _chatbotController = ChatbotController(
+    repository: widget.repository,
+    history: widget.history,
+  );
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(
+      _chatbotController.restoreHistory().then((_) {
+        if (mounted) _scrollToEnd();
+      }),
+    );
+  }
 
   @override
   void dispose() {
@@ -32,12 +53,37 @@ class _ChatbotPageState extends State<ChatbotPage> {
     _chatbotController.updateDraft(value);
   }
 
-  void _sendMessage() {
-    if (!_chatbotController.sendMessage(_messageController.text)) return;
+  Future<void> _sendMessage() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty || _chatbotController.isSending) return;
+    if (message.length > 2000) {
+      AppNotice.show(
+        context,
+        'Pesan maksimal 2000 karakter.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    final pending = _chatbotController.sendMessage(message);
     _messageController.clear();
+    _scrollToEnd();
+    await pending;
+    if (mounted) {
+      _scrollToEnd();
+      if (_chatbotController.messages.isNotEmpty &&
+          _chatbotController.messages.last.failed) {
+        AppNotice.show(
+          context,
+          'Pesan belum berhasil dikirim. Silakan coba lagi.',
+          type: AppNoticeType.error,
+        );
+      }
+    }
+  }
 
+  void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_scrollController.hasClients) return;
+      if (!mounted || !_scrollController.hasClients) return;
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 240),
@@ -74,11 +120,21 @@ class _ChatbotPageState extends State<ChatbotPage> {
                           : _MessageList(
                               controller: _scrollController,
                               messages: _chatbotController.messages,
+                              isSending: _chatbotController.isSending,
                             ),
                     ),
+                    if (_chatbotController.historyUnavailable)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Riwayat belum dapat disimpan atau dimuat di perangkat ini.',
+                        ),
+                      ),
                     _ChatInput(
                       controller: _messageController,
-                      hasMessage: _chatbotController.hasMessage,
+                      hasMessage:
+                          _chatbotController.hasMessage &&
+                          !_chatbotController.isSending,
                       onChanged: _handleMessageChanged,
                       onSend: _sendMessage,
                     ),
@@ -180,7 +236,7 @@ class _ChatbotWelcome extends StatelessWidget {
             child: Column(
               children: [
                 SizedBox(height: topSpace),
-                const _WelcomeOrb(),
+                const ChatbotIcon(size: 80),
                 const SizedBox(height: 30),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 310),
@@ -219,75 +275,16 @@ class _ChatbotWelcome extends StatelessWidget {
   }
 }
 
-class _WelcomeOrb extends StatelessWidget {
-  const _WelcomeOrb();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox.square(
-      dimension: 112,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 106,
-            height: 106,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [Color(0x6636D7C8), Color(0x1A75E5D8), Colors.white],
-                stops: [0, 0.52, 1],
-              ),
-            ),
-          ),
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                center: Alignment(-0.22, -0.28),
-                colors: [
-                  Color(0xFFFFFFFF),
-                  Color(0xFFE6FFF9),
-                  Color(0xFF8FE3D8),
-                  Color(0xFFF9D675),
-                ],
-                stops: [0, 0.38, 0.73, 1],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x3334C8B8),
-                  blurRadius: 20,
-                  spreadRadius: 3,
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            right: 15,
-            bottom: 18,
-            child: Container(
-              width: 17,
-              height: 17,
-              decoration: BoxDecoration(
-                color: const Color(0xFF65D5C8),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _MessageList extends StatelessWidget {
-  const _MessageList({required this.controller, required this.messages});
+  const _MessageList({
+    required this.controller,
+    required this.messages,
+    required this.isSending,
+  });
 
   final ScrollController controller;
-  final List<String> messages;
+  final List<ChatMessage> messages;
+  final bool isSending;
 
   @override
   Widget build(BuildContext context) {
@@ -295,18 +292,32 @@ class _MessageList extends StatelessWidget {
       controller: controller,
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
-      itemCount: messages.length,
+      itemCount: messages.length + (isSending ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
+        if (index == messages.length) {
+          return const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Boo sedang mengetik…',
+              semanticsLabel: 'Boo sedang menyiapkan jawaban',
+            ),
+          );
+        }
+        final message = messages[index];
         return Align(
-          alignment: Alignment.centerRight,
+          alignment: message.isUser
+              ? Alignment.centerRight
+              : Alignment.centerLeft,
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: MediaQuery.sizeOf(context).width * 0.76,
             ),
             child: DecoratedBox(
-              decoration: const BoxDecoration(
-                color: AppColors.primaryAction,
+              decoration: BoxDecoration(
+                color: message.isUser
+                    ? AppColors.primaryAction
+                    : AppColors.slate100,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(18),
                   topRight: Radius.circular(18),
@@ -320,9 +331,9 @@ class _MessageList extends StatelessWidget {
                   vertical: 11,
                 ),
                 child: Text(
-                  messages[index],
-                  style: const TextStyle(
-                    color: Colors.white,
+                  message.content,
+                  style: TextStyle(
+                    color: message.isUser ? Colors.white : AppColors.slate900,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     height: 1.45,
@@ -395,15 +406,9 @@ class _ChatInput extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            const Icon(
-              Icons.image_outlined,
-              color: AppColors.slate500,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
             Semantics(
               button: true,
-              label: hasMessage ? 'Kirim pesan' : 'Pesan suara',
+              label: 'Kirim pesan',
               child: Material(
                 color: AppColors.primaryAction,
                 shape: const CircleBorder(),
@@ -413,7 +418,7 @@ class _ChatInput extends StatelessWidget {
                   child: SizedBox.square(
                     dimension: 40,
                     child: Icon(
-                      hasMessage ? Icons.send_rounded : Icons.mic_none_rounded,
+                      Icons.send_rounded,
                       color: Colors.white,
                       size: 20,
                     ),

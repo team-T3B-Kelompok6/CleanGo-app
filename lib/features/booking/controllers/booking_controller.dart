@@ -19,13 +19,25 @@ class BookingController extends ChangeNotifier {
        _selectedTime = initialDraft?.selectedTime ?? '12:00',
        _address = initialAddress ?? BookingController.initialAddress,
        _addressId = initialDraft?.addressId,
-       _note = initialDraft?.note ?? initialNote;
+       _note = initialDraft?.note ?? initialNote {
+    _ensureTimeSelection();
+  }
 
   static DateTime get initialDate => DateUtils.dateOnly(DateTime.now());
 
   static const int platformFee = 5000;
 
-  static const List<String> availableTimes = ['08:00', '12:00', '16:00'];
+  static const List<String> availableTimes = [
+    '08:00',
+    '09:00',
+    '10:00',
+    '11:00',
+    '12:00',
+    '13:00',
+    '14:00',
+    '15:00',
+    '16:00',
+  ];
 
   static const CleaningAddress initialAddress = CleaningAddress(
     label: 'Rumah (Utama)',
@@ -89,11 +101,50 @@ class BookingController extends ChangeNotifier {
 
   String get formattedSelectedTime => '$_selectedTime WIB';
 
+  bool isTimeAvailable(String time, {DateTime? now}) {
+    if (!availableTimes.contains(time)) return false;
+    final hour = int.parse(time.substring(0, 2));
+    final scheduled = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day,
+      hour,
+    );
+    return !scheduled.isBefore(now ?? DateTime.now());
+  }
+
+  String? validateSchedule({DateTime? now}) {
+    final current = now ?? DateTime.now();
+    if (_selectedDate.isBefore(DateUtils.dateOnly(current))) {
+      return 'Tanggal booking sudah lewat. Pilih tanggal lain.';
+    }
+    if (!availableTimes.contains(_selectedTime)) {
+      return 'Pilih tanggal dan jam mulai yang masih tersedia.';
+    }
+    if (!isTimeAvailable(_selectedTime, now: current)) {
+      return 'Jam mulai sudah lewat. Pilih jam atau tanggal lain.';
+    }
+    return null;
+  }
+
+  void _ensureTimeSelection() {
+    if (isTimeAvailable(_selectedTime)) return;
+    _selectedTime = availableTimes.firstWhere(
+      (time) => isTimeAvailable(time),
+      orElse: () => '',
+    );
+  }
+
   void startBooking(ServiceModel service) {
     if (_service?.id == service.id) {
       final today = initialDate;
+      final previousDate = _selectedDate;
+      final previousTime = _selectedTime;
       if (_selectedDate.isBefore(today)) {
         _selectedDate = today;
+      }
+      _ensureTimeSelection();
+      if (_selectedDate != previousDate || _selectedTime != previousTime) {
         notifyListeners();
         _persistDraft();
       }
@@ -103,6 +154,7 @@ class BookingController extends ChangeNotifier {
     _service = service;
     _selectedDate = initialDate;
     _selectedTime = '12:00';
+    _ensureTimeSelection();
     _address = initialAddress;
     _addressId = null;
     _note = initialNote;
@@ -111,17 +163,19 @@ class BookingController extends ChangeNotifier {
   }
 
   void selectDate(DateTime date) {
-    if (DateUtils.isSameDay(date, _selectedDate)) {
+    if (date.isBefore(initialDate) ||
+        DateUtils.isSameDay(date, _selectedDate)) {
       return;
     }
 
-    _selectedDate = date;
+    _selectedDate = DateUtils.dateOnly(date);
+    _ensureTimeSelection();
     notifyListeners();
     _persistDraft();
   }
 
   void selectTime(String time) {
-    if (!availableTimes.contains(time) || time == _selectedTime) {
+    if (!isTimeAvailable(time) || time == _selectedTime) {
       return;
     }
 

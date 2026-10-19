@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../controllers/auth_session_controller.dart';
 import '../data/dummy_auth_service.dart';
 import 'register_page.dart';
@@ -23,6 +24,7 @@ class _LoginPageState extends State<LoginPage> {
   final _authService = const DummyAuthService();
 
   bool _obscurePassword = true;
+  bool _isSubmitting = false;
   String? _phoneCredentialError;
   String? _passwordCredentialError;
 
@@ -127,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
                           SizedBox(
                             height: 52,
                             child: FilledButton(
-                              onPressed: _submit,
+                              onPressed: _isSubmitting ? null : _submit,
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppColors.primaryAction,
                                 foregroundColor: Colors.white,
@@ -225,6 +227,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     FocusScope.of(context).unfocus();
     final result = _authService.validateLogin(
       phone: _phoneController.text,
@@ -237,11 +240,30 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (!result.isSuccess) {
+      AppNotice.show(
+        context,
+        'Login belum berhasil. Periksa kembali nomor telepon dan kata sandi Anda.',
+        type: AppNoticeType.error,
+      );
       return;
     }
 
-    await context.read<AuthSessionController>().createLocalSession();
+    setState(() => _isSubmitting = true);
+    try {
+      await context.read<AuthSessionController>().createLocalSession();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        AppNotice.show(
+          context,
+          'Sesi login belum dapat disimpan. Silakan coba lagi.',
+          type: AppNoticeType.error,
+        );
+      }
+      return;
+    }
     if (!mounted) return;
+    AppNotice.show(context, 'Berhasil masuk ke CleanGo.');
     Navigator.of(context).pushReplacementNamed(AppRoutes.home);
   }
 
@@ -254,11 +276,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Pendaftaran berhasil. Silakan masuk.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotice.show(context, 'Pendaftaran berhasil. Silakan masuk.');
   }
 }

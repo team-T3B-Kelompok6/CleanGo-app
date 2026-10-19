@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../domain/models/payment_method_model.dart';
 import '../controllers/checkout_controller.dart';
@@ -11,6 +12,7 @@ import '../widgets/order_confirmation_dialog.dart';
 import '../widgets/payment_method_icon.dart';
 import 'payment_page.dart';
 import 'payment_method_page.dart';
+import 'promo_page.dart';
 
 abstract final class _CheckoutTypography {
   static const String fontFamily = AppTheme.fontFamily;
@@ -85,26 +87,32 @@ class CheckoutPage extends StatefulWidget {
 class _CheckoutPageState extends State<CheckoutPage> {
   PaymentMethodType _selectedPaymentMethod = PaymentMethodType.qris;
   final CheckoutController _checkoutController = CheckoutController();
-  final TextEditingController _promoTextController = TextEditingController();
 
-  @override
-  void dispose() {
-    _promoTextController.dispose();
-    super.dispose();
-  }
+  Future<void> _openPromos() async {
+    final selectedCode = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => PromoPage(
+          servicePrice: context.read<BookingController>().servicePriceValue,
+          initialPromoCode: _checkoutController.appliedPromo?.code,
+        ),
+      ),
+    );
 
-  void _applyPromo() {
-    FocusManager.instance.primaryFocus?.unfocus();
+    if (!mounted || selectedCode == null) return;
+
     setState(() {
-      _checkoutController.applyPromo(_promoTextController.text);
+      _checkoutController.applyPromo(selectedCode);
     });
+    final error = _checkoutController.promoError;
+    AppNotice.show(
+      context,
+      error ??
+          (selectedCode.isEmpty
+              ? 'Promo dilepas. Total pembayaran diperbarui.'
+              : 'Kode promo berhasil diterapkan.'),
+      type: error == null ? AppNoticeType.success : AppNoticeType.error,
+    );
     widget.onApplyPromo?.call();
-  }
-
-  void _handlePromoChanged(String code) {
-    if (_checkoutController.updatePromoInput(code)) {
-      setState(() {});
-    }
   }
 
   Future<void> _openPaymentMethods() async {
@@ -120,17 +128,28 @@ class _CheckoutPageState extends State<CheckoutPage> {
       ),
     );
 
-    if (!mounted || selectedMethod == null) {
+    if (!mounted ||
+        selectedMethod == null ||
+        selectedMethod == _selectedPaymentMethod) {
       return;
     }
 
     setState(() => _selectedPaymentMethod = selectedMethod);
+    AppNotice.show(
+      context,
+      'Metode pembayaran diubah menjadi ${paymentMethodByType(selectedMethod).name}.',
+    );
   }
 
   Future<void> _confirmOrder({
     required BookingController booking,
     required String formattedTotal,
   }) async {
+    final error = booking.validateSchedule();
+    if (error != null) {
+      AppNotice.show(context, error, type: AppNoticeType.error);
+      return;
+    }
     final service = booking.service;
     final address = booking.address;
     final note = booking.note.trim().isEmpty
@@ -142,7 +161,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       serviceName: service?.title ?? '-',
       schedule:
           '${booking.formattedSelectedDate}, ${booking.formattedSelectedTime}',
-      address: '${address.label}\n${address.street}, ${address.city}',
+      address: '${address.label}\n${address.fullAddress}',
       note: note,
       paymentMethod: paymentMethod.name,
       total: formattedTotal,
@@ -213,7 +232,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     delegate: SliverChildListDelegate.fixed([
                       _WorkAddressCard(
                         label: address.label,
-                        address: '${address.street}, ${address.city}',
+                        address: address.fullAddress,
                       ),
                       const SizedBox(height: 14),
                       _OrderSummaryCard(
@@ -228,6 +247,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       _PriceDetailsCard(
                         servicePrice: booking.formattedServicePrice,
                         platformFee: booking.formattedPlatformFee,
+                        discountPercent:
+                            _checkoutController.appliedPromo?.discountPercent,
                         discount: _checkoutController.isPromoApplied
                             ? formattedDiscount
                             : null,
@@ -236,12 +257,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       const SizedBox(height: 20),
                       const _SectionLabel('Kode Promo / Voucher'),
                       const SizedBox(height: 8),
-                      _PromoInput(
-                        controller: _promoTextController,
-                        errorText: _checkoutController.promoError,
-                        successText: _checkoutController.promoSuccessMessage,
-                        onChanged: _handlePromoChanged,
-                        onApply: _applyPromo,
+                      _PromoSelectionCard(
+                        code: _checkoutController.appliedPromo?.code,
+                        discount: formattedDiscount,
+                        onTap: _openPromos,
                       ),
                       const SizedBox(height: 20),
                       const _SectionLabel('Metode Pembayaran'),
@@ -493,12 +512,14 @@ class _PriceDetailsCard extends StatelessWidget {
   const _PriceDetailsCard({
     required this.servicePrice,
     required this.platformFee,
+    required this.discountPercent,
     required this.discount,
     required this.total,
   });
 
   final String servicePrice;
   final String platformFee;
+  final int? discountPercent;
   final String? discount;
   final String total;
 
@@ -516,7 +537,7 @@ class _PriceDetailsCard extends StatelessWidget {
           if (discount != null) ...[
             const SizedBox(height: 7),
             _PriceRow(
-              label: 'Diskon Promo (35%)',
+              label: 'Diskon Promo ($discountPercent%)',
               value: '-$discount',
               discounted: true,
             ),
@@ -590,169 +611,79 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _PromoInput extends StatelessWidget {
-  const _PromoInput({
-    required this.controller,
-    required this.errorText,
-    required this.successText,
-    required this.onChanged,
-    required this.onApply,
+class _PromoSelectionCard extends StatelessWidget {
+  const _PromoSelectionCard({
+    required this.code,
+    required this.discount,
+    required this.onTap,
   });
 
-  final TextEditingController controller;
-  final String? errorText;
-  final String? successText;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onApply;
+  final String? code;
+  final String discount;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: controller,
-                onChanged: onChanged,
-                onFieldSubmitted: (_) => onApply(),
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: const [_UpperCaseTextFormatter()],
-                style: const TextStyle(
-                  color: AppColors.slate600,
-                  fontFamily: _CheckoutTypography.fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Masukkan kode promo...',
-                  hintStyle: const TextStyle(
-                    color: AppColors.slate400,
-                    fontFamily: _CheckoutTypography.fontFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  prefixIcon: const Icon(
-                    Icons.sell_outlined,
-                    size: 18,
-                    color: AppColors.slate400,
-                  ),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 42),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.slate200),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: AppColors.primary),
-                  ),
+        Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            key: const ValueKey('checkout-promo-selector'),
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: code == null
+                      ? AppColors.slate100
+                      : AppColors.primaryBorder,
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              height: 48,
-              child: FilledButton(
-                onPressed: onApply,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryAction,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 19),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  const _MintIcon(icon: Icons.sell_outlined),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          code ?? 'Pilih promo yang tersedia',
+                          style: _CheckoutTypography.rowValue.copyWith(
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          code == null
+                              ? 'Lihat promo untuk pesanan Anda'
+                              : 'Hemat $discount dari biaya layanan',
+                          style: _CheckoutTypography.rowLabel.copyWith(
+                            color: code == null
+                                ? AppColors.slate500
+                                : AppColors.primaryAction,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Terapkan',
-                  style: TextStyle(
-                    fontFamily: _CheckoutTypography.fontFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: 8),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.primaryAction,
+                    size: 22,
                   ),
-                ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-        if (errorText != null) ...[
-          const SizedBox(height: 6),
-          _PromoStatusMessage(
-            icon: Icons.error_outline_rounded,
-            message: errorText!,
-            color: const Color(0xFFDC2626),
-          ),
-        ] else if (successText != null) ...[
-          const SizedBox(height: 6),
-          _PromoStatusMessage(
-            icon: Icons.check_circle_outline_rounded,
-            message: successText!,
-            color: AppColors.primaryAction,
-          ),
-        ],
       ],
-    );
-  }
-}
-
-class _PromoStatusMessage extends StatelessWidget {
-  const _PromoStatusMessage({
-    required this.icon,
-    required this.message,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String message;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Icon(icon, size: 15, color: color),
-          ),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: color,
-                fontFamily: _CheckoutTypography.fontFamily,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                height: 1.35,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _UpperCaseTextFormatter extends TextInputFormatter {
-  const _UpperCaseTextFormatter();
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    return newValue.copyWith(
-      text: newValue.text.toUpperCase(),
-      selection: newValue.selection,
-      composing: TextRange.empty,
     );
   }
 }

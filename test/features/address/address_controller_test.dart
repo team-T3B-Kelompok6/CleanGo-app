@@ -21,8 +21,9 @@ void main() {
         final cleaningAddress = model.toCleaningAddress();
 
         expect(cleaningAddress.label, 'Rumah (Utama)');
-        expect(cleaningAddress.street, 'Jl. Melati No. 1');
-        expect(cleaningAddress.city, 'Jl. Melati No. 1, Malang');
+        expect(cleaningAddress.street, model.fullAddress);
+        expect(cleaningAddress.city, isEmpty);
+        expect(cleaningAddress.fullAddress, model.fullAddress);
         expect(cleaningAddress.landmark, 'Pagar Hijau');
         expect(cleaningAddress.customerName, 'Krisna');
         expect(cleaningAddress.phoneNumber, '08123456789');
@@ -45,7 +46,9 @@ void main() {
         final cleaningAddress = model.toCleaningAddress();
 
         expect(cleaningAddress.label, 'Kantor');
-        expect(cleaningAddress.city, 'Jl. Mawar No. 2, Surabaya');
+        expect(cleaningAddress.street, model.fullAddress);
+        expect(cleaningAddress.city, isEmpty);
+        expect(cleaningAddress.fullAddress, model.fullAddress);
       },
     );
   });

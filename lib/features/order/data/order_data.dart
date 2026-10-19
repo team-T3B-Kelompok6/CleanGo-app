@@ -26,6 +26,7 @@ abstract final class OrderData {
       canReview: true,
     ),
     OrderHistoryModel(
+      orderId: '#CG-82909',
       serviceName: 'Deep Cleaning',
       serviceAssetPath: 'assets/images/deep_cleaning.jpeg',
       schedule: 'Selasa, 10 Sep 2024 • 10:00',

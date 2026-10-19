@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_sheet.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
@@ -356,38 +357,12 @@ class _SortBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+    return AppSheet(
+      title: 'Urutkan layanan',
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 10),
-          Center(
-            child: Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.slate200,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(20, 20, 20, 10),
-            child: Text(
-              'Urutkan layanan',
-              style: TextStyle(
-                color: AppColors.slate900,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                height: 1.35,
-              ),
-            ),
-          ),
           ...ServiceSort.values.map(
             (sort) => _SortOption(
               sort: sort,
@@ -395,7 +370,6 @@ class _SortBottomSheet extends StatelessWidget {
               onTap: () => Navigator.pop(context, sort),
             ),
           ),
-          SizedBox(height: 12 + MediaQuery.viewPaddingOf(context).bottom),
         ],
       ),
     );
@@ -420,7 +394,7 @@ class _SortOption extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
               Expanded(

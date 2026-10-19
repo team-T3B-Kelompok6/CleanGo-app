@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../controllers/personal_data_form_controller.dart';
 import '../controllers/profile_controller.dart';
 import '../controllers/profile_form_validator.dart';
@@ -75,38 +76,18 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     }
 
     if (!_formKey.currentState!.validate()) {
+      AppNotice.show(
+        context,
+        'Data diri belum valid. Periksa kembali isian Anda.',
+        type: AppNoticeType.error,
+      );
       return;
     }
 
     final profileController = context.read<ProfileController>();
     _personalDataForm.saveTo(profileController);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-            SizedBox(width: 10),
-            Text(
-              'Perubahan data diri berhasil disimpan',
-              style: TextStyle(
-                color: Colors.white,
-                fontFamily: AppTheme.fontFamily,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-    );
+    AppNotice.show(context, 'Data diri berhasil disimpan.');
 
     Navigator.of(context).pop();
   }
@@ -239,16 +220,7 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          Container(
-            width: 42,
-            height: 42,
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.verified_user_outlined,
-              color: Color(0xFF0D9488),
-              size: 24,
-            ),
-          ),
+          const SizedBox(width: 42),
         ],
       ),
     );
@@ -302,11 +274,10 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
                 right: 0,
                 child: GestureDetector(
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Fitur ubah foto profil CleanGo'),
-                        duration: Duration(seconds: 1),
-                      ),
+                    AppNotice.show(
+                      context,
+                      'Fitur ubah foto profil belum tersedia.',
+                      type: AppNoticeType.info,
                     );
                   },
                   child: Container(

@@ -67,8 +67,8 @@ class AddressModel {
     final fullLabel = isPrimary ? '$type (Utama)' : type;
     return CleaningAddress(
       label: fullLabel,
-      street: title,
-      city: fullAddress,
+      street: fullAddress.trim().isEmpty ? title.trim() : fullAddress.trim(),
+      city: '',
       landmark: note,
       customerName: contactName,
       phoneNumber: phoneNumber,

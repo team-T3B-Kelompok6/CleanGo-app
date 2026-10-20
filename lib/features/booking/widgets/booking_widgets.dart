@@ -153,64 +153,78 @@ class BookingTimeSelector extends StatelessWidget {
     required this.options,
     required this.selectedTime,
     required this.onTimeSelected,
+    this.isTimeAvailable,
   });
 
   final List<String> options;
   final String selectedTime;
   final ValueChanged<String> onTimeSelected;
+  final bool Function(String)? isTimeAvailable;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: options.indexed
-          .map((entry) {
-            final index = entry.$1;
-            final time = entry.$2;
-            final isSelected = time == selectedTime;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: 9,
+          runSpacing: 9,
+          children: options
+              .map((time) {
+                final enabled = isTimeAvailable?.call(time) ?? true;
+                final isSelected = enabled && time == selectedTime;
 
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(left: index == 0 ? 0 : 9),
-                child: Semantics(
-                  button: true,
-                  selected: isSelected,
-                  label: 'Pilih jam $time',
-                  child: Material(
-                    color: isSelected ? AppColors.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: () => onTimeSelected(time),
+                return SizedBox(
+                  width: (constraints.maxWidth - 18) / 3,
+                  child: Semantics(
+                    button: true,
+                    enabled: enabled,
+                    selected: isSelected,
+                    label: 'Pilih jam $time',
+                    child: Material(
+                      color: !enabled
+                          ? AppColors.slate100
+                          : isSelected
+                          ? AppColors.primary
+                          : Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 180),
-                        height: 48,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.slate200,
+                      child: InkWell(
+                        onTap: enabled ? () => onTimeSelected(time) : null,
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          height: 48,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: !enabled
+                                  ? AppColors.slate400
+                                  : isSelected
+                                  ? AppColors.primary
+                                  : AppColors.slate200,
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          time,
-                          style: TextStyle(
-                            color: isSelected
-                                ? Colors.white
-                                : AppColors.slate600,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                          child: Text(
+                            time,
+                            style: TextStyle(
+                              color: !enabled
+                                  ? AppColors.slate400
+                                  : isSelected
+                                  ? Colors.white
+                                  : AppColors.slate600,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ),
-            );
-          })
-          .toList(growable: false),
+                );
+              })
+              .toList(growable: false),
+        );
+      },
     );
   }
 }
@@ -286,7 +300,7 @@ class CleaningAddressCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                address.street,
+                address.fullAddress,
                 style: const TextStyle(
                   color: AppColors.slate900,
                   fontSize: 13,
@@ -294,16 +308,18 @@ class CleaningAddressCard extends StatelessWidget {
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 5),
-              Text(
-                '${address.city} (${address.landmark})',
-                style: const TextStyle(
-                  color: AppColors.slate500,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                  height: 1.55,
+              if (address.landmark.trim().isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Text(
+                  address.landmark,
+                  style: const TextStyle(
+                    color: AppColors.slate500,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    height: 1.55,
+                  ),
                 ),
-              ),
+              ],
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 13),
                 child: Divider(height: 1, color: AppColors.slate100),

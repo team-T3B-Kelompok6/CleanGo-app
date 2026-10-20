@@ -6,6 +6,13 @@ enum OrderStatusStage {
   selesai,
 }
 
+class RoutePoint {
+  const RoutePoint({required this.latitude, required this.longitude});
+
+  final double latitude;
+  final double longitude;
+}
+
 extension OrderStatusStageExtension on OrderStatusStage {
   int get stepNumber => index + 1;
 
@@ -25,23 +32,14 @@ extension OrderStatusStageExtension on OrderStatusStage {
     OrderStatusStage.selesai => 'PESANAN SELESAI',
   };
 
-  String get arrivalEstimate => switch (this) {
-    OrderStatusStage.dikonfirmasi => 'Tiba ~09:30 WIB',
-    OrderStatusStage.ditugaskan => 'Tiba ~09:20 WIB',
-    OrderStatusStage.dalamPerjalanan => 'Tiba ~09:10 WIB',
-    OrderStatusStage.sedangDikerjakan => 'Estimasi selesai 12:15 WIB',
-    OrderStatusStage.selesai => 'Pengerjaan Selesai 12:15 WIB',
-  };
-
   String get travelDescription => switch (this) {
     OrderStatusStage.dikonfirmasi =>
       'Pesanan diterima & diverifikasi sistem CleanGo.',
     OrderStatusStage.ditugaskan =>
-      'Cleaner Siti Rahmawati ditugaskan dan bersiap berangkat.',
+      'Cleaner telah ditugaskan dan bersiap berangkat.',
     OrderStatusStage.dalamPerjalanan =>
-      'Estimasi waktu perjalanan sekitar 15 menit.',
-    OrderStatusStage.sedangDikerjakan =>
-      'Pembersihan Deep Cleaning sedang berlangsung.',
+      'Posisi cleaner diperbarui selama perjalanan.',
+    OrderStatusStage.sedangDikerjakan => 'Layanan sedang berlangsung.',
     OrderStatusStage.selesai =>
       'Pembersihan telah selesai dikerjakan dengan hasil optimal.',
   };
@@ -61,31 +59,16 @@ extension OrderStatusStageExtension on OrderStatusStage {
     }
   }
 
-  String get timeLabel {
-    switch (this) {
-      case OrderStatusStage.dikonfirmasi:
-        return '08:45 WIB';
-      case OrderStatusStage.ditugaskan:
-        return '08:52 WIB';
-      case OrderStatusStage.dalamPerjalanan:
-        return 'Sekarang';
-      case OrderStatusStage.sedangDikerjakan:
-        return 'Estimasi 09:15';
-      case OrderStatusStage.selesai:
-        return 'Estimasi 12:15';
-    }
-  }
-
   String get description {
     switch (this) {
       case OrderStatusStage.dikonfirmasi:
         return 'Pesanan diterima & diverifikasi sistem CleanGo.';
       case OrderStatusStage.ditugaskan:
-        return 'Cleaner ditugaskan oleh Admin dan berangkat dari operasional CleanGo.';
+        return 'Cleaner ditugaskan oleh Admin dan bersiap berangkat.';
       case OrderStatusStage.dalamPerjalanan:
         return 'Cleaner sedang berkendara menuju alamat Anda.';
       case OrderStatusStage.sedangDikerjakan:
-        return 'Pembersihan Deep Cleaning dimulai setelah verifikasi alamat.';
+        return 'Layanan dimulai setelah verifikasi alamat.';
       case OrderStatusStage.selesai:
         return 'Pengecekan kualitas kerja dan konfirmasi selesai.';
     }
@@ -103,7 +86,7 @@ class ScheduledOrderModel {
     required this.orderNumber,
     required this.price,
     required this.paymentStatus,
-    this.stage = OrderStatusStage.dalamPerjalanan,
+    this.stage = OrderStatusStage.dikonfirmasi,
     this.cleanerName = 'Siti Rahmawati',
     this.cleanerRating = 4.9,
     this.cleanerCompletedTasks = '340+ tugas selesai',
@@ -112,9 +95,17 @@ class ScheduledOrderModel {
     this.destinationAddress = 'Blk. N No.521, Mojolangu, Malang',
     this.destinationSubAddress = 'Jl. Bendungan Sigura-gura, Lowokwaru',
     this.originLocation = 'Malang City Point',
-    this.distanceKm = '2.4 km lagi',
-    this.estimatedMinutes = '±15 menit',
-    this.estimatedArrivalTime = '09:10 WIB',
+    this.distanceKm = 'Menunggu keberangkatan',
+    this.estimatedMinutes = 'Belum tersedia',
+    this.estimatedArrivalTime = 'Belum tersedia',
+    this.cleanerLatitude = -7.95565,
+    this.cleanerLongitude = 112.61785,
+    this.destinationLatitude = -7.93980,
+    this.destinationLongitude = 112.62650,
+    this.hasDestinationCoordinates = true,
+    this.etaSource = 'Lokasi cleaner belum dibagikan',
+    this.etaUpdatedAt,
+    this.routePoints = const [],
     this.scheduledAt,
     this.note = '',
     this.paymentMethod = 'QRIS',
@@ -146,6 +137,14 @@ class ScheduledOrderModel {
   final String distanceKm;
   final String estimatedMinutes;
   final String estimatedArrivalTime;
+  final double cleanerLatitude;
+  final double cleanerLongitude;
+  final double destinationLatitude;
+  final double destinationLongitude;
+  final bool hasDestinationCoordinates;
+  final String etaSource;
+  final DateTime? etaUpdatedAt;
+  final List<RoutePoint> routePoints;
   final DateTime? scheduledAt;
   final String note;
   final String paymentMethod;
@@ -177,6 +176,15 @@ class ScheduledOrderModel {
     String? distanceKm,
     String? estimatedMinutes,
     String? estimatedArrivalTime,
+    double? cleanerLatitude,
+    double? cleanerLongitude,
+    double? destinationLatitude,
+    double? destinationLongitude,
+    bool? hasDestinationCoordinates,
+    String? etaSource,
+    DateTime? etaUpdatedAt,
+    List<RoutePoint>? routePoints,
+    bool clearEtaUpdatedAt = false,
     DateTime? scheduledAt,
     String? note,
     String? paymentMethod,
@@ -210,6 +218,17 @@ class ScheduledOrderModel {
       distanceKm: distanceKm ?? this.distanceKm,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
       estimatedArrivalTime: estimatedArrivalTime ?? this.estimatedArrivalTime,
+      cleanerLatitude: cleanerLatitude ?? this.cleanerLatitude,
+      cleanerLongitude: cleanerLongitude ?? this.cleanerLongitude,
+      destinationLatitude: destinationLatitude ?? this.destinationLatitude,
+      destinationLongitude: destinationLongitude ?? this.destinationLongitude,
+      hasDestinationCoordinates:
+          hasDestinationCoordinates ?? this.hasDestinationCoordinates,
+      etaSource: etaSource ?? this.etaSource,
+      etaUpdatedAt: clearEtaUpdatedAt
+          ? null
+          : etaUpdatedAt ?? this.etaUpdatedAt,
+      routePoints: routePoints ?? this.routePoints,
       scheduledAt: scheduledAt ?? this.scheduledAt,
       note: note ?? this.note,
       paymentMethod: paymentMethod ?? this.paymentMethod,

@@ -1,56 +1,47 @@
+import '../domain/models/promo_model.dart';
+
 class CheckoutController {
-  static const String validPromoCode = 'CLEANHEMAT';
-  static const double promoDiscountRate = 0.35;
+  static const List<PromoModel> availablePromos = [
+    PromoModel(code: 'CLEANHEMAT', discountPercent: 35),
+  ];
 
-  bool _isPromoApplied = false;
+  PromoModel? _appliedPromo;
   String? _promoError;
-  String? _promoSuccessMessage;
 
-  bool get isPromoApplied => _isPromoApplied;
+  PromoModel? get appliedPromo => _appliedPromo;
+  bool get isPromoApplied => _appliedPromo != null;
   String? get promoError => _promoError;
-  String? get promoSuccessMessage => _promoSuccessMessage;
+  String? get promoSuccessMessage =>
+      isPromoApplied ? 'Kode promo berhasil diterapkan.' : null;
 
   int discountAmount(int servicePrice) {
-    if (!_isPromoApplied) {
-      return 0;
-    }
-
-    return (servicePrice * promoDiscountRate).round();
+    return _appliedPromo?.discountAmount(servicePrice) ?? 0;
   }
 
   int totalPayment({required int servicePrice, required int platformFee}) {
     return servicePrice - discountAmount(servicePrice) + platformFee;
   }
 
-  bool updatePromoInput(String _) {
-    final hasStateChanged =
-        _isPromoApplied || _promoError != null || _promoSuccessMessage != null;
-
-    _isPromoApplied = false;
+  void clearPromo() {
+    _appliedPromo = null;
     _promoError = null;
-    _promoSuccessMessage = null;
-    return hasStateChanged;
   }
 
   void applyPromo(String code) {
     final normalizedCode = code.trim().toUpperCase();
+    clearPromo();
 
     if (normalizedCode.isEmpty) {
-      _isPromoApplied = false;
-      _promoError = null;
-      _promoSuccessMessage = null;
       return;
     }
 
-    if (normalizedCode != validPromoCode) {
-      _isPromoApplied = false;
-      _promoError = 'Kode promo tidak valid.';
-      _promoSuccessMessage = null;
-      return;
+    for (final promo in availablePromos) {
+      if (promo.code == normalizedCode) {
+        _appliedPromo = promo;
+        return;
+      }
     }
 
-    _isPromoApplied = true;
-    _promoError = null;
-    _promoSuccessMessage = 'Kode promo berhasil diterapkan.';
+    _promoError = 'Kode promo tidak valid.';
   }
 }

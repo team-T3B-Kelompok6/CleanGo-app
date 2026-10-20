@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/app_notice.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/address_controller.dart';
@@ -208,11 +209,10 @@ class _AddressListPageState extends State<AddressListPage> {
                     child: OutlinedButton(
                       onPressed: () {
                         if (!addressController.canAddAddress) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Maksimal 5 alamat tersimpan.'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
+                          AppNotice.show(
+                            context,
+                            'Maksimal 5 alamat tersimpan.',
+                            type: AppNoticeType.error,
                           );
                           return;
                         }
@@ -266,6 +266,11 @@ class _AddressListPageState extends State<AddressListPage> {
                                   addresses.first;
                               context.read<BookingController>().updateAddress(
                                 active.toCleaningAddress(),
+                                addressId: active.id,
+                              );
+                              AppNotice.show(
+                                context,
+                                'Alamat pengerjaan berhasil dipilih.',
                               );
                               Navigator.of(context).pop(active);
                             }

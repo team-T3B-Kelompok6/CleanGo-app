@@ -14,24 +14,31 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     String? token,
+    Map<String, String>? headers,
+    Duration? timeout,
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');
-    final headers = <String, String>{
+    final requestHeaders = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      ...?headers,
     };
     if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
+      requestHeaders['Authorization'] = 'Bearer $token';
     }
 
-    final response = await _client.post(
+    var request = _client.post(
       uri,
-      headers: headers,
+      headers: requestHeaders,
       body: body == null ? null : jsonEncode(body),
     );
+    if (timeout != null) request = request.timeout(timeout);
+    final response = await request;
 
     return _handleResponse(response);
   }
+
+  void close() => _client.close();
 
   Future<Map<String, dynamic>> get(String path, {String? token}) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}$path');

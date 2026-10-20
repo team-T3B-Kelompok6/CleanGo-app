@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/app_notice.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/address_controller.dart';
@@ -59,6 +60,11 @@ class _AddAddressPageState extends State<AddAddressPage> {
     }
 
     if (!_formKey.currentState!.validate()) {
+      AppNotice.show(
+        context,
+        'Alamat belum dapat disimpan. Periksa kembali isian Anda.',
+        type: AppNoticeType.error,
+      );
       return;
     }
 
@@ -74,13 +80,10 @@ class _AddAddressPageState extends State<AddAddressPage> {
     if (created == null) {
       if (!mounted) return;
       setState(() => _addressForm.setSaving(false));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            addressController.error ?? 'Maksimal 5 alamat tersimpan.',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+      AppNotice.show(
+        context,
+        addressController.error ?? 'Maksimal 5 alamat tersimpan.',
+        type: AppNoticeType.error,
       );
       return;
     }
@@ -90,18 +93,13 @@ class _AddAddressPageState extends State<AddAddressPage> {
     if (widget.autoSetPrimary) {
       context.read<BookingController>().updateAddress(
         created.toCleaningAddress(),
+        addressId: created.id,
       );
     }
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Alamat baru berhasil ditambahkan!'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotice.show(context, 'Alamat baru berhasil ditambahkan.');
 
     Navigator.of(context).pop(created);
   }

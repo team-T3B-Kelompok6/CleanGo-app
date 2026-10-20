@@ -1,7 +1,50 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
+import 'package:cleango_app/features/order/data/eta_repository.dart';
 import 'package:cleango_app/features/order/domain/models/order_model.dart';
 import 'package:cleango_app/features/service/controllers/service_controller.dart';
+
+class FakeEtaRepository extends EtaRepository {
+  int calls = 0;
+  double? lastInitialDistanceM;
+  double? lastElapsedSeconds;
+  Future<EtaEstimate>? pendingResult;
+
+  @override
+  Future<EtaEstimate> calculate({
+    required double cleanerLatitude,
+    required double cleanerLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+    required double initialDistanceM,
+    required double elapsedSeconds,
+    required double stoppedDurationSeconds,
+    required double rollingSpeedMps,
+  }) async {
+    calls += 1;
+    lastInitialDistanceM = initialDistanceM;
+    lastElapsedSeconds = elapsedSeconds;
+    if (pendingResult != null) return pendingResult!;
+    return EtaEstimate(
+      distanceMeters: calls == 1 ? 4200 : 2100,
+      baselineEtaSeconds: calls == 1 ? 900 : 450,
+      etaSeconds: calls == 1 ? 720 : 360,
+      etaMinutes: calls == 1 ? 12 : 6,
+      source: 'ml',
+      modelVersion: 'eta-v1',
+      updatedAt: DateTime(2026, 10, 16, 9),
+      path: const [
+        RoutePoint(latitude: -7.97, longitude: 112.61),
+        RoutePoint(latitude: -7.94, longitude: 112.62),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {}
+}
 
 void main() {
   group('OrderController Tests', () {
@@ -11,12 +54,158 @@ void main() {
       controller = OrderController();
     });
 
-    test('Initial stage is dalamPerjalanan and step number is 3 of 5', () {
-      expect(controller.currentStage, OrderStatusStage.dalamPerjalanan);
-      expect(controller.currentStepNumber, 3);
-      expect(controller.currentStepLabel, 'Langkah 3 dari 5');
+    tearDown(() => controller.dispose());
+
+    String addOrder(String serviceName, {int days = 3}) {
+      controller.createOrderFromBooking(
+        serviceName: serviceName,
+        serviceImagePath: 'assets/images/service_deep_cleaning.jpeg',
+        price: 'Rp155.000',
+        address: 'Alamat $serviceName',
+        scheduledAt: DateTime.now().add(Duration(days: days)),
+        note: 'Catatan $serviceName',
+      );
+      return controller.scheduledOrder.orderNumber;
+    }
+
+    test(
+      'keeps multiple active orders with unique IDs and independent stages',
+      () {
+        controller.completeScheduledOrder();
+        final firstId = addOrder('Pesanan pertama');
+        controller.setStage(OrderStatusStage.ditugaskan);
+        final departureTime = controller.stageTimeLabel(
+          OrderStatusStage.ditugaskan,
+        );
+        final secondId = addOrder('Pesanan kedua', days: 4);
+
+        expect(firstId, isNot(secondId));
+        expect(controller.scheduledOrders.map((order) => order.orderNumber), [
+          secondId,
+          firstId,
+        ]);
+        expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
+        expect(controller.selectScheduledOrder(firstId), isTrue);
+        expect(controller.currentStage, OrderStatusStage.ditugaskan);
+        expect(controller.scheduledOrder.note, 'Catatan Pesanan pertama');
+        expect(
+          controller.stageTimeLabel(OrderStatusStage.ditugaskan),
+          departureTime,
+        );
+        expect(controller.selectScheduledOrder('unknown'), isFalse);
+        expect(controller.scheduledOrder.orderNumber, firstId);
+        expect(controller.selectScheduledOrder(secondId), isTrue);
+        expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
+        expect(
+          controller.stageTimeLabel(OrderStatusStage.ditugaskan),
+          'Menunggu',
+        );
+      },
+    );
+
+    test('rescheduling and cancelling one order preserves the others', () {
+      controller.completeScheduledOrder();
+      final firstId = addOrder('Pesanan pertama');
+      final secondId = addOrder('Pesanan kedua', days: 4);
+      final secondSchedule = controller.scheduledOrder.scheduledAt;
+
+      controller.selectScheduledOrder(firstId);
+      final newSchedule = DateTime.now().add(const Duration(days: 7));
+      expect(controller.rescheduleOrder(newSchedule), isTrue);
+      expect(controller.scheduledOrder.scheduledAt, newSchedule);
+      expect(controller.cancelScheduledOrder(), isTrue);
+      expect(controller.hasScheduledOrder, isTrue);
+      expect(controller.scheduledOrders.single.orderNumber, secondId);
+      expect(controller.selectScheduledOrder(firstId), isFalse);
+      expect(controller.historyOrders.first.orderId, firstId);
+      expect(controller.historyOrders.first.status, 'DIBATALKAN');
+      expect(controller.historyOrders.first.canReview, isFalse);
+      expect(controller.selectScheduledOrder(secondId), isTrue);
+      expect(controller.scheduledOrder.scheduledAt, secondSchedule);
+    });
+
+    test('completing and reviewing one order leaves the other active', () {
+      controller.completeScheduledOrder();
+      final firstId = addOrder('Pesanan pertama');
+      final secondId = addOrder('Pesanan kedua');
+      controller.selectScheduledOrder(firstId);
+      controller.completeScheduledOrder();
+      controller.completeScheduledOrder();
+
+      expect(controller.scheduledOrder.orderNumber, firstId);
+      expect(controller.currentStage, OrderStatusStage.selesai);
+      expect(controller.scheduledOrders.single.orderNumber, secondId);
+      expect(controller.hasScheduledOrder, isTrue);
+      expect(
+        controller.historyOrders.where((order) => order.orderId == firstId),
+        hasLength(1),
+      );
+      expect(
+        controller.submitReview(
+          orderId: firstId,
+          rating: 4,
+          tags: [],
+          comment: 'Pekerjaan rapi',
+        ),
+        isTrue,
+      );
+      expect(controller.selectScheduledOrder(secondId), isTrue);
+      expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
+      expect(controller.scheduledOrder.note, 'Catatan Pesanan kedua');
+    });
+
+    test('a late ETA response cannot update another selected order', () async {
+      final repository = FakeEtaRepository();
+      final pending = Completer<EtaEstimate>();
+      repository.pendingResult = pending.future;
+      final tracking = OrderController(etaRepository: repository);
+      addTearDown(tracking.dispose);
+      tracking.setStage(OrderStatusStage.ditugaskan);
+      final firstId = tracking.scheduledOrder.orderNumber;
+      final request = tracking.refreshEta();
+
+      tracking.createOrderFromBooking(
+        serviceName: 'Pesanan kedua',
+        serviceImagePath: 'assets/images/service_deep_cleaning.jpeg',
+        price: 'Rp155.000',
+        address: 'Alamat kedua',
+        destinationLatitude: -7.94,
+        destinationLongitude: 112.62,
+      );
+      tracking.setStage(OrderStatusStage.ditugaskan);
+      pending.complete(
+        EtaEstimate(
+          distanceMeters: 4200,
+          baselineEtaSeconds: 900,
+          etaSeconds: 720,
+          etaMinutes: 12,
+          source: 'ml',
+          modelVersion: 'eta-v1',
+          updatedAt: DateTime.now(),
+          path: const [],
+        ),
+      );
+      await request;
+
+      expect(tracking.scheduledOrder.estimatedMinutes, 'Belum tersedia');
+      expect(tracking.etaLoading, isFalse);
+      expect(tracking.selectScheduledOrder(firstId), isTrue);
+      expect(tracking.currentStage, OrderStatusStage.ditugaskan);
+      expect(tracking.etaLoading, isFalse);
+    });
+
+    test('initial scheduled order waits for departure without a dummy ETA', () {
+      expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
+      expect(controller.currentStepNumber, 1);
+      expect(controller.currentStepLabel, 'Langkah 1 dari 5');
       expect(controller.scheduledOrder.orderNumber, '#CG-82910');
       expect(controller.scheduledOrder.cleanerName, 'Siti Rahmawati');
+      expect(controller.etaAvailable, isFalse);
+      expect(controller.scheduledOrder.estimatedMinutes, 'Belum tersedia');
+      expect(
+        controller.stageTimeLabel(OrderStatusStage.ditugaskan),
+        'Menunggu',
+      );
     });
 
     test('setStage updates progress, status text, and step label correctly across all 5 stages', () {
@@ -52,6 +241,10 @@ void main() {
       expect(controller.currentStepNumber, 5);
       expect(controller.currentStepLabel, 'Langkah 5 dari 5');
       expect(controller.scheduledOrder.progress, 1.0);
+      expect(
+        controller.stageTimeLabel(OrderStatusStage.selesai),
+        startsWith('Selesai '),
+      );
     });
 
     test('nextStage advances step sequentially and stops at selesai', () {
@@ -93,6 +286,63 @@ void main() {
       expect(controller.currentStepNumber, 1);
     });
 
+    test(
+      'ETA starts only after departure and updates from cleaner coordinates',
+      () async {
+        final repository = FakeEtaRepository();
+        final trackingController = OrderController(etaRepository: repository);
+
+        trackingController.setStage(OrderStatusStage.dikonfirmasi);
+        await trackingController.refreshEta();
+        expect(repository.calls, 0);
+        expect(trackingController.etaAvailable, isFalse);
+        expect(
+          trackingController.etaHeadline,
+          'ETA tersedia setelah cleaner berangkat',
+        );
+
+        trackingController.setStage(OrderStatusStage.ditugaskan);
+        await trackingController.refreshEta();
+        expect(repository.calls, 1);
+        expect(repository.lastInitialDistanceM, 1);
+        expect(repository.lastElapsedSeconds, lessThan(2));
+        expect(trackingController.etaAvailable, isTrue);
+        expect(trackingController.scheduledOrder.routePoints, hasLength(2));
+
+        await trackingController.updateCleanerLocation(-7.95, 112.62);
+        expect(repository.calls, 2);
+        expect(trackingController.scheduledOrder.estimatedMinutes, '±6 menit');
+        expect(trackingController.scheduledOrder.cleanerLatitude, -7.95);
+        trackingController.dispose();
+      },
+    );
+
+    test(
+      'ETA stays unavailable when the selected address has no map point',
+      () async {
+        final repository = FakeEtaRepository();
+        final trackingController = OrderController(etaRepository: repository);
+        trackingController.createOrderFromBooking(
+          serviceName: 'Deep Cleaning',
+          serviceImagePath: 'assets/images/deep_cleaning.jpeg',
+          price: 'Rp155.000',
+          address: 'Alamat tanpa titik peta',
+        );
+
+        trackingController.setStage(OrderStatusStage.ditugaskan);
+        await trackingController.refreshEta();
+
+        expect(
+          trackingController.scheduledOrder.hasDestinationCoordinates,
+          isFalse,
+        );
+        expect(trackingController.canCalculateEta, isFalse);
+        expect(repository.calls, 0);
+        expect(trackingController.etaHeadline, 'Titik tujuan belum tersedia');
+        trackingController.dispose();
+      },
+    );
+
     test('submitReview records review data and sets canReview to false on matching history item', () {
       final initialReviewable = controller.historyOrders.firstWhere(
         (o) => o.canReview,
@@ -127,7 +377,67 @@ void main() {
       expect(cuciAc.orderId, '#CG-99012');
     });
 
+    test(
+      'review rejects unknown orders, invalid ratings and repeated submissions',
+      () {
+        expect(
+          controller.submitReview(
+            orderId: 'unknown',
+            rating: 5,
+            tags: [],
+            comment: '',
+          ),
+          isFalse,
+        );
+        expect(
+          controller.submitReview(
+            orderId: '#CG-82910',
+            rating: 5,
+            tags: [],
+            comment: '',
+          ),
+          isFalse,
+        );
+        final order = controller.historyOrders.firstWhere(
+          (item) => item.canReview,
+        );
+        expect(
+          controller.submitReview(
+            orderId: order.orderId,
+            rating: 0,
+            tags: [],
+            comment: '',
+          ),
+          isFalse,
+        );
+        expect(
+          controller.submitReview(
+            orderId: order.orderId,
+            rating: 5,
+            tags: [],
+            comment: '',
+          ),
+          isTrue,
+        );
+        expect(
+          controller.submitReview(
+            orderId: order.orderId,
+            rating: 4,
+            tags: [],
+            comment: 'Kedua',
+          ),
+          isFalse,
+        );
+        final review = controller.historyOrders
+            .firstWhere((item) => item.orderId == order.orderId)
+            .review!;
+        expect(review.rating, 5);
+        expect(review.comment, isEmpty);
+      },
+    );
+
     test('submitReview on scheduled order (#CG-82910) does NOT overwrite Cuci AC review status', () {
+      controller.completeScheduledOrder();
       controller.submitReview(
         orderId: '#CG-82910',
         rating: 5,

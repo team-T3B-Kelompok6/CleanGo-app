@@ -10,10 +10,22 @@ import '../domain/models/address_model.dart';
 class AddressController extends ChangeNotifier {
   static const int maxAddresses = 5;
 
-  AddressController({this.repository, List<AddressModel>? initialAddresses, TokenStorage? tokenStorage, CustomerAddressService? remote})
-      : tokenStorage = tokenStorage, _remote = remote ?? CustomerAddressService() {
-    _addresses = List<AddressModel>.from(initialAddresses ?? defaultAddresses);
-    _selectedAddressId = _addresses.isEmpty ? '' : _addresses.firstWhere((a) => a.isPrimary, orElse: () => _addresses.first).id;
+  AddressController({
+    this.repository,
+    List<AddressModel>? initialAddresses,
+    TokenStorage? tokenStorage,
+    CustomerAddressService? remote,
+  })  : tokenStorage = tokenStorage,
+        _remote = remote ?? CustomerAddressService() {
+    final seed = initialAddresses == null || initialAddresses.isEmpty
+        ? defaultAddresses
+        : initialAddresses;
+    _addresses = seed.map(_withDefaultCoordinates).toList();
+    _selectedAddressId = _addresses.isEmpty
+        ? ''
+        : _addresses
+            .firstWhere((a) => a.isPrimary, orElse: () => _addresses.first)
+            .id;
     _subscription = repository?.watchAddresses().listen(_applySnapshot);
   }
 
@@ -27,6 +39,8 @@ class AddressController extends ChangeNotifier {
       contactName: 'krisna',
       phoneNumber: '(+62) 081223728077',
       isPrimary: true,
+      latitude: -7.93980,
+      longitude: 112.62650,
     ),
     AddressModel(
       id: 'addr-2',
@@ -87,6 +101,15 @@ class AddressController extends ChangeNotifier {
   List<AddressModel> get addresses => List.unmodifiable(_addresses);
   bool get canAddAddress => _addresses.length < maxAddresses;
   String get selectedAddressId => _selectedAddressId;
+
+  AddressModel? findById(String? id) {
+    if (id == null) return null;
+    try {
+      return _addresses.firstWhere((address) => address.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
 
   AddressModel? get selectedAddress {
     try {
@@ -206,9 +229,24 @@ class AddressController extends ChangeNotifier {
   }
 
   void _applySnapshot(AddressSnapshot snapshot) {
-    _addresses = List<AddressModel>.from(snapshot.addresses);
+    _addresses = snapshot.addresses.map(_withDefaultCoordinates).toList();
     _selectedAddressId = snapshot.selectedAddressId;
     notifyListeners();
+  }
+
+  static AddressModel _withDefaultCoordinates(AddressModel address) {
+    if (address.latitude != null && address.longitude != null) return address;
+    for (final seed in defaultAddresses) {
+      if (seed.id == address.id &&
+          seed.latitude != null &&
+          seed.longitude != null) {
+        return address.copyWith(
+          latitude: seed.latitude,
+          longitude: seed.longitude,
+        );
+      }
+    }
+    return address;
   }
 
   Future<void> _persist() async {

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../controllers/auth_session_controller.dart';
 import '../data/api_auth_service.dart';
 import '../data/dummy_auth_service.dart';
@@ -312,6 +313,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submit() async {
+    if (_isSubmitting) return;
     FocusScope.of(context).unfocus();
 
     final phoneError = AuthValidators.phone(_phoneController.text);
@@ -374,11 +376,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Pendaftaran berhasil. Silakan masuk.'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppNotice.show(context, 'Pendaftaran berhasil. Silakan masuk.');
   }
 }

@@ -38,9 +38,11 @@ class _SplashPageState extends State<SplashPage>
     final preferences = context.read<AppPreferences>();
     final hasSession = await context.read<AuthSessionController>().hasSession();
     if (!mounted) return;
+    final hasCompletedOnboarding = await preferences.hasCompletedOnboarding();
+    if (!mounted) return;
 
     final Widget destination;
-    if (!preferences.hasCompletedOnboarding) {
+    if (!hasCompletedOnboarding) {
       destination = const OnboardingPage();
     } else if (hasSession) {
       await context.read<ProfileController>().loadFromApi();

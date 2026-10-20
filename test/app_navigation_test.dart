@@ -72,6 +72,11 @@ void main() {
     await finishNavigation(tester);
     expect(find.byType(BookingPage), findsOneWidget);
 
+    tester.element(find.byType(BookingPage)).read<BookingController>()
+      ..selectDate(DateTime.now().add(const Duration(days: 1)))
+      ..selectTime('10:00');
+    await tester.pump();
+
     await tester.tap(find.text('Lanjut ke Checkout'));
     await finishNavigation(tester);
     expect(find.byType(CheckoutPage), findsOneWidget);

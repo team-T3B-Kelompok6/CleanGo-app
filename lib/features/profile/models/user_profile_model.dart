@@ -9,7 +9,6 @@ class UserProfileModel {
     required this.gender,
     required this.birthDate,
     this.avatarAsset = 'assets/images/user_profile.jpeg',
-    this.password = '321321',
   });
 
   final String id;
@@ -21,7 +20,6 @@ class UserProfileModel {
   final String gender; // 'Laki-laki' | 'Perempuan'
   final DateTime birthDate;
   final String avatarAsset;
-  final String password;
 
   String get formattedBirthDate => formatBirthDate(birthDate);
 
@@ -54,7 +52,6 @@ class UserProfileModel {
     String? gender,
     DateTime? birthDate,
     String? avatarAsset,
-    String? password,
   }) {
     return UserProfileModel(
       id: id ?? this.id,
@@ -66,7 +63,6 @@ class UserProfileModel {
       gender: gender ?? this.gender,
       birthDate: birthDate ?? this.birthDate,
       avatarAsset: avatarAsset ?? this.avatarAsset,
-      password: password ?? this.password,
     );
   }
 
@@ -81,7 +77,6 @@ class UserProfileModel {
       'gender': gender,
       'birthDate': birthDate.toIso8601String(),
       'avatarAsset': avatarAsset,
-      'password': password,
     };
   }
 
@@ -114,7 +109,6 @@ class UserProfileModel {
           : DateTime(1995, 5, 14),
       avatarAsset:
           json['avatarAsset'] as String? ?? 'assets/images/user_profile.jpeg',
-      password: json['password'] as String? ?? '321321',
     );
   }
 }

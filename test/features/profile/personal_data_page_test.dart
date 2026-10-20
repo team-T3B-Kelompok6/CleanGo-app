@@ -23,7 +23,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Masukkan nama lengkap yang valid.'), findsOneWidget);
-    expect(find.text('Perubahan data diri berhasil disimpan'), findsNothing);
+    expect(find.text('Data diri berhasil disimpan.'), findsNothing);
 
     await tester.enterText(nameField, 'Krisna Pratama');
     await tester.pump();

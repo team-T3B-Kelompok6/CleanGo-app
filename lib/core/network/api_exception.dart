@@ -5,6 +5,10 @@ class ApiException implements Exception {
     this.code,
   });
 
+  const ApiException.simple(this.message)
+      : statusCode = 500,
+        code = null;
+
   final int statusCode;
   final String message;
   final String? code;

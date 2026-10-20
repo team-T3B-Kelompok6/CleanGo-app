@@ -12,11 +12,30 @@ class AuthSessionController extends ChangeNotifier {
 
   Future<bool> hasSession() async {
     final token = await _tokenStorage.readAccessToken();
-    return token != null && token.isNotEmpty;
+    final expiresAt = await _tokenStorage.readExpiresAt();
+    final isValid =
+        token != null &&
+        token.isNotEmpty &&
+        expiresAt != null &&
+        expiresAt.isAfter(DateTime.now().toUtc());
+    if (!isValid) {
+      await _tokenStorage.clearSession();
+    }
+    return isValid;
   }
 
   Future<void> createSession(String token) {
     return _tokenStorage.writeAccessToken(token);
+  }
+
+  Future<void> saveSession({
+    required String accessToken,
+    required String refreshToken,
+    required DateTime expiresAt,
+  }) async {
+    await _tokenStorage.writeAccessToken(accessToken);
+    await _tokenStorage.writeRefreshToken(refreshToken);
+    await _tokenStorage.writeExpiresAt(expiresAt);
   }
 
   Future<void> createLocalSession() async {
@@ -24,10 +43,14 @@ class AuthSessionController extends ChangeNotifier {
     final token = base64UrlEncode(
       List<int>.generate(32, (_) => random.nextInt(256)),
     ).replaceAll('=', '');
-    await createSession(token);
+    await saveSession(
+      accessToken: token,
+      refreshToken: token,
+      expiresAt: DateTime.now().toUtc().add(const Duration(days: 1)),
+    );
   }
 
   Future<void> signOut() {
-    return _tokenStorage.deleteAccessToken();
+    return _tokenStorage.clearSession();
   }
 }

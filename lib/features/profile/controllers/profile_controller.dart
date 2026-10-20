@@ -71,6 +71,8 @@ class ProfileController extends ChangeNotifier {
   );
 
   late UserProfileModel _profile;
+  // Demo-only credential kept out of the serializable profile model.
+  String _password = '321321';
 
   UserProfileModel get profile => _profile;
 
@@ -84,16 +86,16 @@ class ProfileController extends ChangeNotifier {
   DateTime get birthDate => _profile.birthDate;
   String get formattedBirthDate => _profile.formattedBirthDate;
   String get avatarAsset => _profile.avatarAsset;
-  String get password => _profile.password;
+  String get password => _password;
 
-  bool verifyPassword(String input) => input == _profile.password;
+  bool verifyPassword(String input) => input == _password;
 
   bool changePassword({
     required String currentPassword,
     required String newPassword,
   }) {
     if (verifyPassword(currentPassword)) {
-      _profile = _profile.copyWith(password: newPassword);
+      _password = newPassword;
       notifyListeners();
       return true;
     }
@@ -108,7 +110,6 @@ class ProfileController extends ChangeNotifier {
     String? gender,
     DateTime? birthDate,
     String? avatarAsset,
-    String? password,
   }) {
     _profile = _profile.copyWith(
       fullName: fullName,
@@ -118,7 +119,6 @@ class ProfileController extends ChangeNotifier {
       gender: gender,
       birthDate: birthDate,
       avatarAsset: avatarAsset,
-      password: password,
     );
     notifyListeners();
   }

@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_dialog.dart';
+import '../../../shared/widgets/app_notice.dart';
+import '../../../shared/widgets/app_sheet.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../controllers/support_controller.dart';
@@ -38,32 +41,15 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   }
 
   void _showContactSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          style: const TextStyle(
-            color: Colors.white,
-            fontFamily: AppTheme.fontFamily,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      ),
-    );
+    AppNotice.show(context, message, type: AppNoticeType.info);
   }
 
   void _showTermsModal() {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
         return DraggableScrollableSheet(
           initialChildSize: 0.75,
@@ -71,68 +57,30 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
           maxChildSize: 0.95,
           expand: false,
           builder: (_, scrollController) {
-            return Column(
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(2),
+            return AppSheet(
+              title: 'Syarat & Ketentuan Layanan',
+              scrollController: scrollController,
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TermsSection(
+                    title: '1. Jaminan Garansi 100%',
+                    description: 'CleanGo menjamin kepuasan pelanggan melalui inspeksi pengerjaan. Jika pelanggan mendapati area yang kurang bersih, pengajuan re-cleaning dapat dilakukan dalam 1x24 jam secara gratis.',
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 8,
+                  _TermsSection(
+                    title: '2. Kebijakan Reschedule & Pembatalan',
+                    description: 'Perubahan jadwal dan pembatalan dapat dilakukan maksimal H-1 atau 24 jam sebelum waktu pengerjaan. Setelah batas tersebut, hubungi WhatsApp CS CleanGo untuk bantuan.',
                   ),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Syarat & Ketentuan Layanan',
-                          style: TextStyle(
-                            color: Color(0xFF0F172A),
-                            fontFamily: AppTheme.fontFamily,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
+                  _TermsSection(
+                    title: '3. Perlindungan & Asuransi Barang',
+                    description: 'Seluruh staf cleaner telah melalui uji integritas dan verifikasi identitas resmi. CleanGo menanggung penggantian kerugian hingga Rp 5.000.000 untuk kerusakan yang terbukti akibat kelalaian staf.',
                   ),
-                ),
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                Expanded(
-                  child: ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(20),
-                    children: const [
-                      _TermsSection(
-                        title: '1. Jaminan Garansi 100%',
-                        description: 'CleanGo menjamin kepuasan pelanggan melalui inspeksi pengerjaan. Jika pelanggan mendapati area yang kurang bersih, pengajuan re-cleaning dapat dilakukan dalam 1x24 jam secara gratis.',
-                      ),
-                      _TermsSection(
-                        title: '2. Kebijakan Reschedule & Pembatalan',
-                        description: 'Perubahan jadwal dan pembatalan dapat dilakukan maksimal H-1 atau 24 jam sebelum waktu pengerjaan. Setelah batas tersebut, hubungi WhatsApp CS CleanGo untuk bantuan.',
-                      ),
-                      _TermsSection(
-                        title: '3. Perlindungan & Asuransi Barang',
-                        description: 'Seluruh staf cleaner telah melalui uji integritas dan verifikasi identitas resmi. CleanGo menanggung penggantian kerugian hingga Rp 5.000.000 untuk kerusakan yang terbukti akibat kelalaian staf.',
-                      ),
-                      _TermsSection(
-                        title: '4. Privasi & Keamanan Data',
-                        description: 'Data identitas, nomor kontak, serta alamat rumah pelanggan dilindungi dengan enkripsi ketat dan hanya digunakan untuk keperluan layanan pembersihan CleanGo.',
-                      ),
-                    ],
+                  _TermsSection(
+                    title: '4. Privasi & Keamanan Data',
+                    description: 'Data identitas, nomor kontak, serta alamat rumah pelanggan dilindungi dengan enkripsi ketat dan hanya digunakan untuk keperluan layanan pembersihan CleanGo.',
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         );
@@ -144,47 +92,13 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     showDialog<void>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.help_outline_rounded, color: AppColors.primary),
-              SizedBox(width: 8),
-              Text(
-                'Pusat Dukungan',
-                style: TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Layanan Customer Service CleanGo beroperasi setiap hari pukul 07.00 - 22.00 WIB. Untuk respon tercepat, Anda juga dapat bertanya langsung ke asisten Boo! di pojok kanan bawah.',
-            style: TextStyle(
-              color: Color(0xFF475569),
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 13.5,
-              height: 1.5,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Mengerti',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+        return AppDialog(
+          title: 'Pusat Dukungan',
+          message:
+              'Customer Service tersedia setiap hari pukul 07.00–22.00 WIB. '
+              'Untuk pertanyaan seputar layanan, Anda juga dapat bertanya kepada Boo.',
+          confirmLabel: 'Mengerti',
+          onConfirm: () => Navigator.pop(context),
         );
       },
     );
@@ -289,13 +203,16 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
               padding: EdgeInsets.zero,
             ),
           ),
-          const Text(
-            'Pusat Bantuan & FAQ',
-            style: TextStyle(
-              color: Color(0xFF0F172A),
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+          const Expanded(
+            child: Text(
+              'Pusat Bantuan & FAQ',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF0F172A),
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           GestureDetector(

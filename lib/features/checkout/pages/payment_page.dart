@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../../address/controllers/address_controller.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../../order/controllers/order_controller.dart';
@@ -38,6 +39,7 @@ class _PaymentPageState extends State<PaymentPage> {
   static const _paymentFlowController = PaymentFlowController();
 
   late final PaymentCountdownController _countdownController;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -100,8 +102,7 @@ class _PaymentPageState extends State<PaymentPage> {
                             serviceName: booking.service?.title ?? '-',
                             schedule:
                                 '${booking.formattedSelectedDate}, ${booking.formattedSelectedTime}',
-                            address:
-                                '${address.label}\n${address.street}, ${address.city}',
+                            address: '${address.label}\n${address.fullAddress}',
                             note: booking.note.trim().isEmpty
                                 ? 'Tidak ada catatan'
                                 : booking.note.trim(),
@@ -118,12 +119,14 @@ class _PaymentPageState extends State<PaymentPage> {
         bottomNavigationBar: AnimatedBuilder(
           animation: _countdownController,
           builder: (context, _) => _PaymentActionBar(
-            label: _countdownController.isExpired
+            label: _isSubmitting
+                ? 'Memproses pesanan...'
+                : _countdownController.isExpired
                 ? 'Waktu Pembayaran Berakhir'
                 : _isCash
                 ? 'Konfirmasi Pembayaran Tunai'
                 : 'Saya Sudah Membayar',
-            onPressed: _countdownController.isExpired
+            onPressed: _countdownController.isExpired || _isSubmitting
                 ? null
                 : () => _showPaymentInformation(context),
           ),
@@ -133,87 +136,46 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Future<void> _showPaymentInformation(BuildContext context) async {
-    final isSameDay = _paymentFlowController.createOrder(
-      booking: context.read<BookingController>(),
-      addresses: context.read<AddressController>(),
-      orders: context.read<OrderController>(),
-      method: widget.method,
-      totalPayment: widget.totalPayment,
-      servicePrice: widget.servicePrice,
-      platformFee: widget.platformFee,
-      discountAmount: widget.discountAmount,
-    );
+    if (_isSubmitting || _countdownController.isExpired) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final isSameDay = await _paymentFlowController.createOrder(
+        booking: context.read<BookingController>(),
+        addresses: context.read<AddressController>(),
+        orders: context.read<OrderController>(),
+        method: widget.method,
+        totalPayment: widget.totalPayment,
+        servicePrice: widget.servicePrice,
+        platformFee: widget.platformFee,
+        discountAmount: widget.discountAmount,
+      );
+      if (!context.mounted) return;
 
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        icon: const Icon(
-          Icons.check_circle_rounded,
-          color: AppColors.primaryAction,
-          size: 44,
+      AppNotice.show(
+        context,
+        _isCash
+            ? 'Pesanan dikonfirmasi. Siapkan pembayaran tunai ${widget.totalPayment}.'
+            : 'Pembayaran berhasil. Pesanan Anda sudah dikonfirmasi.',
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+          builder: (_) => isSameDay
+              ? const OrderStatusPage(openedAfterPayment: true)
+              : const OrdersPage(initialTab: OrdersTab.scheduled),
         ),
-        title: const Text(
-          'Pembayaran Berhasil!',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.slate900,
-            fontFamily: AppTheme.fontFamily,
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        content: Text(
-          _isCash
-              ? 'Pesanan berhasil dibuat. Siapkan pembayaran tunai ${widget.totalPayment} saat staf tiba di lokasi.'
-              : 'Pembayaran ${widget.totalPayment} melalui ${widget.method.name} berhasil diverifikasi sistem CleanGo.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColors.slate500,
-            fontFamily: AppTheme.fontFamily,
-            fontSize: 13,
-            height: 1.5,
-          ),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: FilledButton(
-              onPressed: () {
-                Navigator.pop(dialogCtx);
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute<void>(
-                    builder: (_) => isSameDay
-                        ? const OrderStatusPage(openedAfterPayment: true)
-                        : const OrdersPage(initialTab: OrdersTab.scheduled),
-                  ),
-                  (route) => route.isFirst,
-                );
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primaryAction,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(
-                isSameDay ? 'Lihat Status Pesanan' : 'Lihat Pesanan Terjadwal',
-                style: const TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+        (route) => route.isFirst,
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      setState(() => _isSubmitting = false);
+      AppNotice.show(
+        context,
+        error is StateError
+            ? error.message.toString()
+            : 'Pesanan belum berhasil diproses. Silakan coba lagi.',
+        type: AppNoticeType.error,
+      );
+    }
   }
 }
 
@@ -301,11 +263,7 @@ class _PaymentCountdownCard extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: expired
-                  ? const [Color(0xFFFFF1F2), Color(0xFFFFFBFB)]
-                  : const [Color(0xFFE8FAF7), Color(0xFFF7FFFE)],
-            ),
+            color: expired ? const Color(0xFFFFF1F2) : Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: expired
@@ -367,18 +325,6 @@ class _PaymentCountdownCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (!expired)
-                const Text(
-                  'Pesanan ditahan\nselama waktu ini',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    color: AppColors.slate500,
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w500,
-                    height: 1.35,
-                  ),
-                ),
             ],
           ),
         );

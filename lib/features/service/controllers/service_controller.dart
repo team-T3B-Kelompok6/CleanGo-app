@@ -1,15 +1,38 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
+import '../../../core/storage/app_preferences.dart';
 import '../data/service_data.dart';
+import '../data/service_repository.dart';
 import '../domain/models/service_model.dart';
 
 class ServiceController extends ChangeNotifier {
-  static const List<String> filters = ServiceData.filters;
-  static const List<ServiceModel> _allServices = ServiceData.services;
+  ServiceController({
+    ServiceRepository? repository,
+    this.preferences,
+    List<ServiceModel>? initialServices,
+    String? initialFilter,
+  }) : _allServices = List<ServiceModel>.from(
+         initialServices ?? ServiceData.services,
+       ),
+       _selectedFilter = filters.contains(initialFilter)
+           ? initialFilter!
+           : filters.first {
+    _subscription = repository?.watchServices().listen(_applyServices);
+    if (repository != null) {
+      unawaited(repository.refresh().catchError((_) => false));
+    }
+  }
 
-  String _selectedFilter = filters.first;
+  static const List<String> filters = ServiceData.filters;
+
+  final AppPreferences? preferences;
+  late List<ServiceModel> _allServices;
+  late String _selectedFilter;
   String _searchQuery = '';
   ServiceModel? _selectedService;
+  StreamSubscription<List<ServiceModel>>? _subscription;
 
   String get selectedFilter => _selectedFilter;
   String get searchQuery => _searchQuery;
@@ -82,6 +105,7 @@ class ServiceController extends ChangeNotifier {
 
     _selectedFilter = filter;
     notifyListeners();
+    unawaited(preferences?.saveLastServiceFilter(filter));
   }
 
   void updateSearchQuery(String query) {
@@ -101,6 +125,7 @@ class ServiceController extends ChangeNotifier {
     _selectedFilter = filters.first;
     _searchQuery = '';
     notifyListeners();
+    unawaited(preferences?.removeLastServiceFilter());
   }
 
   void selectService(ServiceModel service) {
@@ -110,5 +135,19 @@ class ServiceController extends ChangeNotifier {
 
     _selectedService = service;
     notifyListeners();
+  }
+
+  void _applyServices(List<ServiceModel> services) {
+    if (services.isEmpty) return;
+    final selectedId = _selectedService?.id;
+    _allServices = List<ServiceModel>.from(services);
+    _selectedService = findServiceById(selectedId);
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    unawaited(_subscription?.cancel());
+    super.dispose();
   }
 }

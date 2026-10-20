@@ -14,17 +14,47 @@ Pengembangannya dilakukan sesuai pada design CleanGo di Figma:
 
 CleanGo menggunakan tiga jenis penyimpanan sesuai karakter datanya:
 
-- **Drift** menyimpan data alamat yang terstruktur dan dapat dipantau secara
-  reaktif. Perubahan beberapa alamat disimpan dalam satu transaksi.
-- **SharedPreferences** menyimpan pengaturan sederhana berupa status bahwa
-  onboarding sudah diselesaikan.
-- **Flutter Secure Storage** menyimpan access token sesi lokal agar data rahasia
-  tidak diletakkan di penyimpanan biasa.
+- **Drift** menyimpan alamat, draft booking, dan cache layanan secara
+  terstruktur. Data dapat dipantau secara reaktif, pembaruan banyak baris
+  memakai transaksi, dan migrasi schema menjaga data lama saat database naik
+  dari versi 1 ke versi 2.
+- **SharedPreferencesAsync** menyimpan pengaturan kecil yang tidak sensitif,
+  yaitu status onboarding dan filter layanan terakhir.
+- **Flutter Secure Storage** menyimpan access token, refresh token, dan waktu
+  kedaluwarsa sesi agar data rahasia tidak diletakkan di penyimpanan biasa.
 
 Implementasi dipisahkan antara database/storage, repository, controller, dan UI.
-Saat ini autentikasi dan data aplikasi lainnya masih berupa simulasi lokal;
-struktur penyimpanan ini disiapkan tanpa menambahkan backend.
+Saat ini autentikasi dan data remote masih berupa simulasi lokal. Repository
+layanan sudah memakai cache lokal dan menyediakan kontrak sumber data remote,
+tetapi implementasi API Express baru akan dipasang saat endpoint backend siap.
 
+
+## Chatbot Boo
+
+Halaman Boo memanggil Express `POST /api/customer/chat`. Secara default Boo memakai
+pengetahuan umum CleanGo dari PRD/konsep dan Groq; MySQL tidak diperlukan untuk chat
+umum. Harga/promo live dan data pesanan pribadi masih pending. Jalankan backend
+terlebih dahulu. Untuk emulator Android:
+
+```powershell
+flutter run --dart-define=API_URL=http://10.0.2.2:3001/api
+```
+
+HP fisik memakai alamat IP LAN komputer. Key Groq hanya disimpan pada backend.
+Chat umum tersedia sebagai tamu. Integrasi database chatbot dinonaktifkan secara
+default (`CHATBOT_DATABASE_ENABLED=false` pada backend). Aktifkan hanya setelah
+auth/booking server siap dan diuji; login serta pesanan lokal/dummy bukan data server.
+Konfigurasi lokal backend saat ini sudah diaktifkan atas permintaan pengguna:
+knowledge dan database baca dipakai bersama. Harga/FAQ/promo mengikuti server;
+pesanan pribadi tetap memerlukan JWT customer. Login lokal/dummy tidak otomatis
+menjadi login backend, dan Boo belum mengambil lokasi cleaner secara langsung.
+Percakapan baru disimpan lokal melalui Flutter Secure Storage (maksimal 60 pesan)
+dan dimuat lagi saat Boo dibuka, termasuk setelah aplikasi ditutup. Riwayat
+dipisahkan berdasarkan sesi login: logout/ganti sesi tidak menampilkan chat sesi
+sebelumnya. Logout atau pembersihan sesi kedaluwarsa menghapus riwayat Boo lokal
+sesi tersebut untuk privasi. Belum ada sinkronisasi chat lintas perangkat/server. Jika storage gagal,
+chat tetap bisa digunakan dengan peringatan bahwa riwayat belum tersimpan/termuat.
+Pesan teks saja; tombol gambar dan mikrofon yang belum berfungsi tidak ditampilkan.
 
 ## Struktur project
 

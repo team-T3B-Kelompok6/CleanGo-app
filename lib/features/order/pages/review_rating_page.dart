@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/app_notice.dart';
 import '../controllers/order_controller.dart';
 import '../controllers/review_draft_controller.dart';
 import 'orders_page.dart';
@@ -25,6 +26,7 @@ class ReviewRatingPage extends StatefulWidget {
 class _ReviewRatingPageState extends State<ReviewRatingPage> {
   final ReviewDraftController _draft = ReviewDraftController();
   final TextEditingController _reviewController = TextEditingController();
+  bool _isSubmitted = false;
 
   int get _selectedRating => _draft.selectedRating;
   List<String> get _selectedChips => _draft.selectedChips;
@@ -45,33 +47,22 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
 
   void _addMockPhoto() {
     if (!_draft.addMockPhoto()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Maksimal 3 foto yang dapat dilampirkan.',
-            style: TextStyle(fontFamily: 'Inter'),
-          ),
-          duration: Duration(seconds: 2),
-        ),
+      AppNotice.show(
+        context,
+        'Maksimal 3 foto yang dapat dilampirkan.',
+        type: AppNoticeType.error,
       );
       return;
     }
 
     setState(() {});
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Foto hasil pengerjaan #${_attachedPhotos.length} berhasil ditambahkan!',
-          style: const TextStyle(fontFamily: 'Inter'),
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    AppNotice.show(context, 'Foto hasil pengerjaan berhasil ditambahkan.');
   }
 
   void _removePhoto(int index) {
     setState(() => _draft.removePhoto(index));
+    AppNotice.show(context, 'Foto berhasil dihapus.');
   }
 
   void _navigateToHistoryOrders(BuildContext context) {
@@ -84,8 +75,10 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
   }
 
   void _submitReview() {
+    if (_isSubmitted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     final orderController = context.read<OrderController>();
-    orderController.submitReview(
+    final success = orderController.submitReview(
       orderId: widget.orderId,
       rating: _selectedRating,
       tags: _draft.selectedChips,
@@ -93,84 +86,20 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
       photos: _draft.attachedPhotos,
     );
 
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE6FAF7),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_circle_rounded,
-                  color: Color(0xFF00685F),
-                  size: 38,
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Terima Kasih!',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Ulasan dan rating Anda sangat berarti untuk membantu kami menjaga kualitas layanan CleanGo.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 13,
-                  color: Color(0xFF64748B),
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(dialogCtx).pop();
-                    _navigateToHistoryOrders(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00685F),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Selesai',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+    if (!success) {
+      AppNotice.show(
+        context,
+        'Ulasan belum dapat dikirim. Pesanan mungkin sudah diulas atau belum selesai.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    _isSubmitted = true;
+    AppNotice.show(
+      context,
+      'Ulasan berhasil dikirim. Terima kasih atas penilaian Anda.',
     );
+    _navigateToHistoryOrders(context);
   }
 
   @override
@@ -401,40 +330,34 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
             children: List.generate(5, (index) {
               final starIndex = index + 1;
               final isFilled = starIndex <= _selectedRating;
-              return GestureDetector(
-                onTap: () {
-                  setState(() => _draft.selectRating(starIndex));
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Icon(
-                    Icons.star_rounded,
-                    size: 38,
-                    color: isFilled
-                        ? const Color(0xFFF59E0B)
-                        : const Color(0xFFCBD5E1),
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _draft.selectRating(starIndex));
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Icon(
+                      Icons.star_rounded,
+                      size: 38,
+                      color: isFilled
+                          ? const Color(0xFFF59E0B)
+                          : const Color(0xFFCBD5E1),
+                    ),
                   ),
                 ),
               );
             }),
           ),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDFA),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF2DD4BF), width: 1.2),
-            ),
-            child: Text(
-              _ratingLabel,
-              style: const TextStyle(
-                color: Color(0xFF0F766E),
-                fontFamily: 'Inter',
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+          Text(
+            _ratingLabel,
+            style: const TextStyle(
+              color: Color(0xFF00685F),
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -495,7 +418,11 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
                     ),
                   ),
                   child: Text(
-                    chip,
+                    chip
+                        .replaceAll(' ✨', '')
+                        .replaceAll(' ⏰', '')
+                        .replaceAll(' 😊', '')
+                        .replaceAll(' 📦', ''),
                     style: TextStyle(
                       color: isSelected
                           ? Colors.white

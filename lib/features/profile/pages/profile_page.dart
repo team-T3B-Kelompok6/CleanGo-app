@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../address/controllers/address_controller.dart';
@@ -201,8 +202,20 @@ class ProfilePage extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) async {
-    await context.read<AuthSessionController>().signOut();
+    try {
+      await context.read<AuthSessionController>().signOut();
+    } catch (_) {
+      if (context.mounted) {
+        AppNotice.show(
+          context,
+          'Belum berhasil keluar dari akun. Silakan coba lagi.',
+          type: AppNoticeType.error,
+        );
+      }
+      return;
+    }
     if (!context.mounted) return;
+    AppNotice.show(context, 'Anda berhasil keluar dari akun.');
     Navigator.pushNamedAndRemoveUntil(
       context,
       AppRoutes.login,

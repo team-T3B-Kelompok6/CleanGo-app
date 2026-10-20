@@ -6,6 +6,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_notice.dart';
+import '../../address/controllers/address_controller.dart';
 import '../../address/pages/address_list_page.dart';
 import '../../checkout/pages/checkout_page.dart';
 import '../../service/domain/models/service_model.dart';
@@ -38,8 +40,21 @@ class _BookingPageState extends State<BookingPage> {
   void initState() {
     super.initState();
     final bookingController = context.read<BookingController>();
-    bookingController.startBooking(widget.service);
     _noteController = TextEditingController(text: bookingController.note);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      bookingController.startBooking(widget.service);
+      if (bookingController.addressId == null) {
+        final address = context.read<AddressController>().selectedAddress;
+        if (address != null) {
+          bookingController.updateAddress(
+            address.toCleaningAddress(),
+            addressId: address.id,
+          );
+        }
+      }
+      _noteController.text = bookingController.note;
+    });
   }
 
   @override
@@ -101,12 +116,16 @@ class _BookingPageState extends State<BookingPage> {
                       const SizedBox(height: 24),
                       const _SectionTitle('Pilih Jam Mulai'),
                       const SizedBox(height: 12),
-                      Selector<BookingController, String>(
-                        selector: (_, controller) => controller.selectedTime,
-                        builder: (context, selectedTime, _) {
+                      Selector<BookingController, (DateTime, String)>(
+                        selector: (_, controller) =>
+                            (controller.selectedDate, controller.selectedTime),
+                        builder: (context, selection, _) {
                           return BookingTimeSelector(
                             options: BookingController.availableTimes,
-                            selectedTime: selectedTime,
+                            selectedTime: selection.$2,
+                            isTimeAvailable: context
+                                .read<BookingController>()
+                                .isTimeAvailable,
                             onTimeSelected: context
                                 .read<BookingController>()
                                 .selectTime,
@@ -158,6 +177,11 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   void _handleContinue() {
+    final error = context.read<BookingController>().validateSchedule();
+    if (error != null) {
+      AppNotice.show(context, error, type: AppNoticeType.error);
+      return;
+    }
     if (widget.onContinue != null) {
       widget.onContinue!.call();
       return;

@@ -106,7 +106,7 @@ class ApiClient {
     }
 
     final message = body['message'] as String? ?? 'Terjadi kesalahan';
-    final code = body?['code'] as String?;
+    final code = body['code'] as String?;
     throw ApiException(
       statusCode: response.statusCode,
       message: message,

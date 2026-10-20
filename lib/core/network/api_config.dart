@@ -17,4 +17,7 @@ class ApiConfig {
   static String get customerBookings => '$apiPrefix/customer/bookings';
   static String get customerChat => '$apiPrefix/customer/chat';
   static String get trackingEtaPreview => '$apiPrefix/tracking/eta-preview';
+  static String get customerBanners => '$apiPrefix/customer/banners';
+  static String get customerPromos => '$apiPrefix/customer/promos';
+  static String get customerPromoValidate => '$apiPrefix/customer/promos/validate';
 }

@@ -15,6 +15,7 @@ import '../data/home_data.dart';
 import '../domain/models/popular_service_model.dart';
 import '../domain/models/service_category_model.dart';
 import '../../profile/controllers/profile_controller.dart';
+import '../controllers/home_controller.dart';
 import '../../service/controllers/service_controller.dart';
 import '../../service/pages/service_detail_page.dart';
 import '../widgets/popular_service_card.dart';
@@ -25,6 +26,9 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) context.read<HomeController>().loadFromApi();
+    });
     final mediaQuery = MediaQuery.of(context);
     final double screenWidth = mediaQuery.size.width;
     final double cardWidth = math.min(256, math.max(224, screenWidth * 0.70));
@@ -142,8 +146,8 @@ class _HomeIntroSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
+    return DecoratedBox(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
@@ -159,7 +163,9 @@ class _HomeIntroSection extends StatelessWidget {
       child: Column(
         children: [
           _HomeHeader(),
-          _PromoSection(bannerPaths: HomeData.promoBanners),
+          _PromoSection(
+            bannerPaths: context.watch<HomeController>().banners,
+          ),
         ],
       ),
     );
@@ -442,10 +448,7 @@ class _PromoSectionState extends State<_PromoSection> {
                 return Semantics(
                   image: true,
                   label: 'Promo ${index + 1} dari ${widget.bannerPaths.length}',
-                  child: Image.asset(
-                    widget.bannerPaths[index],
-                    fit: BoxFit.contain,
-                  ),
+                  child: _BannerImage(source: widget.bannerPaths[index]),
                 );
               },
             ),
@@ -469,6 +472,24 @@ class _PromoSectionState extends State<_PromoSection> {
         ],
       ),
     );
+  }
+}
+
+class _BannerImage extends StatelessWidget {
+  const _BannerImage({required this.source});
+
+  final String source;
+
+  @override
+  Widget build(BuildContext context) {
+    if (source.startsWith('http')) {
+      return Image.network(
+        source,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      );
+    }
+    return Image.asset(source, fit: BoxFit.contain);
   }
 }
 

@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_notice.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../domain/models/payment_method_model.dart';
 import '../controllers/checkout_controller.dart';
+import '../data/customer_promo_api.dart';
 import '../widgets/order_confirmation_dialog.dart';
 import '../widgets/payment_method_icon.dart';
 import 'payment_page.dart';
@@ -86,7 +87,9 @@ class CheckoutPage extends StatefulWidget {
 
 class _CheckoutPageState extends State<CheckoutPage> {
   PaymentMethodType _selectedPaymentMethod = PaymentMethodType.qris;
-  final CheckoutController _checkoutController = CheckoutController();
+  final CheckoutController _checkoutController = CheckoutController(
+    promoApi: CustomerPromoApi(),
+  );
 
   Future<void> _openPromos() async {
     final selectedCode = await Navigator.of(context).push<String>(
@@ -100,9 +103,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     if (!mounted || selectedCode == null) return;
 
-    setState(() {
-      _checkoutController.applyPromo(selectedCode);
-    });
+    await _checkoutController.applyPromoRemote(
+      code: selectedCode,
+      servicePrice: context.read<BookingController>().servicePriceValue,
+      serviceId: context.read<BookingController>().service?.id,
+    );
+    if (!mounted) return;
+    setState(() {});
     final error = _checkoutController.promoError;
     AppNotice.show(
       context,

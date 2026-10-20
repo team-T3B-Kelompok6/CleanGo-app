@@ -28,7 +28,21 @@ class ServiceController extends ChangeNotifier {
     }
   }
 
+  /// Default chips used before the catalogue is loaded.
   static const List<String> filters = ServiceData.filters;
+
+  /// Filter chips built from the services currently loaded from the API, so a
+  /// category added in the admin dashboard shows up here automatically.
+  List<String> get filterOptions {
+    final categories = _allServices
+        .map((service) => service.category.trim())
+        .where((category) => category.isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    if (categories.isEmpty) return filters;
+    return [filters.first, ...categories];
+  }
 
   final AppPreferences? preferences;
   final CustomerServiceDetailApi? _detailApi;
@@ -90,7 +104,7 @@ class ServiceController extends ChangeNotifier {
     return _allServices
         .where((service) {
           final matchesFilter =
-              _selectedFilter == filters.first ||
+              _selectedFilter == filterOptions.first ||
               service.category == _selectedFilter;
           final matchesSearch =
               normalizedQuery.isEmpty ||
@@ -104,7 +118,7 @@ class ServiceController extends ChangeNotifier {
   }
 
   void selectFilter(String filter) {
-    if (!filters.contains(filter) || filter == _selectedFilter) {
+    if (!filterOptions.contains(filter) || filter == _selectedFilter) {
       return;
     }
 
@@ -123,11 +137,11 @@ class ServiceController extends ChangeNotifier {
   }
 
   void resetFilters() {
-    if (_selectedFilter == filters.first && _searchQuery.isEmpty) {
+    if (_selectedFilter == filterOptions.first && _searchQuery.isEmpty) {
       return;
     }
 
-    _selectedFilter = filters.first;
+    _selectedFilter = filterOptions.first;
     _searchQuery = '';
     notifyListeners();
     unawaited(preferences?.removeLastServiceFilter());
@@ -167,6 +181,9 @@ class ServiceController extends ChangeNotifier {
     final selectedId = _selectedService?.id;
     _allServices = List<ServiceModel>.from(services);
     _selectedService = findServiceById(selectedId);
+    if (!filterOptions.contains(_selectedFilter)) {
+      _selectedFilter = filterOptions.first;
+    }
     notifyListeners();
   }
 

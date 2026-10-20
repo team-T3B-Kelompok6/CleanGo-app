@@ -63,7 +63,7 @@ class _ServiceListPageState extends State<ServiceListPage> {
                     slivers: [
                       SliverToBoxAdapter(
                         child: _ServiceListHeader(
-                          filters: ServiceController.filters,
+                          filters: serviceController.filterOptions,
                           selectedFilter: serviceController.selectedFilter,
                           searchQuery: serviceController.searchQuery,
                           serviceCount: services.length,

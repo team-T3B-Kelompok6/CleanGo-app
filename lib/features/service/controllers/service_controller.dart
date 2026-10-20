@@ -98,6 +98,9 @@ class ServiceController extends ChangeNotifier {
     );
   }
 
+  /// Every service loaded from the backend (unfiltered).
+  List<ServiceModel> get allServices => List.unmodifiable(_allServices);
+
   List<ServiceModel> get visibleServices {
     final normalizedQuery = _searchQuery.trim().toLowerCase();
 

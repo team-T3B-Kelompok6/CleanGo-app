@@ -7,6 +7,7 @@ import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../controllers/message_controller.dart';
+import '../data/customer_notification_api.dart';
 import '../domain/models/message_notification_model.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -24,7 +25,10 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
-    _controller = MessageController();
+    _controller = MessageController(notificationApi: CustomerNotificationApi());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.loadFromApi();
+    });
   }
 
   @override

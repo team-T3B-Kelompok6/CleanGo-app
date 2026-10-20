@@ -15,8 +15,9 @@ import '../data/home_data.dart';
 import '../domain/models/popular_service_model.dart';
 import '../domain/models/service_category_model.dart';
 import '../../profile/controllers/profile_controller.dart';
-import '../controllers/home_controller.dart';
 import '../../service/controllers/service_controller.dart';
+import '../controllers/home_controller.dart';
+import '../data/home_catalog.dart';
 import '../../service/pages/service_detail_page.dart';
 import '../widgets/popular_service_card.dart';
 import '../widgets/service_category_item.dart';
@@ -29,6 +30,13 @@ class HomePage extends StatelessWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (context.mounted) context.read<HomeController>().loadFromApi();
     });
+    final services = context.watch<ServiceController>().allServices;
+    final derivedCategories = HomeCatalog.categories(services);
+    final derivedPopular = HomeCatalog.popularServices(services);
+    final catalogCategories =
+        derivedCategories.isEmpty ? HomeData.categories : derivedCategories;
+    final catalogPopular =
+        derivedPopular.isEmpty ? HomeData.popularServices : derivedPopular;
     final mediaQuery = MediaQuery.of(context);
     final double screenWidth = mediaQuery.size.width;
     final double cardWidth = math.min(256, math.max(224, screenWidth * 0.70));
@@ -63,7 +71,7 @@ class HomePage extends StatelessWidget {
                       const SliverToBoxAdapter(child: _HomeIntroSection()),
                       SliverToBoxAdapter(
                         child: _ServiceCategoriesSection(
-                          categories: HomeData.categories,
+                          categories: catalogCategories,
                           onViewAll: () => _openServices(context),
                           onServiceSelected: (serviceId) =>
                               _openServiceDetail(context, serviceId),
@@ -71,7 +79,7 @@ class HomePage extends StatelessWidget {
                       ),
                       SliverToBoxAdapter(
                         child: _PopularServicesSection(
-                          services: HomeData.popularServices,
+                          services: catalogPopular,
                           cardWidth: cardWidth,
                           onViewAll: () => _openServices(context),
                           onServiceSelected: (serviceId) =>

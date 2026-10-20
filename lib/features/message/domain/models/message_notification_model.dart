@@ -25,6 +25,45 @@ class MessageNotificationModel {
   final bool isWarning;
   final String? badge;
 
+  /// Maps a backend notification into the app's inbox model.
+  factory MessageNotificationModel.fromApiJson(
+    Map<String, dynamic> json, {
+    DateTime? now,
+  }) {
+    final type = json['type'] as String? ?? 'system';
+    final (category, icon, warning) = switch (type) {
+      'promo' => (MessageCategory.promo, MessageIconType.promo, false),
+      'payment' => (MessageCategory.order, MessageIconType.payment, false),
+      'risk_alert' => (MessageCategory.order, MessageIconType.delayed, true),
+      'order' => (MessageCategory.order, MessageIconType.confirmed, false),
+      _ => (MessageCategory.order, MessageIconType.confirmed, false),
+    };
+    return MessageNotificationModel(
+      id: '${json['id'] ?? ''}',
+      title: json['title'] as String? ?? 'Notifikasi',
+      description: json['message'] as String? ?? '',
+      timeLabel: relativeLabel(json['createdAt'] as String?, now: now),
+      category: category,
+      iconType: icon,
+      isUnread: json['isRead'] != true,
+      isWarning: warning,
+    );
+  }
+
+  /// Short Indonesian relative label ("5 menit lalu").
+  static String relativeLabel(String? iso, {DateTime? now}) {
+    final parsed = iso == null ? null : DateTime.tryParse(iso);
+    if (parsed == null) return '';
+    final current = (now ?? DateTime.now()).toUtc();
+    final difference = current.difference(parsed.toUtc());
+    if (difference.inMinutes < 1) return 'Baru saja';
+    if (difference.inMinutes < 60) return '${difference.inMinutes} menit lalu';
+    if (difference.inHours < 24) return '${difference.inHours} jam lalu';
+    if (difference.inDays < 7) return '${difference.inDays} hari lalu';
+    final weeks = difference.inDays ~/ 7;
+    return '$weeks minggu lalu';
+  }
+
   MessageNotificationModel copyWith({
     String? id,
     String? title,

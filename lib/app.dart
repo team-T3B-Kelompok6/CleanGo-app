@@ -126,7 +126,11 @@ class _CleanGoAppState extends State<CleanGoApp> {
             bannerApi: CustomerBannerApi(tokenStorage: widget.tokenStorage),
           ),
         ),
-        ChangeNotifierProvider(create: (_) => OrderController()),
+        ChangeNotifierProvider(
+          create: (_) => OrderController(
+            bookingApi: CustomerBookingApi(tokenStorage: widget.tokenStorage),
+          ),
+        ),
       ],
       child: MaterialApp(
         title: 'CleanGo',

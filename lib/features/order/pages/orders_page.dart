@@ -43,6 +43,9 @@ class _OrdersPageState extends State<OrdersPage> {
   void initState() {
     super.initState();
     _selectedTab = widget.initialTab;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<OrderController>().loadFromApi();
+    });
   }
 
   @override

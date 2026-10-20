@@ -36,7 +36,10 @@ class AddressModel {
         type: j['label'] as String? ?? j['type'] as String? ?? 'Lainnya',
         contactName: j['recipient_name'] as String? ?? j['recipientName'] as String? ?? j['contactName'] as String? ?? '',
         phoneNumber: j['recipient_phone'] as String? ?? j['recipientPhone'] as String? ?? j['phoneNumber'] as String? ?? '',
-        isPrimary: j['is_primary'] == true || j['isPrimary'] == true,
+        isPrimary: j['is_primary'] == true ||
+            j['is_primary'] == 1 ||
+            j['isPrimary'] == true ||
+            j['isPrimary'] == 1,
         latitude: (j['latitude'] as num?)?.toDouble(),
         longitude: (j['longitude'] as num?)?.toDouble(),
       );

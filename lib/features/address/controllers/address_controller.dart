@@ -56,9 +56,22 @@ class AddressController extends ChangeNotifier {
     try { _addresses = await _remote.fetchAddresses(token); if (_addresses.isNotEmpty) _selectedAddressId = _addresses.firstWhere((a) => a.isPrimary, orElse: () => _addresses.first).id; _error = null; notifyListeners(); } catch (e) { _error = e.toString(); }
   }
 
-  Future<bool> createRemote(AddressModel address) async {
-    if (!await _usingRemote()) return addAddress(address);
-    try { final created = await _remote.createAddress((await tokenStorage!.readAccessToken())!, address.toApiPayload()); addAddress(created); _error = null; return true; } catch (e) { _error = e.toString(); notifyListeners(); return false; }
+  Future<AddressModel?> createRemote(AddressModel address) async {
+    if (!await _usingRemote()) return addAddress(address) ? address : null;
+    try {
+      final created = await _remote.createAddress(
+        (await tokenStorage!.readAccessToken())!,
+        address.toApiPayload(),
+      );
+      if (!_addresses.any((a) => a.id == created.id)) addAddress(created);
+      _error = null;
+      notifyListeners();
+      return created;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<bool> updateRemote(AddressModel address) async {

@@ -12,7 +12,6 @@ import '../data/google_sign_in_service.dart';
 import 'register_page.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
-import '../widgets/facebook_dummy_dialog.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../../address/controllers/address_controller.dart';
 
@@ -289,40 +288,6 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) {
         setState(() => _generalError = 'Gagal masuk dengan Google: $e');
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _handleFacebookLogin() async {
-    final account = await showFacebookDummyDialog(context);
-    if (account == null || !mounted) return;
-
-    setState(() {
-      _isLoading = true;
-      _generalError = null;
-    });
-
-    try {
-      final result = await _authService.socialLogin(
-        provider: 'facebook',
-        email: account.email,
-        name: account.name,
-      );
-      if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token);
-      try {
-        if (mounted) await context.read<ProfileController>().loadFromApi();
-      } catch (_) {}
-      try {
-        if (mounted) await context.read<AddressController>().loadFromApi();
-      } catch (_) {}
-      if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-    } on ApiException catch (e) {
-      if (mounted) setState(() => _generalError = e.message);
-    } catch (_) {
-      if (mounted) setState(() => _generalError = 'Gagal terhubung ke server.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

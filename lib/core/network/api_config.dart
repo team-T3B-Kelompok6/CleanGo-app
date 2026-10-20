@@ -12,4 +12,5 @@ class ApiConfig {
   static String get customerAuth => '$apiPrefix/customer/auth';
   static String get customerProfile => '$apiPrefix/customer/profile';
   static String get customerAddresses => '$apiPrefix/customer/addresses';
+  static String get customerFaqs => '$apiPrefix/customer/faqs';
 }

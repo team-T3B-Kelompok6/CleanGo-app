@@ -79,7 +79,9 @@ class _CleanGoAppState extends State<CleanGoApp> {
           ),
         ),
         ChangeNotifierProvider(create: (_) => ProfileController(tokenStorage: widget.tokenStorage)),
-        ChangeNotifierProvider(create: (_) => SupportController()),
+        ChangeNotifierProvider(
+          create: (_) => SupportController(tokenStorage: widget.tokenStorage),
+        ),
         ChangeNotifierProvider(create: (_) => OrderController()),
       ],
       child: MaterialApp(

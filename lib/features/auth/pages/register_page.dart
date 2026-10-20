@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../address/controllers/address_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../controllers/auth_session_controller.dart';
 import '../data/api_auth_service.dart';

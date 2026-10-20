@@ -120,15 +120,47 @@ class _BookingPageState extends State<BookingPage> {
                         selector: (_, controller) =>
                             (controller.selectedDate, controller.selectedTime),
                         builder: (context, selection, _) {
-                          return BookingTimeSelector(
-                            options: context.watch<BookingController>().slots,
-                            selectedTime: selection.$2,
-                            isTimeAvailable: context
-                                .read<BookingController>()
-                                .isTimeAvailable,
-                            onTimeSelected: context
-                                .read<BookingController>()
-                                .selectTime,
+                          final bookingController =
+                              context.watch<BookingController>();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              BookingTimeSelector(
+                                options: bookingController.allSlots,
+                                selectedTime: selection.$2,
+                                isTimeAvailable:
+                                    bookingController.isTimeAvailable,
+                                onTimeSelected: bookingController.selectTime,
+                                onUnavailableTap: (time) {
+                                  AppNotice.show(
+                                    context,
+                                    bookingController.slotReason(time) ??
+                                        'Jam ini tidak tersedia. Pilih jam lain.',
+                                    type: AppNoticeType.error,
+                                  );
+                                },
+                              ),
+                              if (bookingController.availabilityLoading) ...[
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'Memuat jadwal terbaru…',
+                                  style: TextStyle(
+                                    color: AppColors.slate500,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ] else if (bookingController.availabilityError !=
+                                  null) ...[
+                                const SizedBox(height: 10),
+                                const Text(
+                                  'Jadwal terbaru belum dapat dimuat. Menampilkan jadwal umum.',
+                                  style: TextStyle(
+                                    color: AppColors.slate500,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ],
                           );
                         },
                       ),

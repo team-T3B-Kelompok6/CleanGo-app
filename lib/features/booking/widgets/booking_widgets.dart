@@ -154,12 +154,14 @@ class BookingTimeSelector extends StatelessWidget {
     required this.selectedTime,
     required this.onTimeSelected,
     this.isTimeAvailable,
+    this.onUnavailableTap,
   });
 
   final List<String> options;
   final String selectedTime;
   final ValueChanged<String> onTimeSelected;
   final bool Function(String)? isTimeAvailable;
+  final ValueChanged<String>? onUnavailableTap;
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +190,11 @@ class BookingTimeSelector extends StatelessWidget {
                           : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       child: InkWell(
-                        onTap: enabled ? () => onTimeSelected(time) : null,
+                        onTap: enabled
+                            ? () => onTimeSelected(time)
+                            : (onUnavailableTap == null
+                                  ? null
+                                  : () => onUnavailableTap!(time)),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),

@@ -76,6 +76,15 @@ class BookingController extends ChangeNotifier {
   /// Slots offered for the selected date: server slots when loaded, otherwise
   /// the local default schedule.
   List<String> get slots => _apiSlots.isEmpty ? availableTimes : _apiSlots;
+
+  /// Every slot the backend reported for the selected date, including the ones
+  /// that are closed, so the UI can show why a time cannot be picked.
+  List<String> get allSlots => _slotInfo.isEmpty
+      ? availableTimes
+      : _slotInfo.map((slot) => slot.time).toList(growable: false);
+
+  /// True when the backend reported the slot (available or closed).
+  bool hasSlotInfo(String time) => _slotInfo.any((slot) => slot.time == time);
   List<BookingSlotInfo> get slotInfo => List.unmodifiable(_slotInfo);
   String? get availabilityError => _availabilityError;
   bool get availabilityLoading => _availabilityLoading;

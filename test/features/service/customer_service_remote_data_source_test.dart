@@ -60,6 +60,33 @@ void main() {
       expect(withRemote.iconPath, 'assets/icons/ac_wash.svg');
     });
 
+    test('reads inclusions from the backend object shape', () {
+      final inclusions = CustomerServiceDetailApi.inclusionsFrom({
+        'inclusions': [
+          {'id': 62, 'description': 'Menyapu dan mengepel lantai', 'sortOrder': 1},
+          {'id': 63, 'description': '  Membersihkan debu  ', 'sortOrder': 2},
+          {'id': 64, 'description': '   ', 'sortOrder': 3},
+        ],
+      });
+
+      expect(inclusions, [
+        'Menyapu dan mengepel lantai',
+        'Membersihkan debu',
+      ]);
+    });
+
+    test('still accepts plain string inclusions', () {
+      final inclusions = CustomerServiceDetailApi.inclusionsFrom({
+        'inclusions': ['Alat kebersihan', 'Cairan pembersih'],
+      });
+
+      expect(inclusions, ['Alat kebersihan', 'Cairan pembersih']);
+    });
+
+    test('returns an empty list when inclusions are missing', () {
+      expect(CustomerServiceDetailApi.inclusionsFrom(const {}), isEmpty);
+    });
+
     test('handles unknown categories and zero duration safely', () {
       final service = CustomerServiceRemoteDataSource.toServiceModel({
         'id': 3,

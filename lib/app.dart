@@ -34,6 +34,7 @@ import 'features/profile/pages/change_password_page.dart';
 import 'features/profile/pages/personal_data_page.dart';
 import 'features/profile/pages/profile_page.dart';
 import 'features/service/controllers/service_controller.dart';
+import 'features/service/data/customer_service_remote_data_source.dart';
 import 'features/service/data/service_repository.dart';
 import 'features/service/domain/models/service_model.dart';
 import 'features/service/pages/service_list_page.dart';
@@ -93,6 +94,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
           create: (_) => ServiceController(
             repository: widget.serviceRepository,
             preferences: widget.preferences,
+            detailApi: CustomerServiceDetailApi(tokenStorage: widget.tokenStorage),
             initialServices: widget.initialServices,
             initialFilter: widget.initialServiceFilter,
           ),

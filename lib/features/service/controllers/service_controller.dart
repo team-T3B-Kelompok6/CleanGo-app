@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/storage/app_preferences.dart';
+import '../data/customer_service_remote_data_source.dart';
 import '../data/service_data.dart';
 import '../data/service_repository.dart';
 import '../domain/models/service_model.dart';
@@ -13,7 +14,9 @@ class ServiceController extends ChangeNotifier {
     this.preferences,
     List<ServiceModel>? initialServices,
     String? initialFilter,
-  }) : _allServices = List<ServiceModel>.from(
+    CustomerServiceDetailApi? detailApi,
+  }) : _detailApi = detailApi,
+       _allServices = List<ServiceModel>.from(
          initialServices ?? ServiceData.services,
        ),
        _selectedFilter = filters.contains(initialFilter)
@@ -28,6 +31,8 @@ class ServiceController extends ChangeNotifier {
   static const List<String> filters = ServiceData.filters;
 
   final AppPreferences? preferences;
+  final CustomerServiceDetailApi? _detailApi;
+  final Set<String> _loadedDetails = <String>{};
   late List<ServiceModel> _allServices;
   late String _selectedFilter;
   String _searchQuery = '';
@@ -135,6 +140,26 @@ class ServiceController extends ChangeNotifier {
 
     _selectedService = service;
     notifyListeners();
+    unawaited(loadServiceDetail(service.id));
+  }
+
+  /// Fetches the facility list for [serviceId] once and enriches the cached
+  /// service so the detail page can show `benefits`.
+  Future<void> loadServiceDetail(String serviceId) async {
+    final api = _detailApi;
+    if (api == null || _loadedDetails.contains(serviceId)) return;
+    _loadedDetails.add(serviceId);
+    try {
+      final detailed = await api.fetchDetail(serviceId);
+      if (detailed == null || detailed.detail == null) return;
+      _allServices = _allServices
+          .map((service) => service.id == detailed.id ? detailed : service)
+          .toList(growable: false);
+      if (_selectedService?.id == detailed.id) _selectedService = detailed;
+      notifyListeners();
+    } catch (_) {
+      _loadedDetails.remove(serviceId);
+    }
   }
 
   void _applyServices(List<ServiceModel> services) {

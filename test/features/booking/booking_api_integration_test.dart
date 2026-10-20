@@ -111,6 +111,33 @@ void main() {
       expect(controller.availabilityError, isNotNull);
     });
 
+    test('exposes every server slot so closed times can explain themselves', () async {
+      final api = _FakeBookingApi(
+        slots: const [
+          BookingSlotInfo(time: '08:00', available: false, reason: 'Waktu pemesanan sudah lewat.'),
+          BookingSlotInfo(time: '10:00', available: true),
+          BookingSlotInfo(time: '12:00', available: false, reason: 'Slot sudah penuh.'),
+        ],
+      );
+      final controller = BookingController(bookingApi: api, initialService: _service);
+
+      await controller.loadAvailability();
+
+      expect(controller.allSlots, ['08:00', '10:00', '12:00']);
+      expect(controller.slots, ['10:00']);
+      expect(controller.hasSlotInfo('12:00'), isTrue);
+      expect(controller.slotReason('12:00'), 'Slot sudah penuh.');
+      expect(controller.slotReason('14:00'), isNull);
+    });
+
+    test('falls back to the full local schedule when there is no server data', () async {
+      final controller = BookingController(initialService: _service);
+
+      expect(controller.allSlots, BookingController.availableTimes);
+      expect(controller.hasSlotInfo('08:00'), isFalse);
+      expect(controller.slotReason('08:00'), isNull);
+    });
+
     test('keeps the local schedule when no booking api is configured', () async {
       final controller = BookingController(initialService: _service);
 

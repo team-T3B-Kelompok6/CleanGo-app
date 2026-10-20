@@ -77,3 +77,66 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
     return 'Rp${groups.join('.')}';
   }
 }
+
+/// Reads one service (with its `inclusions`) so the detail page can show the
+/// facility list the backend already provides.
+class CustomerServiceDetailApi {
+  CustomerServiceDetailApi({ApiClient? client, TokenStorage? tokenStorage})
+      : _client = client ?? ApiClient(),
+        _tokens = tokenStorage;
+
+  final ApiClient _client;
+  final TokenStorage? _tokens;
+
+  /// The backend returns `{ id, description, sortOrder }` objects; older
+  /// payloads used plain strings, so both shapes are accepted.
+  static String _inclusionText(dynamic item) {
+    if (item is Map) {
+      return (item['description'] ?? '').toString().trim();
+    }
+    return item.toString().trim();
+  }
+
+  /// Public for unit tests.
+  static List<String> inclusionsFrom(Map<String, dynamic> data) =>
+      (data['inclusions'] as List<dynamic>? ?? const [])
+          .map(_inclusionText)
+          .where((item) => item.isNotEmpty)
+          .toList(growable: false);
+
+  Future<ServiceModel?> fetchDetail(String serviceId) async {
+    final token = await _tokens?.readAccessToken();
+    if (token == null || token.isEmpty) return null;
+    final res = await _client.get(
+      '${ApiConfig.customerServices}/$serviceId',
+      token: token,
+    );
+    final data = res['data'];
+    if (data is! Map<String, dynamic>) return null;
+    final base = CustomerServiceRemoteDataSource.toServiceModel(data);
+    final inclusions = inclusionsFrom(data);
+    return ServiceModel(
+      id: base.id,
+      title: base.title,
+      description: base.description,
+      duration: base.duration,
+      price: base.price,
+      category: base.category,
+      imagePath: base.imagePath,
+      iconPath: base.iconPath,
+      badge: base.badge,
+      rating: base.rating,
+      popularity: base.popularity,
+      releaseOrder: base.releaseOrder,
+      detail: ServiceDetailModel(
+        heroImagePath: base.imagePath ?? base.iconPath!,
+        description: base.description,
+        rating: base.rating ?? '-',
+        reviewCount: '0',
+        satisfactionPercentage: 0,
+        benefits: inclusions,
+        reviews: const [],
+      ),
+    );
+  }
+}

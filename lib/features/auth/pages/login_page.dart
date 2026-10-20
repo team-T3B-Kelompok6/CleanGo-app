@@ -273,7 +273,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token);
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
       try {
         if (mounted) await context.read<ProfileController>().loadFromApi();
       } catch (_) {}
@@ -340,7 +340,7 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token);
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
       try {
         if (mounted) await context.read<ProfileController>().loadFromApi();
       } catch (_) {}

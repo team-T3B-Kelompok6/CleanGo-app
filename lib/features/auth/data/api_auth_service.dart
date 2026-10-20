@@ -70,15 +70,22 @@ class ApiAuthService {
         message: 'Token tidak ditemukan dalam respons',
       );
     }
-    return AuthResult(token: token, user: User.fromJson(userMap ?? {}));
+    return AuthResult(
+      token: token,
+      user: User.fromJson(userMap ?? {}),
+      expiresIn: (data?['expiresIn'] as num?)?.toInt(),
+    );
   }
 }
 
 class AuthResult {
-  const AuthResult({required this.token, required this.user});
+  const AuthResult({required this.token, required this.user, this.expiresIn});
 
   final String token;
   final User user;
+
+  /// Token lifetime in seconds, as reported by the backend.
+  final int? expiresIn;
 }
 
 class User {

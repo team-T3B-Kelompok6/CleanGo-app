@@ -292,7 +292,7 @@ class _RegisterPageState extends State<RegisterPage> {
         idToken: googleUser.idToken,
       );
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token);
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
       try {
         if (mounted) await context.read<ProfileController>().loadFromApi();
       } catch (_) {}
@@ -332,7 +332,7 @@ class _RegisterPageState extends State<RegisterPage> {
         password: _passwordController.text,
       );
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token);
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {

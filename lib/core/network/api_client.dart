@@ -8,7 +8,13 @@ import 'api_exception.dart';
 class ApiClient {
   final http.Client _client;
 
-  ApiClient({http.Client? client}) : _client = client ?? http.Client();
+  ApiClient({http.Client? client, String? baseUrl})
+      : _client = client ?? http.Client(),
+        _baseUrl = baseUrl;
+
+  final String? _baseUrl;
+
+  String get _root => _baseUrl ?? ApiConfig.baseUrl;
 
   Future<Map<String, dynamic>> post(
     String path, {
@@ -17,7 +23,7 @@ class ApiClient {
     Map<String, String>? headers,
     Duration? timeout,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
     final requestHeaders = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -41,7 +47,7 @@ class ApiClient {
   void close() => _client.close();
 
   Future<Map<String, dynamic>> get(String path, {String? token}) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
     final headers = <String, String>{'Accept': 'application/json'};
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -56,7 +62,7 @@ class ApiClient {
     Map<String, dynamic>? body,
     String? token,
   }) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -75,7 +81,7 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> delete(String path, {String? token}) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}$path');
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
     final headers = <String, String>{'Accept': 'application/json'};
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
@@ -92,7 +98,14 @@ class ApiClient {
       return body ?? {};
     }
 
-    final message = body?['message'] as String? ?? 'Terjadi kesalahan';
+    if (body == null) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Respons server tidak valid.',
+      );
+    }
+
+    final message = body['message'] as String? ?? 'Terjadi kesalahan';
     final code = body?['code'] as String?;
     throw ApiException(
       statusCode: response.statusCode,

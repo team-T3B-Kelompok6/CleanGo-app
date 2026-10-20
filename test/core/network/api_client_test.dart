@@ -15,7 +15,7 @@ void main() {
       );
       addTearDown(client.close);
 
-      final response = await client.post('/health', const {});
+      final response = await client.post('/health', body: const {});
 
       expect(response['data'], {'status': 'ok'});
     });
@@ -30,7 +30,7 @@ void main() {
       addTearDown(client.close);
 
       await expectLater(
-        client.post('/tracking/eta-preview', const {}),
+        client.post('/tracking/eta-preview', body: const {}),
         throwsA(
           isA<ApiException>().having(
             (error) => error.message,

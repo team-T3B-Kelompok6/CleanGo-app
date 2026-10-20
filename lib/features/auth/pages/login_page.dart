@@ -313,7 +313,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _submit() async {
-    if (_isSubmitting) return;
+    if (_isLoading) return;
     FocusScope.of(context).unfocus();
 
     final phoneError = AuthValidators.phone(_phoneController.text);

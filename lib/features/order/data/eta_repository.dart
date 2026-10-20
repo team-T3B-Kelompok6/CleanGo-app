@@ -61,7 +61,7 @@ class EtaRepository {
     required double stoppedDurationSeconds,
     required double rollingSpeedMps,
   }) async {
-    final response = await _client.post(ApiEndpoints.etaPreview, {
+    final response = await _client.post(ApiEndpoints.etaPreview, body: {
       'cleanerLatitude': cleanerLatitude,
       'cleanerLongitude': cleanerLongitude,
       'destinationLatitude': destinationLatitude,

@@ -24,21 +24,21 @@ class ChatbotRepository implements ChatbotGateway {
     final context = history.where((entry) => !entry.failed).toList();
     final response = await _client.post(
       '/customer/chat',
-      {
+      body: {
         'message': message,
         'history': context
             .skip(context.length > 8 ? context.length - 8 : 0)
             .map((entry) => entry.toJson())
             .toList(),
       },
-      headers: {if (serverToken) 'Authorization': 'Bearer $token'},
+      token: serverToken ? token : null,
       timeout: const Duration(seconds: 25),
     );
     final data = response['data'];
     if (data is! Map<String, dynamic> ||
         data['answer'] is! String ||
         (data['answer'] as String).trim().isEmpty) {
-      throw const ApiException(
+      throw const ApiException.simple(
         'Jawaban Boo belum tersedia. Silakan coba lagi.',
       );
     }

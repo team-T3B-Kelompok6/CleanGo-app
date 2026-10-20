@@ -40,9 +40,9 @@ class BottomNavigation extends StatelessWidget {
       label: 'Pesanan',
     ),
     _NavigationDestinationData(
-      activeIconPath: 'assets/icons/nav_messages_inactive.svg',
-      inactiveIconPath: 'assets/icons/nav_messages_inactive.svg',
-      label: 'Pesan',
+      activeIconPath: 'assets/icons/notification.svg',
+      inactiveIconPath: 'assets/icons/notification.svg',
+      label: 'Notifikasi',
     ),
     _NavigationDestinationData(
       activeIconPath: 'assets/icons/nav_profile_inactive.svg',
@@ -172,15 +172,18 @@ class _BottomNavigationItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: active ? AppColors.primary : inactiveColor,
-                    fontSize: 10.5,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    height: 1.2,
-                    letterSpacing: 0.1,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: active ? AppColors.primary : inactiveColor,
+                      fontSize: 10.5,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                      height: 1.2,
+                      letterSpacing: 0.1,
+                    ),
                   ),
                 ),
                 if (showActiveIndicator) ...[

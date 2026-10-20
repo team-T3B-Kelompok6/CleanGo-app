@@ -314,7 +314,7 @@ class _NoteField extends StatelessWidget {
         height: 1.6,
       ),
       decoration: InputDecoration(
-        hintText: 'Misal: ada anjing peliharaan di rumah, harap fokus bersihkan lantai atas...',
+        hintText: 'Masukkan catatan (opsional)',
         hintStyle: const TextStyle(
           color: AppColors.slate500,
           fontSize: 13,

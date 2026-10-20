@@ -10,14 +10,52 @@ import 'fake_chat_history.dart';
 
 class PendingChat implements ChatbotGateway {
   final answer = Completer<String>();
+  final questions = <String>[];
   @override
-  Future<String> reply(String message, List<ChatMessage> history) =>
-      answer.future;
+  Future<String> reply(String message, List<ChatMessage> history) {
+    questions.add(message);
+    return answer.future;
+  }
+
   @override
   void close() {}
 }
 
 void main() {
+  testWidgets(
+    'sends the initial help question once and displays the AI answer',
+    (tester) async {
+      final repository = PendingChat();
+      final store = FakeChatHistory();
+      Widget page() => MaterialApp(
+        home: ChatbotPage(
+          initialMessage: '  Bagaimana cara booking?  ',
+          repository: repository,
+          history: store,
+        ),
+      );
+      await tester.pumpWidget(page());
+      await tester.pump();
+      expect(repository.questions, ['Bagaimana cara booking?']);
+      expect(find.text('Bagaimana cara booking?'), findsOneWidget);
+      expect(find.text('Boo sedang mengetik…'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        isEmpty,
+      );
+      await tester.pumpWidget(page());
+      expect(repository.questions, hasLength(1));
+      repository.answer.complete('Pilih layanan lalu tentukan jadwal Anda.');
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Pilih layanan lalu tentukan jadwal Anda.'),
+        findsOneWidget,
+      );
+      expect(store.saved.where((message) => message.isUser), hasLength(1));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('shows the user message, waiting state and assistant reply', (
     tester,
   ) async {

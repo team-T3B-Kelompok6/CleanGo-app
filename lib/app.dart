@@ -21,6 +21,7 @@ import 'features/booking/data/booking_draft_repository.dart';
 import 'features/booking/domain/models/booking_draft.dart';
 import 'features/booking/domain/models/cleaning_address.dart';
 import 'features/home/pages/home_page.dart';
+import 'features/message/controllers/message_controller.dart';
 import 'features/message/pages/messages_page.dart';
 import 'features/onboarding/pages/onboarding_page.dart';
 import 'features/onboarding/pages/splash_page.dart';
@@ -113,6 +114,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
         ChangeNotifierProvider(create: (_) => ProfileController()),
         ChangeNotifierProvider(create: (_) => SupportController()),
         ChangeNotifierProvider(create: (_) => OrderController()),
+        ChangeNotifierProvider(create: (_) => MessageController()),
       ],
       child: MaterialApp(
         title: 'CleanGo',

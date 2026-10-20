@@ -14,10 +14,16 @@ import '../data/chatbot_repository.dart';
 import '../data/chat_history_store.dart';
 
 class ChatbotPage extends StatefulWidget {
-  const ChatbotPage({super.key, this.repository, this.history});
+  const ChatbotPage({
+    super.key,
+    this.repository,
+    this.history,
+    this.initialMessage,
+  });
 
   final ChatbotGateway? repository;
   final ChatHistoryStore? history;
+  final String? initialMessage;
 
   @override
   State<ChatbotPage> createState() => _ChatbotPageState();
@@ -34,11 +40,21 @@ class _ChatbotPageState extends State<ChatbotPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(
-      _chatbotController.restoreHistory().then((_) {
-        if (mounted) _scrollToEnd();
-      }),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final message = widget.initialMessage?.trim() ?? '';
+      if (message.isNotEmpty) {
+        _messageController.text = message;
+        _handleMessageChanged(message);
+        unawaited(_sendMessage());
+      } else {
+        unawaited(
+          _chatbotController.restoreHistory().then((_) {
+            if (mounted) _scrollToEnd();
+          }),
+        );
+      }
+    });
   }
 
   @override

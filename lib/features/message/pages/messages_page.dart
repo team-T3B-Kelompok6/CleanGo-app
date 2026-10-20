@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
@@ -24,13 +25,7 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
-    _controller = MessageController();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+    _controller = context.read<MessageController>();
   }
 
   @override
@@ -159,7 +154,7 @@ class _MessagesHeader extends StatelessWidget {
         children: [
           const Expanded(
             child: Text(
-              'Notifikasi Pesan',
+              'Notifikasi',
               style: TextStyle(
                 color: AppColors.slate900,
                 fontFamily: AppTheme.fontFamily,
@@ -303,17 +298,20 @@ class _MessageNotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = message.isWarning
-        ? const Color(0xFFFFFBEB)
+    final accent = _notificationAccent(message);
+    final backgroundColor = message.isUnread
+        ? Color.alphaBlend(accent.withValues(alpha: 0.08), Colors.white)
         : Colors.white;
-    final borderColor = message.isWarning
-        ? const Color(0xFFF6D986)
+    final borderColor = message.isUnread
+        ? accent.withValues(alpha: 0.24)
         : AppColors.slate100;
 
     return Semantics(
       button: onTap != null,
       label: '${message.title}. ${message.description}',
+      value: message.isUnread ? 'Belum dibaca' : 'Sudah dibaca',
       child: Material(
+        key: ValueKey('notification-${message.id}'),
         color: backgroundColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -329,7 +327,7 @@ class _MessageNotificationCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _MessageIcon(message: message),
+                _MessageIcon(message: message, color: accent),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -352,14 +350,14 @@ class _MessageNotificationCard extends StatelessWidget {
                           ),
                           if (message.isUnread) ...[
                             const SizedBox(width: 8),
-                            const Padding(
-                              padding: EdgeInsets.only(top: 5),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 5),
                               child: DecoratedBox(
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryAction,
+                                  color: accent,
                                   shape: BoxShape.circle,
                                 ),
-                                child: SizedBox.square(dimension: 8),
+                                child: const SizedBox.square(dimension: 8),
                               ),
                             ),
                           ],
@@ -393,7 +391,7 @@ class _MessageNotificationCard extends StatelessWidget {
                             ),
                           ),
                           if (message.badge != null)
-                            _MessageBadge(label: message.badge!),
+                            _MessageBadge(label: message.badge!, color: accent),
                         ],
                       ),
                     ],
@@ -409,21 +407,13 @@ class _MessageNotificationCard extends StatelessWidget {
 }
 
 class _MessageIcon extends StatelessWidget {
-  const _MessageIcon({required this.message});
+  const _MessageIcon({required this.message, required this.color});
 
   final MessageNotificationModel message;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final isWarm =
-        message.iconType == MessageIconType.delayed ||
-        message.iconType == MessageIconType.promo;
-    final background = isWarm
-        ? const Color(0xFFFFF1C7)
-        : AppColors.primaryContainer.withValues(alpha: 0.55);
-    final foreground = isWarm
-        ? const Color(0xFFD97706)
-        : AppColors.primaryAction;
     final icon = switch (message.iconType) {
       MessageIconType.delivery => Icons.directions_bike_outlined,
       MessageIconType.confirmed => Icons.check_circle_outline_rounded,
@@ -434,19 +424,23 @@ class _MessageIcon extends StatelessWidget {
     };
 
     return DecoratedBox(
-      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+      ),
       child: SizedBox.square(
         dimension: 42,
-        child: Icon(icon, size: 22, color: foreground),
+        child: Icon(icon, size: 22, color: color),
       ),
     );
   }
 }
 
 class _MessageBadge extends StatelessWidget {
-  const _MessageBadge({required this.label});
+  const _MessageBadge({required this.label, required this.color});
 
   final String label;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -454,23 +448,19 @@ class _MessageBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.82),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFF1D279)),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.auto_awesome_rounded,
-              size: 11,
-              color: Color(0xFFD97706),
-            ),
+            Icon(Icons.auto_awesome_rounded, size: 11, color: color),
             const SizedBox(width: 4),
             Text(
               label,
-              style: const TextStyle(
-                color: Color(0xFF92400E),
+              style: TextStyle(
+                color: color,
                 fontFamily: AppTheme.fontFamily,
                 fontSize: 9,
                 fontWeight: FontWeight.w600,
@@ -482,4 +472,15 @@ class _MessageBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+Color _notificationAccent(MessageNotificationModel message) {
+  if (message.isWarning) return AppColors.notification;
+  return switch (message.iconType) {
+    MessageIconType.delayed => AppColors.notification,
+    MessageIconType.promo => const Color(0xFF7C3AED),
+    MessageIconType.rating => const Color(0xFFA16207),
+    MessageIconType.payment => const Color(0xFF2563EB),
+    MessageIconType.delivery || MessageIconType.confirmed => AppColors.primary,
+  };
 }

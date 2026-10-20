@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/token_storage.dart';
 import '../models/chat_message.dart';
@@ -23,7 +24,7 @@ class ChatbotRepository implements ChatbotGateway {
     final serverToken = token != null && token.split('.').length == 3;
     final context = history.where((entry) => !entry.failed).toList();
     final response = await _client.post(
-      '/customer/chat',
+      ApiConfig.customerChat,
       body: {
         'message': message,
         'history': context

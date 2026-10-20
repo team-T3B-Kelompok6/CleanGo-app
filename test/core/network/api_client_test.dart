@@ -1,4 +1,5 @@
 import 'package:cleango_app/core/network/api_client.dart';
+import 'package:cleango_app/core/network/api_config.dart';
 import 'package:cleango_app/core/network/api_exception.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -11,7 +12,7 @@ void main() {
         client: MockClient(
           (_) async => http.Response('{"data":{"status":"ok"}}', 200),
         ),
-        baseUrl: 'http://localhost:3001/api',
+        baseUrl: 'http://localhost:3001',
       );
       addTearDown(client.close);
 
@@ -25,7 +26,7 @@ void main() {
         client: MockClient(
           (_) async => http.Response('<html>Bad gateway</html>', 502),
         ),
-        baseUrl: 'http://localhost:3001/api',
+        baseUrl: 'http://localhost:3001',
       );
       addTearDown(client.close);
 
@@ -41,4 +42,25 @@ void main() {
       );
     });
   });
+  group('ApiConfig paths', () {
+    test('every API path already carries the /api prefix', () {
+      // ApiClient.baseUrl has no /api, so a path missing the prefix would hit a
+      // 404 ("Endpoint tidak ditemukan"). This guards that regression.
+      final paths = <String>[
+        ApiConfig.customerAuth,
+        ApiConfig.customerProfile,
+        ApiConfig.customerAddresses,
+        ApiConfig.customerFaqs,
+        ApiConfig.customerServices,
+        ApiConfig.customerBookings,
+        ApiConfig.customerChat,
+        ApiConfig.trackingEtaPreview,
+      ];
+      for (final path in paths) {
+        expect(path.startsWith('/api/'), isTrue, reason: path);
+      }
+      expect(ApiConfig.baseUrl.endsWith('/api'), isFalse);
+    });
+  });
+
 }

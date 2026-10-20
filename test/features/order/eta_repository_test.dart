@@ -31,7 +31,7 @@ void main() {
       );
     });
     final repository = EtaRepository(
-      client: ApiClient(client: client, baseUrl: 'http://localhost:3001/api'),
+      client: ApiClient(client: client, baseUrl: 'http://localhost:3001'),
     );
 
     final result = await repository.calculate(

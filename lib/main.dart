@@ -10,6 +10,7 @@ import 'features/address/data/address_repository.dart';
 import 'features/address/domain/models/address_model.dart';
 import 'features/booking/data/booking_draft_repository.dart';
 import 'features/service/data/service_data.dart';
+import 'features/service/data/customer_service_remote_data_source.dart';
 import 'features/service/data/service_repository.dart';
 import 'features/service/domain/models/service_model.dart';
 
@@ -23,7 +24,11 @@ Future<void> main() async {
     AddressController.defaultAddresses,
   );
   final addressSnapshot = await addressRepository.readAddresses();
-  final serviceRepository = ServiceRepository(database);
+  final tokenStorage = SecureTokenStorage();
+  final serviceRepository = ServiceRepository(
+    database,
+    remote: CustomerServiceRemoteDataSource(tokenStorage: tokenStorage),
+  );
   await serviceRepository.seedDefaultsIfEmpty(ServiceData.services);
   final services = await serviceRepository.readServices();
   final bookingRepository = BookingDraftRepository(database);
@@ -58,7 +63,7 @@ Future<void> main() async {
       initialBookingService: initialBookingService,
       initialBookingAddress: selectedDraftAddress?.toCleaningAddress(),
       preferences: preferences,
-      tokenStorage: SecureTokenStorage(),
+      tokenStorage: tokenStorage,
     ),
   );
 }

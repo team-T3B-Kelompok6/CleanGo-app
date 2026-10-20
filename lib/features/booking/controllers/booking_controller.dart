@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' show DateUtils;
 
 import '../../service/domain/models/service_model.dart';
 import '../data/booking_draft_repository.dart';
+import '../data/customer_booking_api.dart';
 import '../domain/models/cleaning_address.dart';
 import '../domain/models/booking_draft.dart';
 
@@ -14,7 +15,9 @@ class BookingController extends ChangeNotifier {
     BookingDraft? initialDraft,
     ServiceModel? initialService,
     CleaningAddress? initialAddress,
-  }) : _service = initialService,
+    CustomerBookingApi? bookingApi,
+  }) : _bookingApi = bookingApi,
+       _service = initialService,
        _selectedDate = initialDraft?.selectedDate ?? initialDate,
        _selectedTime = initialDraft?.selectedTime ?? '12:00',
        _address = initialAddress ?? BookingController.initialAddress,
@@ -51,6 +54,11 @@ class BookingController extends ChangeNotifier {
   static const String initialNote = '';
 
   final BookingDraftRepository? repository;
+  final CustomerBookingApi? _bookingApi;
+  List<BookingSlotInfo> _slotInfo = const [];
+  List<String> _apiSlots = const [];
+  String? _availabilityError;
+  bool _availabilityLoading = false;
   ServiceModel? _service;
   DateTime _selectedDate;
   String _selectedTime;
@@ -64,6 +72,74 @@ class BookingController extends ChangeNotifier {
   CleaningAddress get address => _address;
   String? get addressId => _addressId;
   String get note => _note;
+
+  /// Slots offered for the selected date: server slots when loaded, otherwise
+  /// the local default schedule.
+  List<String> get slots => _apiSlots.isEmpty ? availableTimes : _apiSlots;
+  List<BookingSlotInfo> get slotInfo => List.unmodifiable(_slotInfo);
+  String? get availabilityError => _availabilityError;
+  bool get availabilityLoading => _availabilityLoading;
+  bool get hasServerAvailability => _apiSlots.isNotEmpty;
+
+  String? slotReason(String time) {
+    for (final slot in _slotInfo) {
+      if (slot.time == time) return slot.reason;
+    }
+    return null;
+  }
+
+  static String isoDate(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  /// Loads the availability board for the selected date and service.
+  Future<void> loadAvailability() async {
+    final api = _bookingApi;
+    if (api == null) return;
+    _availabilityLoading = true;
+    _availabilityError = null;
+    notifyListeners();
+    try {
+      final info = await api.availability(
+        date: isoDate(_selectedDate),
+        serviceId: _service?.id,
+      );
+      _slotInfo = info;
+      _apiSlots = info
+          .where((slot) => slot.available)
+          .map((slot) => slot.time)
+          .toList(growable: false);
+      if (_apiSlots.isNotEmpty && !_apiSlots.contains(_selectedTime)) {
+        _selectedTime = _apiSlots.first;
+      }
+    } catch (error) {
+      _availabilityError = error.toString();
+      _slotInfo = const [];
+      _apiSlots = const [];
+    } finally {
+      _availabilityLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Creates the booking on the backend. Returns null when the app runs without
+  /// a configured booking API (offline/local mode).
+  Future<CreatedBooking?> createBookingOnServer() async {
+    final api = _bookingApi;
+    if (api == null) return null;
+    final service = _service;
+    if (service == null) {
+      throw StateError('Pilih layanan terlebih dahulu.');
+    }
+    return api.create(
+      serviceId: service.id,
+      date: isoDate(_selectedDate),
+      time: _selectedTime,
+      addressId: _addressId,
+      notes: _note,
+    );
+  }
   int get servicePriceValue => _parsePrice(_service?.price ?? '');
   int get totalPayment => servicePriceValue + platformFee;
   String get formattedServicePrice => formatRupiah(servicePriceValue);
@@ -102,7 +178,7 @@ class BookingController extends ChangeNotifier {
   String get formattedSelectedTime => '$_selectedTime WIB';
 
   bool isTimeAvailable(String time, {DateTime? now}) {
-    if (!availableTimes.contains(time)) return false;
+    if (!slots.contains(time)) return false;
     final hour = int.parse(time.substring(0, 2));
     final scheduled = DateTime(
       _selectedDate.year,
@@ -118,7 +194,7 @@ class BookingController extends ChangeNotifier {
     if (_selectedDate.isBefore(DateUtils.dateOnly(current))) {
       return 'Tanggal booking sudah lewat. Pilih tanggal lain.';
     }
-    if (!availableTimes.contains(_selectedTime)) {
+    if (!slots.contains(_selectedTime)) {
       return 'Pilih tanggal dan jam mulai yang masih tersedia.';
     }
     if (!isTimeAvailable(_selectedTime, now: current)) {
@@ -129,7 +205,7 @@ class BookingController extends ChangeNotifier {
 
   void _ensureTimeSelection() {
     if (isTimeAvailable(_selectedTime)) return;
-    _selectedTime = availableTimes.firstWhere(
+    _selectedTime = slots.firstWhere(
       (time) => isTimeAvailable(time),
       orElse: () => '',
     );
@@ -160,6 +236,7 @@ class BookingController extends ChangeNotifier {
     _note = initialNote;
     notifyListeners();
     _persistDraft();
+    if (_bookingApi != null) unawaited(loadAvailability());
   }
 
   void selectDate(DateTime date) {
@@ -170,6 +247,7 @@ class BookingController extends ChangeNotifier {
 
     _selectedDate = DateUtils.dateOnly(date);
     _ensureTimeSelection();
+    if (_bookingApi != null) unawaited(loadAvailability());
     notifyListeners();
     _persistDraft();
   }

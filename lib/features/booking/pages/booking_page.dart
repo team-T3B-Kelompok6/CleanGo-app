@@ -121,7 +121,7 @@ class _BookingPageState extends State<BookingPage> {
                             (controller.selectedDate, controller.selectedTime),
                         builder: (context, selection, _) {
                           return BookingTimeSelector(
-                            options: BookingController.availableTimes,
+                            options: context.watch<BookingController>().slots,
                             selectedTime: selection.$2,
                             isTimeAvailable: context
                                 .read<BookingController>()

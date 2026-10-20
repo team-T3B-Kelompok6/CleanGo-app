@@ -18,6 +18,7 @@ import 'features/auth/pages/register_page.dart';
 import 'features/auth/controllers/auth_session_controller.dart';
 import 'features/booking/controllers/booking_controller.dart';
 import 'features/booking/data/booking_draft_repository.dart';
+import 'features/booking/data/customer_booking_api.dart';
 import 'features/booking/domain/models/booking_draft.dart';
 import 'features/booking/domain/models/cleaning_address.dart';
 import 'features/home/pages/home_page.dart';
@@ -102,6 +103,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
             initialDraft: widget.initialBookingDraft,
             initialService: widget.initialBookingService,
             initialAddress: widget.initialBookingAddress,
+            bookingApi: CustomerBookingApi(tokenStorage: widget.tokenStorage),
           ),
         ),
         ChangeNotifierProvider(

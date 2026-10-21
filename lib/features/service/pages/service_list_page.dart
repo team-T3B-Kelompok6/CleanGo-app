@@ -26,6 +26,15 @@ class _ServiceListPageState extends State<ServiceListPage> {
   ServiceSort? _selectedSort;
 
   @override
+  void initState() {
+    super.initState();
+    // Pull the newest catalogue (photos, prices, categories) on every visit.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<ServiceController>().refreshServices();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final serviceController = context.watch<ServiceController>();
     final services = sortServices(

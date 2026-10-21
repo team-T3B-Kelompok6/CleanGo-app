@@ -16,6 +16,7 @@ class ServiceController extends ChangeNotifier {
     String? initialFilter,
     CustomerServiceDetailApi? detailApi,
   }) : _detailApi = detailApi,
+       _repository = repository,
        _allServices = List<ServiceModel>.from(
          initialServices ?? ServiceData.services,
        ),
@@ -46,6 +47,7 @@ class ServiceController extends ChangeNotifier {
 
   final AppPreferences? preferences;
   final CustomerServiceDetailApi? _detailApi;
+  final ServiceRepository? _repository;
   final Set<String> _loadedDetails = <String>{};
   late List<ServiceModel> _allServices;
   late String _selectedFilter;
@@ -96,6 +98,16 @@ class ServiceController extends ChangeNotifier {
       (service) => service.title.toLowerCase().contains(normalizedName),
       orElse: () => _allServices.first,
     );
+  }
+
+  /// Re-reads the catalogue from the backend (new photos, prices, categories)
+  /// without restarting the app.
+  Future<void> refreshServices() async {
+    try {
+      await _repository?.refresh();
+    } catch (_) {
+      // offline: keep the cached catalogue
+    }
   }
 
   /// Every service loaded from the backend (unfiltered).

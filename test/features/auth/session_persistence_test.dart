@@ -43,6 +43,30 @@ String _tokenWithExpiry(int secondsFromNow) {
   return '$header.$payload.signature';
 }
 
+
+class _BrokenTokenStorage implements TokenStorage {
+  @override
+  Future<void> writeAccessToken(String token) async {}
+
+  @override
+  Future<String?> readAccessToken() async => throw StateError('storage rusak');
+
+  @override
+  Future<void> writeRefreshToken(String token) async {}
+
+  @override
+  Future<String?> readRefreshToken() async => throw StateError('storage rusak');
+
+  @override
+  Future<void> writeExpiresAt(DateTime expiresAt) async {}
+
+  @override
+  Future<DateTime?> readExpiresAt() async => throw StateError('storage rusak');
+
+  @override
+  Future<void> clearSession() async {}
+}
+
 void main() {
   group('AuthSessionController persistence', () {
     test('keeps the session after createSession (app restart)', () async {
@@ -87,6 +111,13 @@ void main() {
       expect(expiresAt, isNotNull);
       final days = expiresAt!.difference(DateTime.now().toUtc()).inDays;
       expect(days, inInclusiveRange(6, 7));
+    });
+
+    test('never throws when the secure store is unreadable', () async {
+      // A broken secure store must not crash the splash screen.
+      final controller = AuthSessionController(_BrokenTokenStorage());
+
+      expect(await controller.hasSession(), isFalse);
     });
 
     test('clears everything on sign out', () async {

@@ -11,17 +11,26 @@ class AuthSessionController extends ChangeNotifier {
   final TokenStorage _tokenStorage;
 
   Future<bool> hasSession() async {
-    final token = await _tokenStorage.readAccessToken();
-    final expiresAt = await _tokenStorage.readExpiresAt();
-    final isValid =
-        token != null &&
-        token.isNotEmpty &&
-        expiresAt != null &&
-        expiresAt.isAfter(DateTime.now().toUtc());
-    if (!isValid) {
-      await _tokenStorage.clearSession();
+    try {
+      final token = await _tokenStorage.readAccessToken();
+      final expiresAt = await _tokenStorage.readExpiresAt();
+      final isValid =
+          token != null &&
+          token.isNotEmpty &&
+          expiresAt != null &&
+          expiresAt.isAfter(DateTime.now().toUtc());
+      if (!isValid) {
+        await _tokenStorage.clearSession();
+      }
+      return isValid;
+    } catch (_) {
+      // A broken/unreadable secure store must not block the app; treat it as a
+      // missing session so the user can sign in again.
+      try {
+        await _tokenStorage.clearSession();
+      } catch (_) {}
+      return false;
     }
-    return isValid;
   }
 
   /// Persists the session so the customer stays signed in after the app is

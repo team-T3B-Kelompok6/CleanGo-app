@@ -35,22 +35,30 @@ class _SplashPageState extends State<SplashPage>
     await Future<void>.delayed(const Duration(milliseconds: 2600));
     if (!mounted) return;
 
-    final preferences = context.read<AppPreferences>();
-    final hasSession = await context.read<AuthSessionController>().hasSession();
-    if (!mounted) return;
-    final hasCompletedOnboarding = await preferences.hasCompletedOnboarding();
-    if (!mounted) return;
-
-    final Widget destination;
-    if (!hasCompletedOnboarding) {
-      destination = const OnboardingPage();
-    } else if (hasSession) {
-      await context.read<ProfileController>().loadFromApi();
+    Widget destination = const LoginPage();
+    try {
+      final preferences = context.read<AppPreferences>();
+      final hasSession = await context
+          .read<AuthSessionController>()
+          .hasSession();
       if (!mounted) return;
-      destination = const HomePage();
-    } else {
+      final hasCompletedOnboarding = await preferences.hasCompletedOnboarding();
+      if (!mounted) return;
+
+      if (!hasCompletedOnboarding) {
+        destination = const OnboardingPage();
+      } else if (hasSession) {
+        try {
+          await context.read<ProfileController>().loadFromApi();
+        } catch (_) {}
+        if (!mounted) return;
+        destination = const HomePage();
+      }
+    } catch (_) {
+      // Never leave the user on a blank splash screen.
       destination = const LoginPage();
     }
+    if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder<void>(

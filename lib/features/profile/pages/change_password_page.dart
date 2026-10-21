@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_sheet.dart';
+import '../../auth/controllers/auth_session_controller.dart';
 import '../controllers/change_password_controller.dart';
 import '../controllers/profile_controller.dart';
 
@@ -66,8 +68,18 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     setState(() => _isSubmitting = false);
 
     if (success) {
-      AppNotice.show(context, 'Kata sandi berhasil diperbarui.');
-      Navigator.of(context).pop();
+      // The server revoked every token issued before this change, so the app
+      // must sign in again with the new password.
+      await context.read<AuthSessionController>().signOut();
+      if (!mounted) return;
+      AppNotice.show(
+        context,
+        'Kata sandi diperbarui. Silakan masuk dengan kata sandi baru.',
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.login,
+        (route) => false,
+      );
       return;
     }
 

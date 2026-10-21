@@ -21,6 +21,7 @@ import 'features/booking/data/booking_draft_repository.dart';
 import 'features/booking/data/customer_booking_api.dart';
 import 'features/home/controllers/home_controller.dart';
 import 'features/home/data/customer_banner_api.dart';
+import 'features/home/data/customer_category_api.dart';
 import 'features/booking/domain/models/booking_draft.dart';
 import 'features/booking/domain/models/cleaning_address.dart';
 import 'features/home/pages/home_page.dart';
@@ -126,6 +127,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
         ChangeNotifierProvider(
           create: (_) => HomeController(
             bannerApi: CustomerBannerApi(tokenStorage: widget.tokenStorage),
+            categoryApi: CustomerCategoryApi(),
           ),
         ),
         ChangeNotifierProvider(

@@ -1,4 +1,5 @@
 import '../../service/domain/models/service_model.dart';
+import '../domain/models/popular_category_model.dart';
 import '../domain/models/popular_service_model.dart';
 import '../domain/models/service_category_model.dart';
 
@@ -24,6 +25,35 @@ abstract final class HomeCatalog {
       );
     }
     return result;
+  }
+
+  /// Home grid built from the backend's popularity ranking. The icon is taken
+  /// from a service in the same category so the grid keeps its look.
+  static List<ServiceCategoryModel> fromPopularCategories(
+    List<PopularCategoryModel> popular,
+    List<ServiceModel> services, {
+    int limit = 8,
+  }) {
+    return popular.take(limit).map((category) {
+      final match = services.where(
+        (service) =>
+            _categoryKey(service.category) == _categoryKey(category.name),
+      );
+      return ServiceCategoryModel(
+        iconPath: match.isEmpty
+            ? _fallbackIcon
+            : (match.first.iconPath ?? _fallbackIcon),
+        label: category.name,
+        serviceId: category.serviceId,
+      );
+    }).toList(growable: false);
+  }
+
+  /// Service categories are normalised ("Sofa dan Kasur" -> "Sofa") by the
+  /// service mapper, so compare on the same key when matching icons.
+  static String _categoryKey(String value) {
+    final key = value.trim().toLowerCase();
+    return key == 'sofa dan kasur' ? 'sofa' : key;
   }
 
   /// The first [limit] catalogue entries, presented as the "popular" carousel.

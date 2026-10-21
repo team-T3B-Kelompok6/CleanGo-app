@@ -33,8 +33,15 @@ class HomePage extends StatelessWidget {
     final services = context.watch<ServiceController>().allServices;
     final derivedCategories = HomeCatalog.categories(services);
     final derivedPopular = HomeCatalog.popularServices(services);
-    final catalogCategories =
-        derivedCategories.isEmpty ? HomeData.categories : derivedCategories;
+    // The backend ranks categories by bookings; fall back to the catalogue when
+    // it is unavailable. At most 8 are shown.
+    final rankedCategories = HomeCatalog.fromPopularCategories(
+      context.watch<HomeController>().popularCategories,
+      services,
+    );
+    final catalogCategories = rankedCategories.isNotEmpty
+        ? rankedCategories
+        : (derivedCategories.isEmpty ? HomeData.categories : derivedCategories);
     final catalogPopular =
         derivedPopular.isEmpty ? HomeData.popularServices : derivedPopular;
     final mediaQuery = MediaQuery.of(context);

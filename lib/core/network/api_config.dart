@@ -21,4 +21,6 @@ class ApiConfig {
   static String get customerPromos => '$apiPrefix/customer/promos';
   static String get customerPromoValidate => '$apiPrefix/customer/promos/validate';
   static String get customerNotifications => '$apiPrefix/customer/notifications';
+  static String get customerPopularCategories =>
+      '$apiPrefix/customer/categories/popular';
 }

@@ -51,9 +51,16 @@ class ProfileController extends ChangeNotifier {
 
   Future<bool> changePasswordRemote({required String currentPassword, required String newPassword}) async {
     final token = await _tokenStorage?.readAccessToken();
-    if (token == null || token.isEmpty) return changePassword(currentPassword: currentPassword, newPassword: newPassword);
+    if (token == null || token.isEmpty) {
+      // Never pretend the password changed: without a session the server would
+      // keep the old password and the user would think it was updated.
+      _error = 'Sesi tidak ditemukan. Silakan masuk kembali.';
+      notifyListeners();
+      return false;
+    }
     try {
       await _service.changePassword(token, currentPassword: currentPassword, newPassword: newPassword);
+      _error = null;
       return true;
     } catch (e) { _error = e.toString(); notifyListeners(); return false; }
   }

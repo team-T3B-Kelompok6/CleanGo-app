@@ -56,6 +56,45 @@ sesi tersebut untuk privasi. Belum ada sinkronisasi chat lintas perangkat/server
 chat tetap bisa digunakan dengan peringatan bahwa riwayat belum tersimpan/termuat.
 Pesan teks saja; tombol gambar dan mikrofon yang belum berfungsi tidak ditampilkan.
 
+### Kontrak jawaban mobile dan backend
+
+Alurnya: halaman Boo/Pusat Bantuan → `ChatbotController` → `ChatbotRepository`
+→ Express `/api/customer/chat` → `data.answer` → bubble chat dan riwayat lokal.
+Mobile menampilkan teks jawaban backend, termasuk baris baru dan poin, tanpa
+menulis ulang jawaban atau menggantinya dengan FAQ/dummy lokal. Respons `groq`,
+`faq`, `order`, dan `support` memakai kontrak yang sama. Perbaikan jawaban di
+backend otomatis berlaku di mobile yang mengakses backend tersebut.
+
+Jawaban kosong/tidak valid atau lebih dari 2.500 karakter ditolak sebelum disimpan
+agar riwayat tetap dapat dimuat. Pesan gagal tidak dikirim kembali sebagai konteks.
+Error backend diteruskan ke pengguna, dan pengiriman ganda dicegah saat menunggu
+jawaban. Key/provider/prompt tetap di backend; tidak ditambahkan ke aplikasi.
+
+HP fisik harus menggunakan IP LAN komputer, bukan `localhost` atau `10.0.2.2`.
+Gunakan Wi-Fi yang sama dan pastikan port backend dapat diakses. Untuk release,
+gunakan HTTPS; izin HTTP lokal pada Android hanya disediakan untuk build debug.
+
+### Tes kontrak Boo
+
+```powershell
+flutter test --no-pub test/features/chatbot
+```
+
+Tes repository/widget memakai respons HTTP tiruan untuk memeriksa teks utuh,
+status error, batas riwayat, serta penyimpanan jawaban. Ada satu tes HTTP nyata
+yang sengaja dilewati pada pengujian biasa agar tidak membutuhkan backend aktif.
+Untuk menjalankannya, siapkan **instance Express lokal terisolasi** dalam mode
+`CHATBOT_DATABASE_ENABLED=false` (konfigurasi proses tes, bukan mengubah `.env`
+utama), kemudian:
+
+```powershell
+flutter test --no-pub --dart-define=CHATBOT_TEST_API_URL=http://127.0.0.1:3001/api test/features/chatbot/chatbot_backend_contract_test.dart
+```
+
+Gunakan port instance tes yang sebenarnya. Tes HTTP mengirim lima pertanyaan
+publik, memeriksa balasan melalui controller/repository Flutter, dan memakai
+storage tiruan. Tes ini tidak memverifikasi akun nyata, database, atau HP fisik.
+
 ## Struktur project
 
 ```text

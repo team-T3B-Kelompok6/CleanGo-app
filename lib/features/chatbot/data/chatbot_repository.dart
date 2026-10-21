@@ -37,6 +37,7 @@ class ChatbotRepository implements ChatbotGateway {
     final data = response['data'];
     if (data is! Map<String, dynamic> ||
         data['answer'] is! String ||
+        (data['answer'] as String).length > 2500 ||
         (data['answer'] as String).trim().isEmpty) {
       throw const ApiException(
         'Jawaban Boo belum tersedia. Silakan coba lagi.',

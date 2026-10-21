@@ -127,6 +127,13 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                           ],
                         ),
                         const SizedBox(height: 10),
+                        _buildFaqCard(
+                          supportController,
+                          supportController.popularFaqs,
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('SEMUA PERTANYAAN'),
+                        const SizedBox(height: 10),
                         _buildFaqSection(supportController, faqs),
                         const SizedBox(height: 24),
                         // Section 3: Bantuan Lainnya
@@ -414,11 +421,43 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     );
   }
 
+  /// White card holding a list of questions.
+  Widget _buildFaqCard(
+    SupportController controller,
+    List<FaqItemModel> faqs,
+  ) {
+    if (faqs.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: faqs.length,
+        separatorBuilder: (_, _) =>
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
+        itemBuilder: (context, index) => _buildFaqItem(controller, faqs[index]),
+      ),
+    );
+  }
+
+  /// Every question, grouped per category.
   Widget _buildFaqSection(
     SupportController controller,
     List<FaqItemModel> faqs,
   ) {
-    // Grouped per category so each topic is easy to scan.
     final groups = controller.groupByCategory(faqs);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -426,32 +465,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
         for (final entry in groups.entries) ...[
           _buildCategoryLabel(entry.key, entry.value.length),
           const SizedBox(height: 8),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x06000000),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: entry.value.length,
-              separatorBuilder: (_, _) => const Divider(
-                height: 1,
-                thickness: 1,
-                color: Color(0xFFF1F5F9),
-              ),
-              itemBuilder: (context, index) =>
-                  _buildFaqItem(controller, entry.value[index]),
-            ),
-          ),
+          _buildFaqCard(controller, entry.value),
           const SizedBox(height: 14),
         ],
       ],

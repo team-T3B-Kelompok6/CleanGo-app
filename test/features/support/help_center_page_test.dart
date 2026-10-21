@@ -63,7 +63,8 @@ void main() {
     for (final faq in FaqData.initialFaqs) {
       controller.setExpanded(faq.id, false);
       await tester.pump();
-      final question = find.text(faq.question);
+      // A popular question also appears in its category list, so target one.
+      final question = find.text(faq.question).first;
       await tester.scrollUntilVisible(
         question,
         200,
@@ -73,9 +74,9 @@ void main() {
       expect(find.text(faq.answer), findsNothing);
       await tester.tap(question);
       await tester.pump();
-      expect(find.text(faq.answer), findsOneWidget);
+      expect(find.text(faq.answer), findsWidgets);
       expect(
-        tester.widget<Text>(find.text(faq.answer)).textAlign,
+        tester.widget<Text>(find.text(faq.answer).first).textAlign,
         TextAlign.justify,
       );
       expect(find.byType(BottomSheet), findsNothing);

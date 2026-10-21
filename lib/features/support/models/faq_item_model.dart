@@ -6,6 +6,7 @@ class FaqItemModel {
     required this.question,
     required this.answer,
     this.category = '',
+    this.viewCount = 0,
     this.highlight,
     required this.icon,
     this.isExpanded = false,
@@ -17,6 +18,9 @@ class FaqItemModel {
 
   /// Category name managed in the admin dashboard (empty for legacy entries).
   final String category;
+
+  /// How many times the question has been opened (drives "popular").
+  final int viewCount;
   final String? highlight;
   final IconData icon;
   final bool isExpanded;
@@ -26,6 +30,7 @@ class FaqItemModel {
     String? question,
     String? answer,
     String? category,
+    int? viewCount,
     String? highlight,
     IconData? icon,
     bool? isExpanded,
@@ -35,6 +40,7 @@ class FaqItemModel {
       question: question ?? this.question,
       answer: answer ?? this.answer,
       category: category ?? this.category,
+      viewCount: viewCount ?? this.viewCount,
       highlight: highlight ?? this.highlight,
       icon: icon ?? this.icon,
       isExpanded: isExpanded ?? this.isExpanded,

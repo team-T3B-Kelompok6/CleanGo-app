@@ -20,19 +20,28 @@ Future<void> main() async {
   final preferences = AppPreferences(SharedPreferencesAsync());
   final database = AppDatabase.defaults();
   final addressRepository = AddressRepository(database);
-  await addressRepository.seedDefaultsIfEmpty(
-    AddressController.defaultAddresses,
-  );
-  final addressSnapshot = await addressRepository.readAddresses();
   final tokenStorage = SecureTokenStorage();
   final serviceRepository = ServiceRepository(
     database,
     remote: CustomerServiceRemoteDataSource(tokenStorage: tokenStorage),
   );
-  await serviceRepository.seedDefaultsIfEmpty(ServiceData.services);
-  final services = await serviceRepository.readServices();
   final bookingRepository = BookingDraftRepository(database);
-  final bookingDraft = await bookingRepository.readDraft();
+
+  // Local storage must never block the first frame: a slow or failing device
+  // store falls back to sensible defaults instead of a black screen.
+  final addressSnapshot = await _guard(
+    () => addressRepository.seedDefaultsIfEmpty(
+      AddressController.defaultAddresses,
+    ).then((_) => addressRepository.readAddresses()),
+    AddressSnapshot(addresses: AddressController.defaultAddresses, selectedAddressId: ''),
+  );
+  final services = await _guard(() async {
+    await serviceRepository.seedDefaultsIfEmpty(ServiceData.services);
+    return serviceRepository.readServices();
+  }, ServiceData.services);
+  final bookingDraft = await _guard(bookingRepository.readDraft, null);
+  final lastServiceFilter = await _guard(preferences.readLastServiceFilter, null);
+
   ServiceModel? initialBookingService;
   AddressModel? selectedDraftAddress;
   if (bookingDraft != null) {
@@ -57,7 +66,7 @@ Future<void> main() async {
       initialAddresses: addressSnapshot.addresses,
       serviceRepository: serviceRepository,
       initialServices: services,
-      initialServiceFilter: await preferences.readLastServiceFilter(),
+      initialServiceFilter: lastServiceFilter,
       bookingRepository: bookingRepository,
       initialBookingDraft: bookingDraft,
       initialBookingService: initialBookingService,
@@ -66,4 +75,14 @@ Future<void> main() async {
       tokenStorage: tokenStorage,
     ),
   );
+}
+
+/// Runs [task] with a timeout; on failure/timeout returns [fallback] so startup
+/// always reaches `runApp`.
+Future<T> _guard<T>(Future<T> Function() task, T fallback) async {
+  try {
+    return await task().timeout(const Duration(seconds: 8));
+  } catch (_) {
+    return fallback;
+  }
 }

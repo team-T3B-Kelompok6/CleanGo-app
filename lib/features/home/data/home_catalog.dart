@@ -49,8 +49,8 @@ abstract final class HomeCatalog {
     }).toList(growable: false);
   }
 
-  /// Service categories are normalised ("Sofa dan Kasur" -> "Sofa") by the
-  /// service mapper, so compare on the same key when matching icons.
+  /// Older cached services used the short label "Sofa"; compare on a key that
+  /// treats both spellings as the same category when matching icons.
   static String _categoryKey(String value) {
     final key = value.trim().toLowerCase();
     return key == 'sofa dan kasur' ? 'sofa' : key;

@@ -5,7 +5,7 @@ abstract final class ServiceData {
     'Semua',
     'Rumah',
     'Kantor',
-    'Sofa',
+    'Sofa dan Kasur',
     'AC',
   ];
 
@@ -145,7 +145,7 @@ abstract final class ServiceData {
       description: 'Sedot debu tungau dan cuci noda basah',
       duration: '±1,5–2 jam',
       price: 'Rp120.000',
-      category: 'Sofa',
+      category: 'Sofa dan Kasur',
       popularity: 86,
       releaseOrder: 2,
       imagePath: 'assets/images/service_sofa_mattress.jpeg',

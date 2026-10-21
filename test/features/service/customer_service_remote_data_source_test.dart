@@ -24,7 +24,7 @@ void main() {
       expect(service.imagePath, isNull);
     });
 
-    test('normalises the Sofa category label used by the mobile filter', () {
+    test('keeps the backend category label for the mobile filter', () {
       final service = CustomerServiceRemoteDataSource.toServiceModel({
         'id': 9,
         'name': 'Sofa Cleaning',
@@ -33,7 +33,7 @@ void main() {
         'categoryName': 'Sofa dan Kasur',
       });
 
-      expect(service.category, 'Sofa');
+      expect(service.category, 'Sofa dan Kasur');
       expect(service.duration, '1 jam 30 menit');
       expect(service.iconPath, 'assets/icons/deep_cleaning.svg');
     });

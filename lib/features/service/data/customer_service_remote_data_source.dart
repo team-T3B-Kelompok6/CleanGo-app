@@ -39,7 +39,7 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
   /// Public so it can be unit tested without a network round-trip.
   static ServiceModel toServiceModel(Map<String, dynamic> json) {
     final categoryName = json['categoryName'] as String? ?? '';
-    final category = categoryName == 'Sofa dan Kasur' ? 'Sofa' : categoryName;
+    final category = categoryName;
     final minutes = (json['durationMinutes'] as num?)?.toInt() ?? 0;
     final imageUrl = json['imageUrl'] as String?;
     return ServiceModel(

@@ -65,12 +65,14 @@ const _service = ServiceModel(
 
 void main() {
   group('BookingController availability', () {
-    test('loads server slots and picks the first available one', () async {
+    test('loads server slots and moves to an available one', () async {
+      // Only one slot is open, so the selection must end up on it no matter
+      // what the local wall clock is.
       final api = _FakeBookingApi(
         slots: const [
           BookingSlotInfo(time: '08:00', available: false, reason: 'Waktu pemesanan sudah lewat.'),
           BookingSlotInfo(time: '10:00', available: true),
-          BookingSlotInfo(time: '12:00', available: true),
+          BookingSlotInfo(time: '12:00', available: false, reason: 'Slot sudah penuh.'),
         ],
       );
       final controller = BookingController(bookingApi: api, initialService: _service);
@@ -79,9 +81,10 @@ void main() {
 
       expect(api.availabilityCalls, 1);
       expect(controller.hasServerAvailability, isTrue);
-      expect(controller.slots, ['10:00', '12:00']);
+      expect(controller.slots, ['10:00']);
       expect(controller.selectedTime, '10:00');
       expect(controller.slotReason('08:00'), 'Waktu pemesanan sudah lewat.');
+      expect(controller.slotReason('12:00'), 'Slot sudah penuh.');
       expect(controller.availabilityError, isNull);
     });
 

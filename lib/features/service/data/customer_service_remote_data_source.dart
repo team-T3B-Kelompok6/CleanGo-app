@@ -49,11 +49,22 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
       duration: _formatDuration(minutes),
       price: _formatRupiah((json['price'] as num?)?.toInt() ?? 0),
       category: category,
-      imagePath: imageUrl != null && imageUrl.startsWith('assets/') ? imageUrl : null,
+      imagePath: resolveImageUrl(imageUrl),
       iconPath: _categoryIcons[categoryName] ?? 'assets/icons/services.svg',
       popularity: 0,
       releaseOrder: (json['id'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  /// Bundled assets stay as-is; backend `/uploads/...` paths become absolute so
+  /// Flutter can load them with `Image.network`.
+  static String? resolveImageUrl(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return null;
+    if (value.startsWith('assets/')) return value;
+    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    if (value.startsWith('/')) return '${ApiConfig.baseUrl}$value';
+    return null;
   }
 
   static String _formatDuration(int minutes) {

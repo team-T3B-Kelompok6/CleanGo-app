@@ -1,3 +1,4 @@
+import 'package:cleango_app/core/network/api_config.dart';
 import 'package:cleango_app/features/service/data/customer_service_remote_data_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -56,7 +57,7 @@ void main() {
       });
 
       expect(withAsset.imagePath, 'assets/images/service_ac.jpeg');
-      expect(withRemote.imagePath, isNull);
+      expect(withRemote.imagePath, '${ApiConfig.baseUrl}/uploads/ac.png');
       expect(withRemote.iconPath, 'assets/icons/ac_wash.svg');
     });
 

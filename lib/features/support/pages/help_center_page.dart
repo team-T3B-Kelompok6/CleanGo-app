@@ -418,30 +418,79 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     SupportController controller,
     List<FaqItemModel> faqs,
   ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x06000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+    // Grouped per category so each topic is easy to scan.
+    final groups = controller.groupByCategory(faqs);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final entry in groups.entries) ...[
+          _buildCategoryLabel(entry.key, entry.value.length),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x06000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: entry.value.length,
+              separatorBuilder: (_, _) => const Divider(
+                height: 1,
+                thickness: 1,
+                color: Color(0xFFF1F5F9),
+              ),
+              itemBuilder: (context, index) =>
+                  _buildFaqItem(controller, entry.value[index]),
+            ),
           ),
+          const SizedBox(height: 14),
         ],
-      ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: faqs.length,
-        separatorBuilder: (_, _) =>
-            const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
-        itemBuilder: (context, index) {
-          final faq = faqs[index];
-          return _buildFaqItem(controller, faq);
-        },
-      ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryLabel(String category, int count) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.folder_outlined,
+          size: 15,
+          color: AppColors.primaryAction,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            category,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.primaryAction,
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        Text(
+          '$count',
+          style: const TextStyle(
+            color: AppColors.slate500,
+            fontFamily: AppTheme.fontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 

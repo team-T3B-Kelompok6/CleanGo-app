@@ -5,6 +5,7 @@ class FaqItemModel {
     required this.id,
     required this.question,
     required this.answer,
+    this.category = '',
     this.highlight,
     required this.icon,
     this.isExpanded = false,
@@ -13,6 +14,9 @@ class FaqItemModel {
   final String id;
   final String question;
   final String answer;
+
+  /// Category name managed in the admin dashboard (empty for legacy entries).
+  final String category;
   final String? highlight;
   final IconData icon;
   final bool isExpanded;
@@ -21,6 +25,7 @@ class FaqItemModel {
     String? id,
     String? question,
     String? answer,
+    String? category,
     String? highlight,
     IconData? icon,
     bool? isExpanded,
@@ -29,6 +34,7 @@ class FaqItemModel {
       id: id ?? this.id,
       question: question ?? this.question,
       answer: answer ?? this.answer,
+      category: category ?? this.category,
       highlight: highlight ?? this.highlight,
       icon: icon ?? this.icon,
       isExpanded: isExpanded ?? this.isExpanded,

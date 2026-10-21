@@ -40,6 +40,17 @@ class SupportController extends ChangeNotifier {
   bool _termsExpanded = false;
 
   List<FaqItemModel> get allFaqs => List.unmodifiable(_faqs);
+
+  /// FAQs grouped by their admin-managed category, keeping the catalogue order.
+  /// Entries without a category fall under "Umum".
+  Map<String, List<FaqItemModel>> groupByCategory(List<FaqItemModel> faqs) {
+    final groups = <String, List<FaqItemModel>>{};
+    for (final faq in faqs) {
+      final key = faq.category.trim().isEmpty ? 'Umum' : faq.category.trim();
+      groups.putIfAbsent(key, () => <FaqItemModel>[]).add(faq);
+    }
+    return groups;
+  }
   int get totalTopicsCount => _faqs.length;
   bool get termsExpanded => _termsExpanded;
 

@@ -6,6 +6,7 @@ class FaqData {
   static const List<FaqItemModel> initialFaqs = [
     FaqItemModel(
       id: 'faq-1',
+      category: 'Jadwal',
       question: 'Bagaimana cara menjadwalkan ulang pesanan?',
       answer: 'Anda dapat mengubah jadwal melalui menu Pesanan paling lambat H-1 atau 24 jam sebelum jadwal pengerjaan.',
       highlight:
@@ -15,6 +16,7 @@ class FaqData {
     ),
     FaqItemModel(
       id: 'faq-2',
+      category: 'Pembayaran',
       question: 'Metode pembayaran apa saja yang didukung?',
       answer: 'CleanGo mendukung pembayaran melalui QRIS dan tunai.',
       icon: Icons.payments_outlined,
@@ -22,6 +24,7 @@ class FaqData {
     ),
     FaqItemModel(
       id: 'faq-3',
+      category: 'Layanan',
       question: 'Apakah staf cleaner CleanGo membawa peralatan sendiri?',
       answer: 'Ya, seluruh staf cleaner CleanGo telah dibekali perlengkapan lengkap, mesin vakum khusus, dan cairan pembersih berstandar ramah lingkungan.',
       icon: Icons.cleaning_services_outlined,
@@ -29,6 +32,7 @@ class FaqData {
     ),
     FaqItemModel(
       id: 'faq-4',
+      category: 'Layanan',
       question: 'Bagaimana jika saya tidak puas dengan hasil pembersihan?',
       answer: 'CleanGo memberikan Jaminan Garansi 100%. Anda dapat mengajukan komplain maksimal 1x24 jam setelah pengerjaan untuk mendapatkan layanan pembersihan ulang (re-cleaning) tanpa biaya tambahan.',
       icon: Icons.verified_outlined,
@@ -36,6 +40,7 @@ class FaqData {
     ),
     FaqItemModel(
       id: 'faq-5',
+      category: 'Jadwal',
       question: 'Bagaimana cara membatalkan pesanan?',
       answer: 'Pembatalan dapat dilakukan melalui menu Pesanan paling lambat H-1 atau 24 jam sebelum jadwal pengerjaan. Setelah melewati batas tersebut, hubungi WhatsApp CS CleanGo.',
       icon: Icons.cancel_outlined,

@@ -22,12 +22,13 @@ class CustomerFaqService {
   }
 
   FaqItemModel _fromApiJson(Map<String, dynamic> j) {
+    final category = j['category'] as String? ?? '';
     return FaqItemModel(
       id: 'faq-${j['id'] ?? ''}',
       question: j['question'] as String? ?? '',
       answer: j['answer'] as String? ?? '',
-      highlight: j['category'] as String?,
-      icon: _categoryIcons[j['category']] ?? Icons.help_outline_rounded,
+      category: category,
+      icon: _categoryIcons[category] ?? Icons.help_outline_rounded,
     );
   }
 }

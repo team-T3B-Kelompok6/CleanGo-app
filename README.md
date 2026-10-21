@@ -242,7 +242,7 @@ cleango_app/
 │   │   │   ├── models/
 │   │   │   │   └── faq_item_model.dart              # Model entitas item FAQ & status ekspansi
 │   │   │   ├── controllers/
-│   │   │   │   └── support_controller.dart          # Global state provider FAQ (pencarian & accordion)
+│   │   │   │   └── support_controller.dart          # Global state dropdown FAQ & syarat layanan
 │   │   │   └── pages/
 │   │   │       └── help_center_page.dart            # Layar Pusat Bantuan & FAQ
 │   │   │

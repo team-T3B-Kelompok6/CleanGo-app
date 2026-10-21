@@ -30,44 +30,22 @@ void main() {
       controller = SupportController();
     });
 
+    tearDown(() => controller.dispose());
+
     test('Initial state contains 5 FAQs and first item is expanded', () {
       expect(controller.allFaqs.length, 5);
       expect(controller.totalTopicsCount, 5);
-      expect(controller.searchQuery, '');
-      expect(controller.filteredFaqs.length, 5);
       expect(controller.allFaqs.first.isExpanded, true);
     });
 
-    test('search filters FAQs by question or answer keyword', () {
-      var notified = false;
-      controller.addListener(() {
-        notified = true;
-      });
-
-      controller.search('jadwal');
-      expect(notified, true);
-      expect(controller.searchQuery, 'jadwal');
-      expect(controller.filteredFaqs.isNotEmpty, true);
-      expect(
-        controller.filteredFaqs.any(
-          (f) => f.question.toLowerCase().contains('jadwal'),
-        ),
-        true,
-      );
-
-      // Search non-existent
-      controller.search('xyz999tidakada');
-      expect(controller.filteredFaqs.isEmpty, true);
-      expect(controller.hasSearchResults, false);
-    });
-
-    test('resetSearch clears search query and restores all FAQs', () {
-      controller.search('bayar');
-      expect(controller.searchQuery, 'bayar');
-
-      controller.resetSearch();
-      expect(controller.searchQuery, '');
-      expect(controller.filteredFaqs.length, 5);
+    test('terms expand independently without changing FAQ contents', () {
+      final faqs = controller.allFaqs;
+      expect(controller.termsExpanded, isFalse);
+      controller.toggleTerms();
+      expect(controller.termsExpanded, isTrue);
+      expect(controller.allFaqs, orderedEquals(faqs));
+      controller.toggleTerms();
+      expect(controller.termsExpanded, isFalse);
     });
 
     test('toggleExpand flips isExpanded state of target FAQ', () {

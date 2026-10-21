@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
-import '../../../shared/widgets/app_sheet.dart';
 import '../../../shared/widgets/chatbot_button.dart';
+import '../../../shared/widgets/chatbot_icon.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../controllers/support_controller.dart';
 import '../models/faq_item_model.dart';
@@ -19,7 +19,7 @@ class HelpCenterPage extends StatefulWidget {
 }
 
 class _HelpCenterPageState extends State<HelpCenterPage> {
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _questionController = TextEditingController();
 
   @override
   void initState() {
@@ -31,61 +31,36 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _questionController.dispose();
     super.dispose();
   }
 
-  void _openChatbot() {
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => const ChatbotPage()));
+  void _openChatbot({String? question}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatbotPage(initialMessage: question),
+      ),
+    );
+  }
+
+  void _askBoo() {
+    final question = _questionController.text.trim();
+    if (question.isEmpty) return;
+    if (question.length > 2000) {
+      AppNotice.show(
+        context,
+        'Pertanyaan maksimal 2000 karakter.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(_questionController.clear);
+    _openChatbot(question: question);
   }
 
   void _showContactSnackBar(String message) {
     AppNotice.show(context, message, type: AppNoticeType.info);
-  }
-
-  void _showTermsModal() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.75,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (_, scrollController) {
-            return AppSheet(
-              title: 'Syarat & Ketentuan Layanan',
-              scrollController: scrollController,
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _TermsSection(
-                    title: '1. Jaminan Garansi 100%',
-                    description: 'CleanGo menjamin kepuasan pelanggan melalui inspeksi pengerjaan. Jika pelanggan mendapati area yang kurang bersih, pengajuan re-cleaning dapat dilakukan dalam 1x24 jam secara gratis.',
-                  ),
-                  _TermsSection(
-                    title: '2. Kebijakan Reschedule & Pembatalan',
-                    description: 'Perubahan jadwal dan pembatalan dapat dilakukan maksimal H-1 atau 24 jam sebelum waktu pengerjaan. Setelah batas tersebut, hubungi WhatsApp CS CleanGo untuk bantuan.',
-                  ),
-                  _TermsSection(
-                    title: '3. Perlindungan & Asuransi Barang',
-                    description: 'Seluruh staf cleaner telah melalui uji integritas dan verifikasi identitas resmi. CleanGo menanggung penggantian kerugian hingga Rp 5.000.000 untuk kerusakan yang terbukti akibat kelalaian staf.',
-                  ),
-                  _TermsSection(
-                    title: '4. Privasi & Keamanan Data',
-                    description: 'Data identitas, nomor kontak, serta alamat rumah pelanggan dilindungi dengan enkripsi ketat dan hanya digunakan untuk keperluan layanan pembersihan CleanGo.',
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   void _showHelpInfoModal() {
@@ -107,7 +82,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   @override
   Widget build(BuildContext context) {
     final supportController = context.watch<SupportController>();
-    final faqs = supportController.filteredFaqs;
+    final faqs = supportController.allFaqs;
     final totalTopics = supportController.totalTopicsCount;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -131,8 +106,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
                       children: [
-                        // Search Bar
-                        _buildSearchBar(supportController),
+                        _buildQuestionBar(),
                         const SizedBox(height: 20),
                         // Section 1: Kontak Customer Service
                         _buildSectionTitle('KONTAK CUSTOMER SERVICE'),
@@ -143,7 +117,12 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildSectionTitle('PERTANYAAN POPULER (FAQ)'),
+                            Expanded(
+                              child: _buildSectionTitle(
+                                'PERTANYAAN POPULER (FAQ)',
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             _buildTopicBadge(totalTopics),
                           ],
                         ),
@@ -153,7 +132,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                         // Section 3: Bantuan Lainnya
                         _buildSectionTitle('BANTUAN LAINNYA'),
                         const SizedBox(height: 10),
-                        _buildOtherHelpCard(),
+                        _buildOtherHelpCard(supportController),
                       ],
                     ),
                   ),
@@ -236,7 +215,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     );
   }
 
-  Widget _buildSearchBar(SupportController controller) {
+  Widget _buildQuestionBar() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -251,8 +230,11 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
         ],
       ),
       child: TextField(
-        controller: _searchController,
-        onChanged: (value) => controller.search(value),
+        key: const ValueKey('help-question-input'),
+        controller: _questionController,
+        onChanged: (_) => setState(() {}),
+        textInputAction: TextInputAction.send,
+        onSubmitted: (_) => _askBoo(),
         style: const TextStyle(
           color: Color(0xFF1E293B),
           fontFamily: AppTheme.fontFamily,
@@ -260,30 +242,22 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
-          hintText: 'Cari topik bantuan atau kendala...',
+          hintText: 'Tanyakan ke Boo tentang CleanGo...',
           hintStyle: const TextStyle(
             color: Color(0xFF94A3B8),
             fontFamily: AppTheme.fontFamily,
             fontSize: 14,
           ),
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: Color(0xFF94A3B8),
-            size: 22,
+          prefixIcon: const Padding(
+            padding: EdgeInsets.all(12),
+            child: ChatbotIcon(size: 28),
           ),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: Color(0xFF94A3B8),
-                    size: 18,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    controller.resetSearch();
-                  },
-                )
-              : null,
+          suffixIcon: IconButton(
+            tooltip: 'Tanya Boo',
+            onPressed: _questionController.text.trim().isEmpty ? null : _askBoo,
+            icon: const Icon(Icons.send_rounded),
+            color: AppColors.primary,
+          ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -376,6 +350,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    bool? expanded,
   }) {
     return InkWell(
       onTap: onTap,
@@ -424,9 +399,13 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                 ],
               ),
             ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF94A3B8),
+            Icon(
+              expanded == null
+                  ? Icons.chevron_right_rounded
+                  : expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              color: const Color(0xFF94A3B8),
               size: 20,
             ),
           ],
@@ -439,60 +418,6 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     SupportController controller,
     List<FaqItemModel> faqs,
   ) {
-    if (faqs.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-        ),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.search_off_rounded,
-              size: 40,
-              color: Color(0xFF94A3B8),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'Topik bantuan tidak ditemukan',
-              style: TextStyle(
-                color: Color(0xFF0F172A),
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Coba kata kunci lain atau hubungi Customer Service kami.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Color(0xFF64748B),
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 12.5,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () {
-                _searchController.clear();
-                controller.resetSearch();
-              },
-              child: const Text(
-                'Reset Pencarian',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -522,6 +447,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
 
   Widget _buildFaqItem(SupportController controller, FaqItemModel faq) {
     return InkWell(
+      key: ValueKey(faq.id),
       onTap: () => controller.toggleExpand(faq.id),
       borderRadius: BorderRadius.circular(16),
       child: Padding(
@@ -577,6 +503,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                   children: [
                     Text(
                       faq.answer,
+                      textAlign: TextAlign.justify,
                       style: const TextStyle(
                         color: Color(0xFF475569),
                         fontFamily: AppTheme.fontFamily,
@@ -620,7 +547,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     );
   }
 
-  Widget _buildOtherHelpCard() {
+  Widget _buildOtherHelpCard(SupportController controller) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -634,11 +561,42 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
           ),
         ],
       ),
-      child: _buildActionTile(
-        icon: Icons.description_outlined,
-        title: 'Syarat & Ketentuan Layanan',
-        subtitle: 'Kebijakan garansi, privasi, dan ganti rugi',
-        onTap: _showTermsModal,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildActionTile(
+            icon: Icons.description_outlined,
+            title: 'Syarat & Ketentuan Layanan',
+            subtitle: 'Kebijakan garansi, privasi, dan ganti rugi',
+            expanded: controller.termsExpanded,
+            onTap: controller.toggleTerms,
+          ),
+          if (controller.termsExpanded)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TermsSection(
+                    title: '1. Jaminan Garansi 100%',
+                    description: 'CleanGo menjamin kepuasan pelanggan melalui inspeksi pengerjaan. Jika pelanggan mendapati area yang kurang bersih, pengajuan re-cleaning dapat dilakukan dalam 1x24 jam secara gratis.',
+                  ),
+                  _TermsSection(
+                    title: '2. Kebijakan Reschedule & Pembatalan',
+                    description: 'Perubahan jadwal dan pembatalan dapat dilakukan maksimal H-1 atau 24 jam sebelum waktu pengerjaan. Setelah batas tersebut, hubungi WhatsApp CS CleanGo untuk bantuan.',
+                  ),
+                  _TermsSection(
+                    title: '3. Perlindungan & Asuransi Barang',
+                    description: 'Seluruh staf cleaner telah melalui uji integritas dan verifikasi identitas resmi. CleanGo menanggung penggantian kerugian hingga Rp 5.000.000 untuk kerusakan yang terbukti akibat kelalaian staf.',
+                  ),
+                  _TermsSection(
+                    title: '4. Privasi & Keamanan Data',
+                    description: 'Data identitas, nomor kontak, serta alamat rumah pelanggan dilindungi dengan enkripsi ketat dan hanya digunakan untuk keperluan layanan pembersihan CleanGo.',
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -669,6 +627,7 @@ class _TermsSection extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             description,
+            textAlign: TextAlign.justify,
             style: const TextStyle(
               color: Color(0xFF475569),
               fontFamily: AppTheme.fontFamily,

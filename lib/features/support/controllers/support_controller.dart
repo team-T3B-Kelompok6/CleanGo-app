@@ -15,7 +15,6 @@ class SupportController extends ChangeNotifier {
   final TokenStorage? _tokenStorage;
   final CustomerFaqService _service;
   late List<FaqItemModel> _faqs;
-  String _searchQuery = '';
   String? _error;
   bool _loading = false;
 
@@ -38,31 +37,14 @@ class SupportController extends ChangeNotifier {
       notifyListeners();
     }
   }
+  bool _termsExpanded = false;
 
   List<FaqItemModel> get allFaqs => List.unmodifiable(_faqs);
-  String get searchQuery => _searchQuery;
   int get totalTopicsCount => _faqs.length;
+  bool get termsExpanded => _termsExpanded;
 
-  List<FaqItemModel> get filteredFaqs {
-    final query = _searchQuery.trim().toLowerCase();
-    if (query.isEmpty) {
-      return List.unmodifiable(_faqs);
-    }
-
-    return _faqs.where((faq) {
-      final matchQuestion = faq.question.toLowerCase().contains(query);
-      final matchAnswer = faq.answer.toLowerCase().contains(query);
-      final matchHighlight =
-          faq.highlight?.toLowerCase().contains(query) ?? false;
-      return matchQuestion || matchAnswer || matchHighlight;
-    }).toList();
-  }
-
-  bool get hasSearchResults => filteredFaqs.isNotEmpty;
-
-  void search(String query) {
-    if (_searchQuery == query) return;
-    _searchQuery = query;
+  void toggleTerms() {
+    _termsExpanded = !_termsExpanded;
     notifyListeners();
   }
 
@@ -81,13 +63,6 @@ class SupportController extends ChangeNotifier {
 
     if (_faqs[index].isExpanded != isExpanded) {
       _faqs[index] = _faqs[index].copyWith(isExpanded: isExpanded);
-      notifyListeners();
-    }
-  }
-
-  void resetSearch() {
-    if (_searchQuery.isNotEmpty) {
-      _searchQuery = '';
       notifyListeners();
     }
   }

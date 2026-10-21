@@ -6,6 +6,7 @@ import 'package:cleango_app/features/booking/pages/booking_page.dart';
 import 'package:cleango_app/features/checkout/pages/checkout_page.dart';
 import 'package:cleango_app/features/home/pages/home_page.dart';
 import 'package:cleango_app/features/message/pages/messages_page.dart';
+import 'package:cleango_app/features/message/controllers/message_controller.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/pages/orders_page.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
@@ -31,6 +32,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => SupportController()),
         ChangeNotifierProvider(create: (_) => HomeController()),
         ChangeNotifierProvider(create: (_) => OrderController()),
+        ChangeNotifierProvider(create: (_) => MessageController()),
       ],
       child: MaterialApp(
         theme: AppTheme.light,
@@ -88,7 +90,7 @@ void main() {
 
   for (final destination in <(String, Type)>[
     ('Pesanan', OrdersPage),
-    ('Pesan', MessagesPage),
+    ('Notifikasi', MessagesPage),
     ('Akun', ProfilePage),
   ]) {
     testWidgets('opens ${destination.$1} from Home bottom navigation', (

@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/constants/app_routes.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
+import '../../profile/controllers/profile_controller.dart';
+import '../controllers/auth_session_controller.dart';
+import '../data/api_auth_service.dart';
 import '../data/dummy_auth_service.dart';
+import '../data/google_sign_in_service.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  const RegisterPage({super.key, this.authService});
+
+  final ApiAuthService? authService;
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -21,10 +30,14 @@ class _RegisterPageState extends State<RegisterPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmationController = TextEditingController();
+  late final ApiAuthService _authService = widget.authService ?? ApiAuthService();
+  final _googleSignInService = GoogleSignInService();
 
   bool _obscurePassword = true;
   bool _obscureConfirmation = true;
   bool _hasSubmitted = false;
+  bool _isLoading = false;
+  String? _serverError;
 
   @override
   void dispose() {
@@ -96,6 +109,25 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                       const SizedBox(height: 28),
+                      if (_serverError != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Text(
+                            _serverError!,
+                            style: TextStyle(
+                              color: Colors.red.shade800,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                       AuthTextField(
                         label: 'Nama Lengkap',
                         hintText: 'Masukkan nama lengkap Anda',
@@ -170,7 +202,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       SizedBox(
                         height: 52,
                         child: FilledButton(
-                          onPressed: _submit,
+                          onPressed: _isLoading ? null : _submit,
                           style: FilledButton.styleFrom(
                             backgroundColor: AppColors.primaryAction,
                             foregroundColor: Colors.white,
@@ -178,13 +210,21 @@ class _RegisterPageState extends State<RegisterPage> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                           ),
-                          child: const Text(
-                            'Daftar',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                          child: _isLoading
+                              ? const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Daftar',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 22),
@@ -218,7 +258,9 @@ class _RegisterPageState extends State<RegisterPage> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      const AuthSocialButtons(),
+                      AuthSocialButtons(
+                        onGoogleTap: _handleGoogleRegister,
+                      ),
                     ],
                   ),
                 ),
@@ -230,11 +272,48 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  void _submit() {
+  Future<void> _handleGoogleRegister() async {
+    setState(() {
+      _isLoading = true;
+      _serverError = null;
+    });
+
+    try {
+      final googleUser = await _googleSignInService.signIn();
+      if (googleUser == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final result = await _authService.socialLogin(
+        provider: 'google',
+        email: googleUser.email,
+        name: googleUser.name,
+        idToken: googleUser.idToken,
+      );
+      if (!mounted) return;
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _serverError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _serverError = 'Gagal daftar dengan Google: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!_hasSubmitted) {
       setState(() => _hasSubmitted = true);
     }
+    setState(() => _serverError = null);
+
     if (!(_formKey.currentState?.validate() ?? false)) {
       AppNotice.show(
         context,
@@ -244,7 +323,29 @@ class _RegisterPageState extends State<RegisterPage> {
       return;
     }
 
-    Navigator.of(context).pop(true);
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await _authService.register(
+        name: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _serverError = e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _serverError = 'Gagal terhubung ke server.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 }
 

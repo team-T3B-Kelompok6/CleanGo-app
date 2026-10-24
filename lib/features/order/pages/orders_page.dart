@@ -43,6 +43,9 @@ class _OrdersPageState extends State<OrdersPage> {
   void initState() {
     super.initState();
     _selectedTab = widget.initialTab;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<OrderController>().loadFromApi();
+    });
   }
 
   @override
@@ -151,7 +154,10 @@ class _OrdersPageState extends State<OrdersPage> {
 
   void _handleNavigation(BuildContext context, int index) {
     if (index == 0) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.home,
+        (route) => false,
+      );
     } else if (index == 1) {
       Navigator.pushReplacementNamed(context, AppRoutes.services);
     } else if (index == 3) {

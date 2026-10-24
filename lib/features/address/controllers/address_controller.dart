@@ -2,20 +2,30 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/storage/token_storage.dart';
 import '../data/address_repository.dart';
+import '../data/customer_address_service.dart';
 import '../domain/models/address_model.dart';
 
 class AddressController extends ChangeNotifier {
   static const int maxAddresses = 5;
 
-  AddressController({this.repository, List<AddressModel>? initialAddresses}) {
+  AddressController({
+    this.repository,
+    List<AddressModel>? initialAddresses,
+    TokenStorage? tokenStorage,
+    CustomerAddressService? remote,
+  })  : tokenStorage = tokenStorage,
+        _remote = remote ?? CustomerAddressService() {
     final seed = initialAddresses == null || initialAddresses.isEmpty
         ? defaultAddresses
         : initialAddresses;
     _addresses = seed.map(_withDefaultCoordinates).toList();
-    _selectedAddressId = _addresses
-        .firstWhere((a) => a.isPrimary, orElse: () => _addresses.first)
-        .id;
+    _selectedAddressId = _addresses.isEmpty
+        ? ''
+        : _addresses
+            .firstWhere((a) => a.isPrimary, orElse: () => _addresses.first)
+            .id;
     _subscription = repository?.watchAddresses().listen(_applySnapshot);
   }
 
@@ -47,7 +57,46 @@ class AddressController extends ChangeNotifier {
   late List<AddressModel> _addresses;
   late String _selectedAddressId;
   final AddressRepository? repository;
+  final TokenStorage? tokenStorage;
+  final CustomerAddressService _remote;
   StreamSubscription<AddressSnapshot>? _subscription;
+  String? _error;
+  String? get error => _error;
+  Future<bool> _usingRemote() async { final t = await tokenStorage?.readAccessToken(); return t != null && t.isNotEmpty; }
+
+  Future<void> loadFromApi() async {
+    final token = await tokenStorage?.readAccessToken();
+    if (token == null || token.isEmpty) return;
+    try { _addresses = await _remote.fetchAddresses(token); if (_addresses.isNotEmpty) _selectedAddressId = _addresses.firstWhere((a) => a.isPrimary, orElse: () => _addresses.first).id; _error = null; notifyListeners(); } catch (e) { _error = e.toString(); }
+  }
+
+  Future<AddressModel?> createRemote(AddressModel address) async {
+    if (!await _usingRemote()) return addAddress(address) ? address : null;
+    try {
+      final created = await _remote.createAddress(
+        (await tokenStorage!.readAccessToken())!,
+        address.toApiPayload(),
+      );
+      if (!_addresses.any((a) => a.id == created.id)) addAddress(created);
+      _error = null;
+      notifyListeners();
+      return created;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return null;
+    }
+  }
+
+  Future<bool> updateRemote(AddressModel address) async {
+    if (!await _usingRemote()) { updateAddress(address); return true; }
+    try { final updated = await _remote.updateAddress((await tokenStorage!.readAccessToken())!, address.id, address.toApiPayload()); updateAddress(updated); _error = null; return true; } catch (e) { _error = e.toString(); notifyListeners(); return false; }
+  }
+
+  Future<bool> deleteRemote(String id) async {
+    if (!await _usingRemote()) { deleteAddress(id); return true; }
+    try { await _remote.deleteAddress((await tokenStorage!.readAccessToken())!, id); deleteAddress(id); _error = null; return true; } catch (e) { _error = e.toString(); notifyListeners(); return false; }
+  }
 
   List<AddressModel> get addresses => List.unmodifiable(_addresses);
   bool get canAddAddress => _addresses.length < maxAddresses;

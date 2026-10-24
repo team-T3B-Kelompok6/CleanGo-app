@@ -73,7 +73,21 @@ class _EditAddressPageState extends State<EditAddressPage> {
     final updated = _addressForm.updateAddress(widget.address);
 
     final addressController = context.read<AddressController>();
-    addressController.updateAddress(updated);
+    if (!await addressController.updateRemote(updated)) {
+      if (!mounted) return;
+      setState(() => _addressForm.setSaving(false));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            addressController.error ?? 'Gagal memperbarui alamat.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
 
     final booking = context.read<BookingController>();
     if (booking.addressId == updated.id ||
@@ -113,13 +127,29 @@ class _EditAddressPageState extends State<EditAddressPage> {
     DeleteAddressDialog.show(
       context,
       addressLabel: widget.address.title,
-      onConfirm: () {
-        context.read<AddressController>().deleteAddress(widget.address.id);
-        AppNotice.show(
-          context,
-          'Alamat "${widget.address.title}" berhasil dihapus.',
+      onConfirm: () async {
+        final addressController = context.read<AddressController>();
+        final removed = await addressController.deleteRemote(
+          widget.address.id,
         );
-        Navigator.of(context).pop();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          removed
+              ? SnackBar(
+                  content: Text(
+                    'Alamat "${widget.address.title}" berhasil dihapus.',
+                  ),
+                  backgroundColor: AppColors.slate900,
+                  behavior: SnackBarBehavior.floating,
+                )
+              : SnackBar(
+                  content: Text(
+                    addressController.error ?? 'Gagal menghapus alamat.',
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                ),
+        );
+        if (removed) Navigator.of(context).pop();
       },
     );
   }

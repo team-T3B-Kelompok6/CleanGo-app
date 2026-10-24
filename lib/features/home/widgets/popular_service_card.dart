@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/popular_service_model.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
 
 class PopularServiceCard extends StatelessWidget {
   const PopularServiceCard({
@@ -59,9 +60,8 @@ class PopularServiceCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           child: ColoredBox(
                             color: AppColors.primaryContainer,
-                            child: Image.asset(
-                              service.imagePath,
-                              fit: BoxFit.cover,
+                            child: RemoteOrAssetImage(
+                              source: service.imagePath,
                             ),
                           ),
                         ),

@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/token_storage.dart';
 import '../models/chat_message.dart';
@@ -23,15 +24,15 @@ class ChatbotRepository implements ChatbotGateway {
     final serverToken = token != null && token.split('.').length == 3;
     final context = history.where((entry) => !entry.failed).toList();
     final response = await _client.post(
-      '/customer/chat',
-      {
+      ApiConfig.customerChat,
+      body: {
         'message': message,
         'history': context
             .skip(context.length > 8 ? context.length - 8 : 0)
             .map((entry) => entry.toJson())
             .toList(),
       },
-      headers: {if (serverToken) 'Authorization': 'Bearer $token'},
+      token: serverToken ? token : null,
       timeout: const Duration(seconds: 25),
     );
     final data = response['data'];
@@ -39,7 +40,7 @@ class ChatbotRepository implements ChatbotGateway {
         data['answer'] is! String ||
         (data['answer'] as String).length > 2500 ||
         (data['answer'] as String).trim().isEmpty) {
-      throw const ApiException(
+      throw const ApiException.simple(
         'Jawaban Boo belum tersedia. Silakan coba lagi.',
       );
     }

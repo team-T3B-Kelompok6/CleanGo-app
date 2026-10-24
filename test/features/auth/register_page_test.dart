@@ -1,23 +1,52 @@
+import 'package:cleango_app/core/storage/token_storage.dart';
 import 'package:cleango_app/core/theme/app_theme.dart';
+import 'package:cleango_app/features/auth/controllers/auth_session_controller.dart';
+import 'package:cleango_app/features/auth/data/api_auth_service.dart';
 import 'package:cleango_app/features/auth/pages/register_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+
+class _StubAuthService extends ApiAuthService {
+  @override
+  Future<AuthResult> register({
+    required String name,
+    required String phone,
+    required String password,
+    String? email,
+  }) async {
+    return AuthResult(
+      token: 'test-token',
+      user: User(id: 1, name: name, email: email ?? '', role: 'customer'),
+    );
+  }
+}
 
 void main() {
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues({});
+  });
+
   Widget buildRegister() {
     return MaterialApp(theme: AppTheme.light, home: const RegisterPage());
   }
 
   Widget buildRegisterFlow() {
-    return MaterialApp(
-      theme: AppTheme.light,
-      home: Builder(
-        builder: (context) => Scaffold(
-          body: FilledButton(
-            onPressed: () => Navigator.of(context).push<void>(
-              MaterialPageRoute(builder: (_) => const RegisterPage()),
+    return ChangeNotifierProvider(
+      create: (_) => AuthSessionController(SecureTokenStorage()),
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: FilledButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                MaterialPageRoute(
+                  builder: (_) => RegisterPage(authService: _StubAuthService()),
+                ),
+              ),
+              child: const Text('Buka Register'),
             ),
-            child: const Text('Buka Register'),
           ),
         ),
       ),
@@ -82,7 +111,8 @@ void main() {
     await tester.enterText(fields.at(2), 'CleanGo123');
     await tester.enterText(fields.at(3), 'CleanGo123');
     await tester.tap(find.widgetWithText(FilledButton, 'Daftar'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.byType(RegisterPage), findsNothing);
     expect(find.text('Buka Register'), findsOneWidget);

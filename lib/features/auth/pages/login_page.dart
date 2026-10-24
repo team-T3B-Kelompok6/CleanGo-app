@@ -3,16 +3,23 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../controllers/auth_session_controller.dart';
+import '../data/api_auth_service.dart';
 import '../data/dummy_auth_service.dart';
+import '../data/google_sign_in_service.dart';
 import 'register_page.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
+import '../../profile/controllers/profile_controller.dart';
+import '../../address/controllers/address_controller.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.authService});
+
+  final ApiAuthService? authService;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -21,12 +28,14 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authService = const DummyAuthService();
+  late final ApiAuthService _authService = widget.authService ?? ApiAuthService();
+  final _googleSignInService = GoogleSignInService();
 
   bool _obscurePassword = true;
-  bool _isSubmitting = false;
+  bool _isLoading = false;
   String? _phoneCredentialError;
   String? _passwordCredentialError;
+  String? _generalError;
 
   @override
   void dispose() {
@@ -89,6 +98,25 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           const SizedBox(height: 34),
+                          if (_generalError != null) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.red.shade200),
+                              ),
+                              child: Text(
+                                _generalError!,
+                                style: TextStyle(
+                                  color: Colors.red.shade800,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           AuthTextField(
                             label: 'Nomor telepon',
                             hintText: 'Masukkan nomor telepon Anda',
@@ -129,7 +157,7 @@ class _LoginPageState extends State<LoginPage> {
                           SizedBox(
                             height: 52,
                             child: FilledButton(
-                              onPressed: _isSubmitting ? null : _submit,
+                              onPressed: _isLoading ? null : _submit,
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppColors.primaryAction,
                                 foregroundColor: Colors.white,
@@ -137,13 +165,21 @@ class _LoginPageState extends State<LoginPage> {
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                               ),
-                              child: const Text(
-                                'Login',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+                              child: _isLoading
+                                  ? const SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Login',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                             ),
                           ),
                           const SizedBox(height: 22),
@@ -200,7 +236,9 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          const AuthSocialButtons(),
+                          AuthSocialButtons(
+                            onGoogleTap: _handleGoogleLogin,
+                          ),
                         ],
                       ),
                     ),
@@ -214,57 +252,119 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  Future<void> _handleGoogleLogin() async {
+    setState(() {
+      _isLoading = true;
+      _generalError = null;
+    });
+
+    try {
+      final googleUser = await _googleSignInService.signIn();
+      if (googleUser == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final result = await _authService.socialLogin(
+        provider: 'google',
+        email: googleUser.email,
+        name: googleUser.name,
+        idToken: googleUser.idToken,
+      );
+
+      if (!mounted) return;
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) await context.read<AddressController>().loadFromApi();
+      } catch (_) {}
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _generalError = e.message);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _generalError = 'Gagal masuk dengan Google: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   void _clearPhoneError() {
-    if (_phoneCredentialError != null) {
-      setState(() => _phoneCredentialError = null);
+    if (_phoneCredentialError != null || _generalError != null) {
+      setState(() {
+        _phoneCredentialError = null;
+        _generalError = null;
+      });
     }
   }
 
   void _clearPasswordError() {
-    if (_passwordCredentialError != null) {
-      setState(() => _passwordCredentialError = null);
+    if (_passwordCredentialError != null || _generalError != null) {
+      setState(() {
+        _passwordCredentialError = null;
+        _generalError = null;
+      });
     }
   }
 
   Future<void> _submit() async {
-    if (_isSubmitting) return;
+    if (_isLoading) return;
     FocusScope.of(context).unfocus();
-    final result = _authService.validateLogin(
-      phone: _phoneController.text,
-      password: _passwordController.text,
+
+    final phoneError = AuthValidators.phone(_phoneController.text);
+    final passwordError = AuthValidators.requiredPassword(
+      _passwordController.text,
     );
 
     setState(() {
-      _phoneCredentialError = result.phoneError;
-      _passwordCredentialError = result.passwordError;
+      _phoneCredentialError = phoneError;
+      _passwordCredentialError = passwordError;
+      _generalError = null;
     });
 
-    if (!result.isSuccess) {
-      AppNotice.show(
-        context,
-        'Login belum berhasil. Periksa kembali nomor telepon dan kata sandi Anda.',
-        type: AppNoticeType.error,
-      );
+    if (phoneError != null || passwordError != null) {
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() => _isLoading = true);
+
     try {
-      await context.read<AuthSessionController>().createLocalSession();
+      final result = await _authService.login(
+        phone: _phoneController.text.trim(),
+        password: _passwordController.text,
+      );
+
+      if (!mounted) return;
+      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      try {
+        if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) await context.read<AddressController>().loadFromApi();
+      } catch (_) {}
+
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _generalError = e.message;
+      });
     } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _generalError = 'Gagal terhubung ke server. Pastikan server aktif.';
+      });
+    } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
-        AppNotice.show(
-          context,
-          'Sesi login belum dapat disimpan. Silakan coba lagi.',
-          type: AppNoticeType.error,
-        );
+        setState(() => _isLoading = false);
       }
-      return;
     }
-    if (!mounted) return;
-    AppNotice.show(context, 'Berhasil masuk ke CleanGo.');
-    Navigator.of(context).pushReplacementNamed(AppRoutes.home);
   }
 
   Future<void> _openRegister() async {

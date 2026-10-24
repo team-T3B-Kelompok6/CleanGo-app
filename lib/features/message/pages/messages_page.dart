@@ -26,6 +26,9 @@ class _MessagesPageState extends State<MessagesPage> {
   void initState() {
     super.initState();
     _controller = context.read<MessageController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.loadFromApi();
+    });
   }
 
   @override
@@ -125,7 +128,10 @@ class _MessagesPageState extends State<MessagesPage> {
 
   void _handleNavigation(BuildContext context, int index) {
     if (index == 0) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.home,
+        (route) => false,
+      );
     } else if (index == 1) {
       Navigator.pushReplacementNamed(context, AppRoutes.services);
     } else if (index == 2) {

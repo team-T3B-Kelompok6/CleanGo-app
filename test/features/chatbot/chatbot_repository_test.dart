@@ -138,7 +138,7 @@ void main() {
       final repository = ChatbotRepository(
         tokens: FakeTokens(token),
         client: ApiClient(
-          baseUrl: 'http://localhost:3001/api',
+          baseUrl: 'http://localhost:3001',
           client: MockClient((request) async {
             expect(request.url.path, '/api/customer/chat');
             expect(
@@ -169,7 +169,7 @@ void main() {
     final repository = ChatbotRepository(
       tokens: FakeTokens(null),
       client: ApiClient(
-        baseUrl: 'http://localhost:3001/api',
+        baseUrl: 'http://localhost:3001',
         client: MockClient((_) async => http.Response('{"data":{}}', 200)),
       ),
     );

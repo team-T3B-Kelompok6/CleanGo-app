@@ -1,15 +1,37 @@
 import 'package:flutter/foundation.dart';
 
+import '../data/customer_notification_api.dart';
 import '../data/message_data.dart';
 import '../domain/models/message_notification_model.dart';
 
 enum MessageTab { all, orders, promo }
 
 class MessageController extends ChangeNotifier {
-  MessageController({List<MessageNotificationModel>? initialMessages})
-    : _messages = List<MessageNotificationModel>.from(
-        initialMessages ?? MessageData.notifications,
-      );
+  MessageController({
+    List<MessageNotificationModel>? initialMessages,
+    CustomerNotificationApi? notificationApi,
+  })  : _notificationApi = notificationApi,
+        _messages = List<MessageNotificationModel>.from(
+          initialMessages ?? MessageData.notifications,
+        );
+
+  final CustomerNotificationApi? _notificationApi;
+
+  /// Loads the inbox from the backend; keeps the demo list on failure/empty.
+  Future<void> loadFromApi() async {
+    final api = _notificationApi;
+    if (api == null) return;
+    try {
+      final rows = await api.fetchNotifications();
+      if (rows.isEmpty) return;
+      _messages
+        ..clear()
+        ..addAll(rows.map(MessageNotificationModel.fromApiJson));
+      notifyListeners();
+    } catch (_) {
+      // offline / no session: keep the bundled demo notifications
+    }
+  }
 
   MessageTab _selectedTab = MessageTab.all;
   final List<MessageNotificationModel> _messages;
@@ -43,5 +65,10 @@ class MessageController extends ChangeNotifier {
 
     _messages[index] = _messages[index].copyWith(isUnread: false);
     notifyListeners();
+    final api = _notificationApi;
+    if (api != null) {
+      // Fire and forget: the local state is already updated.
+      api.markRead(id).catchError((_) {});
+    }
   }
 }

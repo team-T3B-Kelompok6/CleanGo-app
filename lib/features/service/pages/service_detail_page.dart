@@ -12,6 +12,7 @@ import '../domain/models/service_model.dart';
 import '../controllers/service_controller.dart';
 import '../widgets/review_card.dart';
 import 'all_reviews_page.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
 
 class ServiceDetailPage extends StatelessWidget {
   const ServiceDetailPage({super.key});
@@ -119,7 +120,7 @@ class _Hero extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (imagePath != null)
-                Image.asset(imagePath, fit: BoxFit.cover)
+                RemoteOrAssetImage(source: imagePath)
               else
                 const ColoredBox(color: AppColors.slate200),
               const DecoratedBox(

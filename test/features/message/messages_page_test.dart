@@ -1,3 +1,4 @@
+import 'package:cleango_app/core/constants/app_routes.dart';
 import 'package:cleango_app/core/theme/app_theme.dart';
 import 'package:cleango_app/features/message/controllers/message_controller.dart';
 import 'package:cleango_app/features/message/domain/models/message_notification_model.dart';
@@ -83,25 +84,27 @@ void main() {
         initialMessages: [_messages().first],
       );
       addTearDown(controller.dispose);
+      // The app registers AppRoutes.home; mirror it so the Beranda button in the
+      // bottom navigation resolves (it replaces the stack with Home).
+      Widget openNotifications() => Builder(
+        builder: (context) => Scaffold(
+          body: Center(
+            child: FilledButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const MessagesPage()),
+              ),
+              child: const Text('Buka Notifikasi'),
+            ),
+          ),
+        ),
+      );
       await tester.pumpWidget(
         ChangeNotifierProvider.value(
           value: controller,
           child: MaterialApp(
             theme: AppTheme.light,
-            home: Builder(
-              builder: (context) => Scaffold(
-                body: Center(
-                  child: FilledButton(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => const MessagesPage(),
-                      ),
-                    ),
-                    child: const Text('Buka Notifikasi'),
-                  ),
-                ),
-              ),
-            ),
+            home: openNotifications(),
+            routes: {AppRoutes.home: (_) => openNotifications()},
           ),
         ),
       );

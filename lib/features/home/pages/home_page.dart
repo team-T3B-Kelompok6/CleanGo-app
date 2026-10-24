@@ -14,7 +14,10 @@ import '../../chatbot/pages/chatbot_page.dart';
 import '../data/home_data.dart';
 import '../domain/models/popular_service_model.dart';
 import '../domain/models/service_category_model.dart';
+import '../../profile/controllers/profile_controller.dart';
 import '../../service/controllers/service_controller.dart';
+import '../controllers/home_controller.dart';
+import '../data/home_catalog.dart';
 import '../../service/pages/service_detail_page.dart';
 import '../widgets/popular_service_card.dart';
 import '../widgets/service_category_item.dart';
@@ -24,6 +27,23 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) context.read<HomeController>().loadFromApi();
+    });
+    final services = context.watch<ServiceController>().allServices;
+    final derivedCategories = HomeCatalog.categories(services);
+    final derivedPopular = HomeCatalog.popularServices(services);
+    // The backend ranks categories by bookings; fall back to the catalogue when
+    // it is unavailable. At most 8 are shown.
+    final rankedCategories = HomeCatalog.fromPopularCategories(
+      context.watch<HomeController>().popularCategories,
+      services,
+    );
+    final catalogCategories = rankedCategories.isNotEmpty
+        ? rankedCategories
+        : (derivedCategories.isEmpty ? HomeData.categories : derivedCategories);
+    final catalogPopular =
+        derivedPopular.isEmpty ? HomeData.popularServices : derivedPopular;
     final mediaQuery = MediaQuery.of(context);
     final double screenWidth = mediaQuery.size.width;
     final double cardWidth = math.min(256, math.max(224, screenWidth * 0.70));
@@ -58,7 +78,7 @@ class HomePage extends StatelessWidget {
                       const SliverToBoxAdapter(child: _HomeIntroSection()),
                       SliverToBoxAdapter(
                         child: _ServiceCategoriesSection(
-                          categories: HomeData.categories,
+                          categories: catalogCategories,
                           onViewAll: () => _openServices(context),
                           onServiceSelected: (serviceId) =>
                               _openServiceDetail(context, serviceId),
@@ -66,7 +86,7 @@ class HomePage extends StatelessWidget {
                       ),
                       SliverToBoxAdapter(
                         child: _PopularServicesSection(
-                          services: HomeData.popularServices,
+                          services: catalogPopular,
                           cardWidth: cardWidth,
                           onViewAll: () => _openServices(context),
                           onServiceSelected: (serviceId) =>
@@ -141,8 +161,8 @@ class _HomeIntroSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
+    return DecoratedBox(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
@@ -158,7 +178,9 @@ class _HomeIntroSection extends StatelessWidget {
       child: Column(
         children: [
           _HomeHeader(),
-          _PromoSection(bannerPaths: HomeData.promoBanners),
+          _PromoSection(
+            bannerPaths: context.watch<HomeController>().banners,
+          ),
         ],
       ),
     );
@@ -234,6 +256,8 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final profile = context.watch<ProfileController>().profile;
+    final greetingName = profile.fullName.isNotEmpty ? profile.fullName : 'Pengguna';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
@@ -264,7 +288,7 @@ class _HomeHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -273,7 +297,7 @@ class _HomeHeader extends StatelessWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              'Halo, Krisna',
+                              'Halo, $greetingName',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -439,10 +463,7 @@ class _PromoSectionState extends State<_PromoSection> {
                 return Semantics(
                   image: true,
                   label: 'Promo ${index + 1} dari ${widget.bannerPaths.length}',
-                  child: Image.asset(
-                    widget.bannerPaths[index],
-                    fit: BoxFit.contain,
-                  ),
+                  child: _BannerImage(source: widget.bannerPaths[index]),
                 );
               },
             ),
@@ -466,6 +487,24 @@ class _PromoSectionState extends State<_PromoSection> {
         ],
       ),
     );
+  }
+}
+
+class _BannerImage extends StatelessWidget {
+  const _BannerImage({required this.source});
+
+  final String source;
+
+  @override
+  Widget build(BuildContext context) {
+    if (source.startsWith('http')) {
+      return Image.network(
+        source,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      );
+    }
+    return Image.asset(source, fit: BoxFit.contain);
   }
 }
 

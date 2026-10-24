@@ -22,6 +22,14 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   final TextEditingController _questionController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<SupportController>().loadFromApi();
+    });
+  }
+
+  @override
   void dispose() {
     _questionController.dispose();
     super.dispose();
@@ -118,6 +126,13 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
                             _buildTopicBadge(totalTopics),
                           ],
                         ),
+                        const SizedBox(height: 10),
+                        _buildFaqCard(
+                          supportController,
+                          supportController.popularFaqs,
+                        ),
+                        const SizedBox(height: 24),
+                        _buildSectionTitle('SEMUA PERTANYAAN'),
                         const SizedBox(height: 10),
                         _buildFaqSection(supportController, faqs),
                         const SizedBox(height: 24),
@@ -406,10 +421,14 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     );
   }
 
-  Widget _buildFaqSection(
+  /// White card holding a list of questions.
+  Widget _buildFaqCard(
     SupportController controller,
     List<FaqItemModel> faqs,
   ) {
+    if (faqs.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -429,11 +448,63 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
         itemCount: faqs.length,
         separatorBuilder: (_, _) =>
             const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
-        itemBuilder: (context, index) {
-          final faq = faqs[index];
-          return _buildFaqItem(controller, faq);
-        },
+        itemBuilder: (context, index) => _buildFaqItem(controller, faqs[index]),
       ),
+    );
+  }
+
+  /// Every question, grouped per category.
+  Widget _buildFaqSection(
+    SupportController controller,
+    List<FaqItemModel> faqs,
+  ) {
+    final groups = controller.groupByCategory(faqs);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final entry in groups.entries) ...[
+          _buildCategoryLabel(entry.key, entry.value.length),
+          const SizedBox(height: 8),
+          _buildFaqCard(controller, entry.value),
+          const SizedBox(height: 14),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCategoryLabel(String category, int count) {
+    return Row(
+      children: [
+        const Icon(
+          Icons.folder_outlined,
+          size: 15,
+          color: AppColors.primaryAction,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            category,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.primaryAction,
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        Text(
+          '$count',
+          style: const TextStyle(
+            color: AppColors.slate500,
+            fontFamily: AppTheme.fontFamily,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 

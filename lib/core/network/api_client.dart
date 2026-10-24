@@ -2,46 +2,124 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'api_endpoints.dart';
+import 'api_config.dart';
 import 'api_exception.dart';
 
 class ApiClient {
+  final http.Client _client;
+
   ApiClient({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiEndpoints.baseUrl;
+      _baseUrl = baseUrl;
 
-  final http.Client _client;
-  final String _baseUrl;
+  final String? _baseUrl;
+
+  String get _root => ApiConfig.normalizeBaseUrl(_baseUrl ?? ApiConfig.baseUrl);
 
   Future<Map<String, dynamic>> post(
-    String path,
-    Map<String, dynamic> body, {
-    Map<String, String> headers = const {},
-    Duration timeout = const Duration(seconds: 15),
+    String path, {
+    Map<String, dynamic>? body,
+    String? token,
+    Map<String, String>? headers,
+    Duration? timeout,
   }) async {
-    final response = await _client
-        .post(
-          Uri.parse('${_baseUrl.replaceAll(RegExp(r'/$'), '')}$path'),
-          headers: {'Content-Type': 'application/json', ...headers},
-          body: jsonEncode(body),
-        )
-        .timeout(timeout);
-    final Object? decoded;
-    try {
-      decoded = jsonDecode(response.body);
-    } on FormatException {
-      throw const ApiException('Respons server tidak valid.');
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
+    final requestHeaders = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...?headers,
+    };
+    if (token != null && token.isNotEmpty) {
+      requestHeaders['Authorization'] = 'Bearer $token';
     }
-    if (decoded is! Map<String, dynamic>) {
-      throw const ApiException('Respons server tidak valid.');
-    }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw ApiException(
-        decoded['message']?.toString() ?? 'Permintaan gagal diproses.',
-      );
-    }
-    return decoded;
+
+    var request = _client.post(
+      uri,
+      headers: requestHeaders,
+      body: body == null ? null : jsonEncode(body),
+    );
+    if (timeout != null) request = request.timeout(timeout);
+    final response = await request;
+
+    return _handleResponse(response);
   }
 
   void close() => _client.close();
+
+  Future<Map<String, dynamic>> get(String path, {String? token}) async {
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await _client.get(uri, headers: headers);
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+    String? token,
+  }) async {
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await _client.patch(
+      uri,
+      headers: headers,
+      body: body == null ? null : jsonEncode(body),
+    );
+
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> delete(String path, {String? token}) async {
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await _client.delete(uri, headers: headers);
+    return _handleResponse(response);
+  }
+
+  Map<String, dynamic> _handleResponse(http.Response response) {
+    final body = _decodeBody(response);
+
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body ?? {};
+    }
+
+    if (body == null) {
+      throw ApiException(
+        statusCode: response.statusCode,
+        message: 'Respons server tidak valid.',
+      );
+    }
+
+    final message = body['message'] as String? ?? 'Terjadi kesalahan';
+    final code = body['code'] as String?;
+    throw ApiException(
+      statusCode: response.statusCode,
+      message: message,
+      code: code,
+    );
+  }
+
+  Map<String, dynamic>? _decodeBody(http.Response response) {
+    if (response.body.isEmpty) return null;
+    try {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
 }

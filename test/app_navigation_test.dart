@@ -15,6 +15,7 @@ import 'package:cleango_app/features/service/controllers/service_controller.dart
 import 'package:cleango_app/features/service/pages/service_detail_page.dart';
 import 'package:cleango_app/features/service/pages/service_list_page.dart';
 import 'package:cleango_app/features/service/widgets/service_card.dart';
+import 'package:cleango_app/features/home/controllers/home_controller.dart';
 import 'package:cleango_app/features/support/controllers/support_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,6 +30,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => AddressController()),
         ChangeNotifierProvider(create: (_) => ProfileController()),
         ChangeNotifierProvider(create: (_) => SupportController()),
+        ChangeNotifierProvider(create: (_) => HomeController()),
         ChangeNotifierProvider(create: (_) => OrderController()),
         ChangeNotifierProvider(create: (_) => MessageController()),
       ],

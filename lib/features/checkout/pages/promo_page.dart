@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/checkout_controller.dart';
+import '../data/customer_promo_api.dart';
 import '../domain/models/promo_model.dart';
 
 class PromoPage extends StatefulWidget {
@@ -22,12 +23,28 @@ class PromoPage extends StatefulWidget {
 }
 
 class _PromoPageState extends State<PromoPage> {
-  final _selection = CheckoutController();
+  final _selection = CheckoutController(promoApi: CustomerPromoApi());
 
   @override
   void initState() {
     super.initState();
-    _selection.applyPromo(widget.initialPromoCode ?? '');
+    // Show the current selection immediately; the backend refresh follows.
+    final code = widget.initialPromoCode ?? '';
+    if (code.isNotEmpty) _selection.applyPromo(code);
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _selection.loadPromos();
+    final code = widget.initialPromoCode ?? '';
+    if (code.isNotEmpty) {
+      // Re-validate against the freshly loaded list (handles server-only codes).
+      await _selection.applyPromoRemote(
+        code: code,
+        servicePrice: widget.servicePrice,
+      );
+    }
+    if (mounted) setState(() {});
   }
 
   @override
@@ -106,10 +123,10 @@ class _PromoPageState extends State<PromoPage> {
                     child: ListView.separated(
                       physics: const BouncingScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
-                      itemCount: CheckoutController.availablePromos.length,
+                      itemCount: _selection.promos.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 14),
                       itemBuilder: (context, index) {
-                        final promo = CheckoutController.availablePromos[index];
+                        final promo = _selection.promos[index];
                         final selected =
                             _selection.appliedPromo?.code == promo.code;
                         return _PromoOptionCard(

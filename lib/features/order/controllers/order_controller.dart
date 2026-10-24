@@ -3,13 +3,16 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../../booking/controllers/booking_controller.dart';
+import '../../booking/data/customer_booking_api.dart';
 import '../data/order_data.dart';
 import '../data/eta_repository.dart';
 import '../domain/models/order_model.dart';
 
 class OrderController extends ChangeNotifier {
-  OrderController({EtaRepository? etaRepository})
-    : _etaRepository = etaRepository ?? EtaRepository() {
+  OrderController({EtaRepository? etaRepository, CustomerBookingApi? bookingApi})
+    : _etaRepository = etaRepository ?? EtaRepository(),
+      _bookingApi = bookingApi {
     _selected = _ActiveOrderState(
       OrderData.scheduledOrder.copyWith(
         scheduledAt: DateTime.now().add(const Duration(days: 3)),
@@ -25,6 +28,7 @@ class OrderController extends ChangeNotifier {
   final Map<String, _ActiveOrderState> _orders = {};
   late List<OrderHistoryModel> _history;
   final EtaRepository _etaRepository;
+  final CustomerBookingApi? _bookingApi;
   bool _disposed = false;
   // shortcut: IDs are unique in this local session; use backend IDs on integration.
   int _nextOrderNumber = DateTime.now().millisecondsSinceEpoch % 1000000;
@@ -438,6 +442,102 @@ class OrderController extends ChangeNotifier {
 
     notifyListeners();
     return true;
+  }
+
+  /// Loads the customer's bookings from the backend and replaces the demo data.
+  /// Keeps the bundled demo orders when the request fails or returns nothing.
+  Future<void> loadFromApi() async {
+    final api = _bookingApi;
+    if (api == null) return;
+    try {
+      final bookings = await api.fetchBookings();
+      if (bookings.isEmpty) return;
+
+      final active = bookings.where((b) => !b.isFinished).toList();
+      final finished = bookings.where((b) => b.isFinished).toList();
+
+      if (active.isNotEmpty) {
+        _orders.clear();
+        for (final booking in active) {
+          final state = _ActiveOrderState(_fromBooking(booking));
+          _orders[state.order.orderNumber] = state;
+        }
+        _selected = _orders.values.last;
+        _stageUpdatedAt
+          ..clear()
+          ..[_activeStage] = DateTime.now();
+        _resetTripTracking();
+      }
+
+      if (finished.isNotEmpty) {
+        _history = finished.map(_historyFromBooking).toList(growable: false);
+      }
+      notifyListeners();
+    } catch (_) {
+      // offline / no session: keep the bundled demo orders
+    }
+  }
+
+  static OrderStatusStage _stageFor(String status) {
+    switch (status) {
+      case 'Menunggu Lokasi':
+        return OrderStatusStage.ditugaskan;
+      case 'Menuju Lokasi':
+        return OrderStatusStage.dalamPerjalanan;
+      case 'Sedang Dikerjakan':
+        return OrderStatusStage.sedangDikerjakan;
+      case 'Selesai':
+        return OrderStatusStage.selesai;
+      default:
+        return OrderStatusStage.dikonfirmasi;
+    }
+  }
+
+  ScheduledOrderModel _fromBooking(CustomerBookingSummary booking) {
+    final stage = _stageFor(booking.status);
+    return OrderData.scheduledOrder.copyWith(
+      serviceName: booking.service,
+      price: BookingController.formatRupiah(booking.totalAmount),
+      orderNumber: '#${booking.code}',
+      stage: stage,
+      progress: stage.progress,
+      status: stage.statusLabel,
+      arrivalEstimate: booking.status == 'Menunggu Assign'
+          ? 'Menunggu penugasan cleaner'
+          : 'Menunggu pembaruan lokasi',
+      travelDescription: 'Status pesanan: ${booking.status}.',
+      scheduledAt: booking.scheduledAt,
+      note: booking.notes,
+      destinationAddress: booking.address,
+      destinationLatitude: booking.latitude,
+      destinationLongitude: booking.longitude,
+      hasDestinationCoordinates:
+          booking.latitude != null && booking.longitude != null,
+      servicePrice: booking.servicePrice,
+      platformFee: booking.platformFee,
+      discountAmount: booking.discountAmount,
+      routePoints: const [],
+      clearEtaUpdatedAt: true,
+    );
+  }
+
+  OrderHistoryModel _historyFromBooking(CustomerBookingSummary booking) {
+    final scheduled = booking.scheduledAt;
+    return OrderHistoryModel(
+      orderId: '#${booking.code}',
+      serviceName: booking.service,
+      serviceAssetPath: OrderData.scheduledOrder.serviceImagePath,
+      schedule: scheduled == null ? 'Jadwal layanan' : _formatDateTime(scheduled),
+      status: booking.status.toUpperCase(),
+      customerName: OrderData.scheduledOrder.customerName,
+      price: BookingController.formatRupiah(booking.totalAmount),
+      canReview: booking.status == 'Selesai',
+      address: booking.address,
+      note: booking.notes,
+      servicePrice: booking.servicePrice,
+      platformFee: booking.platformFee,
+      discountAmount: booking.discountAmount,
+    );
   }
 
   void createOrderFromBooking({

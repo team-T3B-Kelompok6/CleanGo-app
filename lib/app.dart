@@ -18,10 +18,15 @@ import 'features/auth/pages/register_page.dart';
 import 'features/auth/controllers/auth_session_controller.dart';
 import 'features/booking/controllers/booking_controller.dart';
 import 'features/booking/data/booking_draft_repository.dart';
+import 'features/booking/data/customer_booking_api.dart';
+import 'features/home/controllers/home_controller.dart';
+import 'features/home/data/customer_banner_api.dart';
+import 'features/home/data/customer_category_api.dart';
 import 'features/booking/domain/models/booking_draft.dart';
 import 'features/booking/domain/models/cleaning_address.dart';
 import 'features/home/pages/home_page.dart';
 import 'features/message/controllers/message_controller.dart';
+import 'features/message/data/customer_notification_api.dart';
 import 'features/message/pages/messages_page.dart';
 import 'features/onboarding/pages/onboarding_page.dart';
 import 'features/onboarding/pages/splash_page.dart';
@@ -34,6 +39,7 @@ import 'features/profile/pages/change_password_page.dart';
 import 'features/profile/pages/personal_data_page.dart';
 import 'features/profile/pages/profile_page.dart';
 import 'features/service/controllers/service_controller.dart';
+import 'features/service/data/customer_service_remote_data_source.dart';
 import 'features/service/data/service_repository.dart';
 import 'features/service/domain/models/service_model.dart';
 import 'features/service/pages/service_list_page.dart';
@@ -93,6 +99,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
           create: (_) => ServiceController(
             repository: widget.serviceRepository,
             preferences: widget.preferences,
+            detailApi: CustomerServiceDetailApi(tokenStorage: widget.tokenStorage),
             initialServices: widget.initialServices,
             initialFilter: widget.initialServiceFilter,
           ),
@@ -103,18 +110,38 @@ class _CleanGoAppState extends State<CleanGoApp> {
             initialDraft: widget.initialBookingDraft,
             initialService: widget.initialBookingService,
             initialAddress: widget.initialBookingAddress,
+            bookingApi: CustomerBookingApi(tokenStorage: widget.tokenStorage),
           ),
         ),
         ChangeNotifierProvider(
           create: (_) => AddressController(
             repository: widget.addressRepository,
             initialAddresses: widget.initialAddresses,
+            tokenStorage: widget.tokenStorage,
           ),
         ),
-        ChangeNotifierProvider(create: (_) => ProfileController()),
-        ChangeNotifierProvider(create: (_) => SupportController()),
-        ChangeNotifierProvider(create: (_) => OrderController()),
-        ChangeNotifierProvider(create: (_) => MessageController()),
+        ChangeNotifierProvider(create: (_) => ProfileController(tokenStorage: widget.tokenStorage)),
+        ChangeNotifierProvider(
+          create: (_) => SupportController(tokenStorage: widget.tokenStorage),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => HomeController(
+            bannerApi: CustomerBannerApi(tokenStorage: widget.tokenStorage),
+            categoryApi: CustomerCategoryApi(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => OrderController(
+            bookingApi: CustomerBookingApi(tokenStorage: widget.tokenStorage),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MessageController(
+            notificationApi: CustomerNotificationApi(
+              tokenStorage: widget.tokenStorage,
+            ),
+          ),
+        ),
       ],
       child: MaterialApp(
         title: 'CleanGo',

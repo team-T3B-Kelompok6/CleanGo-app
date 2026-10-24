@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_sheet.dart';
+import '../../auth/controllers/auth_session_controller.dart';
 import '../controllers/change_password_controller.dart';
 import '../controllers/profile_controller.dart';
 
@@ -18,6 +20,7 @@ class ChangePasswordPage extends StatefulWidget {
 
 class _ChangePasswordPageState extends State<ChangePasswordPage> {
   late final ChangePasswordController _passwordController;
+  bool _isSubmitting = false;
   final TextEditingController _currentPassTextController =
       TextEditingController();
   final TextEditingController _newPassTextController = TextEditingController();
@@ -39,12 +42,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     super.dispose();
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     FocusScope.of(context).unfocus();
-    final profileController = context.read<ProfileController>();
-    final activePassword = profileController.password;
+    if (_isSubmitting) return;
 
-    final isValid = _passwordController.validate(activePassword);
+    // The backend verifies the current password, so only the form shape is
+    // checked here (null skips the legacy local comparison).
+    final isValid = _passwordController.validate(null);
     if (!isValid) {
       AppNotice.show(
         context,
@@ -54,15 +58,40 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       return;
     }
 
-    final success = profileController.changePassword(
+    setState(() => _isSubmitting = true);
+    final profileController = context.read<ProfileController>();
+    final success = await profileController.changePasswordRemote(
       currentPassword: _passwordController.currentPassword,
       newPassword: _passwordController.newPassword,
     );
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
 
     if (success) {
-      AppNotice.show(context, 'Kata sandi berhasil diperbarui.');
-      Navigator.of(context).pop();
+      // The server revoked every token issued before this change, so the app
+      // must sign in again with the new password.
+      await context.read<AuthSessionController>().signOut();
+      if (!mounted) return;
+      AppNotice.show(
+        context,
+        'Kata sandi diperbarui. Silakan masuk dengan kata sandi baru.',
+      );
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.login,
+        (route) => false,
+      );
+      return;
     }
+
+    final error = profileController.error;
+    if (error != null && error.contains('lama salah')) {
+      _passwordController.setCurrentPasswordError('Kata sandi saat ini salah.');
+    }
+    AppNotice.show(
+      context,
+      error ?? 'Kata sandi belum dapat diperbarui. Coba lagi.',
+      type: AppNoticeType.error,
+    );
   }
 
   void _showForgotPasswordModal() {
@@ -657,7 +686,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
-              onPressed: _handleSubmit,
+              onPressed: _isSubmitting ? null : _handleSubmit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF00685F),
                 foregroundColor: Colors.white,
@@ -666,7 +695,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Row(
+              child: _isSubmitting
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.check_rounded, color: Colors.white, size: 20),

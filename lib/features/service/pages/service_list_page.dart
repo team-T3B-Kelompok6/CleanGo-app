@@ -26,6 +26,15 @@ class _ServiceListPageState extends State<ServiceListPage> {
   ServiceSort? _selectedSort;
 
   @override
+  void initState() {
+    super.initState();
+    // Pull the newest catalogue (photos, prices, categories) on every visit.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<ServiceController>().refreshServices();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final serviceController = context.watch<ServiceController>();
     final services = sortServices(
@@ -63,7 +72,7 @@ class _ServiceListPageState extends State<ServiceListPage> {
                     slivers: [
                       SliverToBoxAdapter(
                         child: _ServiceListHeader(
-                          filters: ServiceController.filters,
+                          filters: serviceController.filterOptions,
                           selectedFilter: serviceController.selectedFilter,
                           searchQuery: serviceController.searchQuery,
                           serviceCount: services.length,
@@ -107,7 +116,10 @@ class _ServiceListPageState extends State<ServiceListPage> {
           showOrderBadge: false,
           onDestinationSelected: (index) {
             if (index == 0) {
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                AppRoutes.home,
+                (route) => false,
+              );
             } else if (index == 2) {
               Navigator.pushNamed(context, AppRoutes.orders);
             } else if (index == 3) {

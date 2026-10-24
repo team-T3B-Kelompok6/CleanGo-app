@@ -60,6 +60,8 @@ class PaymentFlowController {
         scheduledAt.month == currentTime.month &&
         scheduledAt.day == currentTime.day;
 
+    // Persist the booking on the backend first; local-only mode skips this.
+    await booking.createBookingOnServer();
     await booking.clearDraft();
     orders.createOrderFromBooking(
       serviceName: booking.service?.title ?? 'Deep Cleaning',

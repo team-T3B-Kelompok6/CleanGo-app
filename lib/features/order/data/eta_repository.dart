@@ -1,5 +1,5 @@
 import '../../../core/network/api_client.dart';
-import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/api_config.dart';
 import '../domain/models/order_model.dart';
 
 class EtaEstimate {
@@ -61,7 +61,7 @@ class EtaRepository {
     required double stoppedDurationSeconds,
     required double rollingSpeedMps,
   }) async {
-    final response = await _client.post(ApiEndpoints.etaPreview, {
+    final response = await _client.post(ApiConfig.trackingEtaPreview, body: {
       'cleanerLatitude': cleanerLatitude,
       'cleanerLongitude': cleanerLongitude,
       'destinationLatitude': destinationLatitude,

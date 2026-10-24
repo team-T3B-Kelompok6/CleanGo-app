@@ -75,22 +75,25 @@ class _AddAddressPageState extends State<AddAddressPage> {
     );
 
     final addressController = context.read<AddressController>();
-    final wasAdded = addressController.addAddress(newAddress);
+    final created = await addressController.createRemote(newAddress);
 
-    if (!wasAdded) {
+    if (created == null) {
+      if (!mounted) return;
       setState(() => _addressForm.setSaving(false));
       AppNotice.show(
         context,
-        'Maksimal 5 alamat tersimpan.',
+        addressController.error ?? 'Maksimal 5 alamat tersimpan.',
         type: AppNoticeType.error,
       );
       return;
     }
 
+    if (!mounted) return;
+
     if (widget.autoSetPrimary) {
       context.read<BookingController>().updateAddress(
-        newAddress.toCleaningAddress(),
-        addressId: newAddress.id,
+        created.toCleaningAddress(),
+        addressId: created.id,
       );
     }
 
@@ -98,7 +101,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
 
     AppNotice.show(context, 'Alamat baru berhasil ditambahkan.');
 
-    Navigator.of(context).pop(newAddress);
+    Navigator.of(context).pop(created);
   }
 
   Future<void> _pickFromMap() async {

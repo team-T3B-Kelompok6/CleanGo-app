@@ -100,7 +100,17 @@ class ChangePasswordController extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool validate(String activePassword) {
+  /// Sets the inline error for the current password (used when the server
+  /// rejects it).
+  void setCurrentPasswordError(String message) {
+    _currentPasswordError = message;
+    notifyListeners();
+  }
+
+  /// Validates the form. Pass [activePassword] only for the legacy local check;
+  /// the backend is the authority on whether the current password is right, so
+  /// the page passes null and lets the server decide.
+  bool validate(String? activePassword) {
     bool isValid = true;
     _currentPasswordError = null;
     _newPasswordError = null;
@@ -109,7 +119,7 @@ class ChangePasswordController extends ChangeNotifier {
     if (_currentPassword.trim().isEmpty) {
       _currentPasswordError = 'Kata sandi saat ini wajib diisi.';
       isValid = false;
-    } else if (_currentPassword != activePassword) {
+    } else if (activePassword != null && _currentPassword != activePassword) {
       _failedCurrentPasswordAttempts++;
       _currentPasswordError = _failedCurrentPasswordAttempts >= 3
           ? 'Kata sandi tidak sesuai. Coba lagi atau klik "Lupa Kata Sandi" untuk mengatur ulang.'

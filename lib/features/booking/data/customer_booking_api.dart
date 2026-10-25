@@ -87,6 +87,22 @@ class CustomerBookingApi {
         .toList(growable: false);
   }
 
+  /// Dummy payment (trial only): marks the booking as paid without a gateway.
+  Future<CreatedBooking> pay({
+    required String bookingId,
+    required String method,
+  }) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    final res = await _client.post(
+      '${ApiConfig.customerBookings}/$bookingId/pay',
+      body: {'method': method},
+      token: token,
+    );
+    final data = res['data'] as Map<String, dynamic>? ?? const {};
+    return CreatedBooking.fromJson(data);
+  }
+
   Future<CreatedBooking> create({
     required String serviceId,
     required String date,

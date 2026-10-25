@@ -112,7 +112,7 @@ class CheckoutController {
       return;
     }
 
-    for (final promo in availablePromos) {
+    for (final promo in [..._promos, ...availablePromos]) {
       if (promo.code == normalizedCode) {
         _appliedPromo = promo;
         return;

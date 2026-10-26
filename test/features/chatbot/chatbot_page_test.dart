@@ -74,6 +74,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text(answer), findsOneWidget);
+      expect(find.text('Boo · CS AI'), findsOneWidget);
       expect(find.text('Boo sedang mengetik…'), findsNothing);
       expect(store.saved.last.content, answer);
       expect(store.saved.last.failed, isFalse);

@@ -1,5 +1,6 @@
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
+import '../../../core/storage/token_storage.dart';
 import '../domain/models/order_model.dart';
 
 class EtaEstimate {
@@ -12,6 +13,9 @@ class EtaEstimate {
     required this.modelVersion,
     required this.updatedAt,
     required this.path,
+    this.cleanerLatitude,
+    this.cleanerLongitude,
+    this.estimatedArrivalAt,
   });
 
   final int distanceMeters;
@@ -22,6 +26,9 @@ class EtaEstimate {
   final String? modelVersion;
   final DateTime updatedAt;
   final List<RoutePoint> path;
+  final double? cleanerLatitude;
+  final double? cleanerLongitude;
+  final DateTime? estimatedArrivalAt;
 
   factory EtaEstimate.fromJson(Map<String, dynamic> json) {
     return EtaEstimate(
@@ -42,35 +49,55 @@ class EtaEstimate {
             ),
           )
           .toList(growable: false),
+      cleanerLatitude: (json['cleaner']?['latitude'] as num?)?.toDouble(),
+      cleanerLongitude: (json['cleaner']?['longitude'] as num?)?.toDouble(),
+      estimatedArrivalAt: DateTime.tryParse(
+        json['estimatedArrivalAt'] as String? ?? '',
+      )?.toLocal(),
     );
   }
 }
 
 class EtaRepository {
-  EtaRepository({ApiClient? client}) : _client = client ?? ApiClient();
+  EtaRepository({ApiClient? client, TokenStorage? tokenStorage})
+    : _client = client ?? ApiClient(),
+      _tokens = tokenStorage ?? SecureTokenStorage();
 
   final ApiClient _client;
+  final TokenStorage _tokens;
+
+  Future<EtaEstimate> calculateForBooking(String bookingId) async {
+    final token = await _tokens.readAccessToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('Silakan masuk kembali.');
+    }
+    final response = await _client.get(
+      '${ApiConfig.customerBookings}/${Uri.encodeComponent(bookingId)}/tracking',
+      token: token,
+      timeout: const Duration(seconds: 14),
+    );
+    final data = response['data'];
+    if (data is! Map<String, dynamic> || data['orderId'] != bookingId) {
+      throw const FormatException('Data ETA pesanan tidak sesuai.');
+    }
+    return EtaEstimate.fromJson(data);
+  }
 
   Future<EtaEstimate> calculate({
     required double cleanerLatitude,
     required double cleanerLongitude,
     required double destinationLatitude,
     required double destinationLongitude,
-    required double initialDistanceM,
-    required double elapsedSeconds,
-    required double stoppedDurationSeconds,
-    required double rollingSpeedMps,
   }) async {
-    final response = await _client.post(ApiConfig.trackingEtaPreview, body: {
-      'cleanerLatitude': cleanerLatitude,
-      'cleanerLongitude': cleanerLongitude,
-      'destinationLatitude': destinationLatitude,
-      'destinationLongitude': destinationLongitude,
-      'initialDistanceM': initialDistanceM,
-      'elapsedSeconds': elapsedSeconds,
-      'stoppedDurationSeconds': stoppedDurationSeconds,
-      'rollingSpeedMps': rollingSpeedMps,
-    });
+    final response = await _client.post(
+      ApiConfig.trackingEtaPreview,
+      body: {
+        'cleanerLatitude': cleanerLatitude,
+        'cleanerLongitude': cleanerLongitude,
+        'destinationLatitude': destinationLatitude,
+        'destinationLongitude': destinationLongitude,
+      },
+    );
     final data = response['data'];
     if (data is! Map<String, dynamic>) {
       throw const FormatException('Data ETA tidak tersedia.');

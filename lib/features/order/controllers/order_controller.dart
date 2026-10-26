@@ -1,18 +1,20 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
 import '../../booking/controllers/booking_controller.dart';
 import '../../booking/data/customer_booking_api.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/order_data.dart';
 import '../data/eta_repository.dart';
 import '../domain/models/order_model.dart';
 
 class OrderController extends ChangeNotifier {
-  OrderController({EtaRepository? etaRepository, CustomerBookingApi? bookingApi})
-    : _etaRepository = etaRepository ?? EtaRepository(),
-      _bookingApi = bookingApi {
+  OrderController({
+    EtaRepository? etaRepository,
+    CustomerBookingApi? bookingApi,
+  }) : _etaRepository = etaRepository ?? EtaRepository(),
+       _bookingApi = bookingApi {
     _selected = _ActiveOrderState(
       OrderData.scheduledOrder.copyWith(
         scheduledAt: DateTime.now().add(const Duration(days: 3)),
@@ -56,12 +58,30 @@ class OrderController extends ChangeNotifier {
       _activeStage == OrderStatusStage.ditugaskan ||
       _activeStage == OrderStatusStage.dalamPerjalanan;
   bool get canCalculateEta =>
-      isTravelStage && _scheduledOrder.hasDestinationCoordinates;
+      isTravelStage &&
+      _scheduledOrder.hasDestinationCoordinates &&
+      (_scheduledOrder.backendBookingId == null ||
+          _activeStage == OrderStatusStage.dalamPerjalanan);
   bool get etaAvailable =>
       canCalculateEta && _scheduledOrder.etaUpdatedAt != null;
+  DateTime? get estimatedWorkCompletedAt {
+    if (_activeStage != OrderStatusStage.sedangDikerjakan) return null;
+    final started = _scheduledOrder.workStartedAt;
+    final minutes = _scheduledOrder.serviceDurationMinutes;
+    if (started == null || minutes == null || minutes <= 0) return null;
+    return started.add(Duration(minutes: minutes));
+  }
 
   String get etaHeadline {
-    if (_activeStage == OrderStatusStage.dikonfirmasi) {
+    if (_activeStage == OrderStatusStage.sedangDikerjakan) {
+      final completed = estimatedWorkCompletedAt;
+      return completed == null
+          ? 'Menunggu waktu mulai dan durasi layanan'
+          : 'Perkiraan selesai ${_formatClock(completed)}';
+    }
+    if (_activeStage == OrderStatusStage.dikonfirmasi ||
+        (_scheduledOrder.backendBookingId != null &&
+            _activeStage == OrderStatusStage.ditugaskan)) {
       return 'ETA tersedia setelah cleaner berangkat';
     }
     if (isTravelStage && !_scheduledOrder.hasDestinationCoordinates) {
@@ -73,6 +93,15 @@ class OrderController extends ChangeNotifier {
   }
 
   String get etaDetail {
+    if (_activeStage == OrderStatusStage.sedangDikerjakan) {
+      final completed = estimatedWorkCompletedAt;
+      if (completed == null) {
+        return 'Estimasi tersedia setelah waktu mulai dan durasi layanan tercatat.';
+      }
+      return DateTime.now().isAfter(completed)
+          ? 'Perkiraan waktu terlewati. Menunggu konfirmasi selesai dari cleaner.'
+          : 'Perkiraan dari waktu mulai dan durasi layanan. Selesai dikonfirmasi cleaner.';
+    }
     if (etaError != null) return etaError!;
     if (_activeStage == OrderStatusStage.dikonfirmasi) {
       return 'Lokasi cleaner belum dibagikan.';
@@ -89,12 +118,18 @@ class OrderController extends ChangeNotifier {
   }
 
   String get etaMinutesLabel {
+    if (_activeStage == OrderStatusStage.sedangDikerjakan) {
+      final completed = estimatedWorkCompletedAt;
+      return completed == null ? 'Belum tersedia' : _formatClock(completed);
+    }
     if (etaLoading) return 'Menghitung…';
     if (!etaAvailable) return 'Belum tersedia';
     return _scheduledOrder.estimatedMinutes;
   }
 
-  String get etaCardTitle => isTravelStage
+  String get etaCardTitle => _activeStage == OrderStatusStage.sedangDikerjakan
+      ? 'Perkiraan Selesai'
+      : isTravelStage
       ? _scheduledOrder.hasDestinationCoordinates
             ? 'Perkiraan Waktu Tiba'
             : 'Status ETA'
@@ -103,6 +138,9 @@ class OrderController extends ChangeNotifier {
       : 'Status Kedatangan';
 
   String stageTimeLabel(OrderStatusStage stage) {
+    if (stage == OrderStatusStage.selesai && estimatedWorkCompletedAt != null) {
+      return 'Estimasi ${_formatClock(estimatedWorkCompletedAt!)}';
+    }
     if (stage.index > _activeStage.index) return 'Menunggu';
     if (stage == _activeStage && stage == OrderStatusStage.dalamPerjalanan) {
       return 'Sekarang';
@@ -146,26 +184,21 @@ class OrderController extends ChangeNotifier {
       selected.etaRefreshPending = true;
       return;
     }
-    selected.departedAt ??= DateTime.now();
     selected.etaLoading = true;
     selected.etaError = null;
     notifyListeners();
     try {
       final now = DateTime.now();
       final tripRevision = selected.tripRevision;
-      final estimate = await _etaRepository.calculate(
-        cleanerLatitude: _scheduledOrder.cleanerLatitude,
-        cleanerLongitude: _scheduledOrder.cleanerLongitude,
-        destinationLatitude: _scheduledOrder.destinationLatitude,
-        destinationLongitude: _scheduledOrder.destinationLongitude,
-        initialDistanceM: selected.initialDistanceM ?? 1,
-        elapsedSeconds: math.max(
-          0.0,
-          now.difference(selected.departedAt!).inMilliseconds / 1000,
-        ),
-        stoppedDurationSeconds: selected.stoppedDurationSeconds,
-        rollingSpeedMps: selected.rollingSpeedMps,
-      );
+      final bookingId = _scheduledOrder.backendBookingId;
+      final estimate = bookingId != null
+          ? await _etaRepository.calculateForBooking(bookingId)
+          : await _etaRepository.calculate(
+              cleanerLatitude: _scheduledOrder.cleanerLatitude,
+              cleanerLongitude: _scheduledOrder.cleanerLongitude,
+              destinationLatitude: _scheduledOrder.destinationLatitude,
+              destinationLongitude: _scheduledOrder.destinationLongitude,
+            );
       if (_disposed ||
           !identical(selected, _selected) ||
           !_hasSelectedOrder ||
@@ -173,26 +206,31 @@ class OrderController extends ChangeNotifier {
           tripRevision != selected.tripRevision) {
         return;
       }
-      selected.initialDistanceM ??= estimate.distanceMeters.toDouble();
-      final arrival = now.add(Duration(seconds: estimate.etaSeconds));
+      final arrival =
+          estimate.estimatedArrivalAt ??
+          now.add(Duration(seconds: estimate.etaSeconds));
       _scheduledOrder = _scheduledOrder.copyWith(
+        cleanerLatitude: estimate.cleanerLatitude,
+        cleanerLongitude: estimate.cleanerLongitude,
+        hasCleanerCoordinates:
+            estimate.cleanerLatitude != null || bookingId == null,
         distanceKm:
             '${(estimate.distanceMeters / 1000).toStringAsFixed(1)} km lagi',
         estimatedMinutes: '±${estimate.etaMinutes} menit',
         estimatedArrivalTime:
             '${arrival.hour.toString().padLeft(2, '0')}:${arrival.minute.toString().padLeft(2, '0')} WIB',
-        etaSource: estimate.source == 'ml'
-            ? 'ML ${estimate.modelVersion ?? ''}'.trim()
-            : 'Rute OSRM',
+        etaSource: 'Perhitungan rute OSRM',
         etaUpdatedAt: estimate.updatedAt,
         routePoints: estimate.path,
         arrivalEstimate: 'Tiba ~${_formatClock(arrival)}',
         travelDescription:
             '${(estimate.distanceMeters / 1000).toStringAsFixed(1)} km lagi • ±${estimate.etaMinutes} menit',
       );
-    } catch (_) {
+    } catch (error) {
       selected.etaError =
-          'ETA belum dapat diperbarui. Data terakhir tetap ditampilkan.';
+          error is ApiException && error.code == 'TRACKING_NOT_READY'
+          ? error.message
+          : 'ETA belum dapat diperbarui. Data terakhir tetap ditampilkan.';
     } finally {
       selected.etaLoading = false;
       final refreshPending = selected.etaRefreshPending;
@@ -204,36 +242,9 @@ class OrderController extends ChangeNotifier {
     }
   }
 
-  Future<void> updateCleanerLocation(
-    double latitude,
-    double longitude, {
-    DateTime? recordedAt,
-  }) async {
+  Future<void> updateCleanerLocation(double latitude, double longitude) async {
+    if (_scheduledOrder.backendBookingId != null) return;
     if (_disposed || !_hasSelectedOrder || !canCalculateEta) return;
-    final selected = _selected;
-    final timestamp = recordedAt ?? DateTime.now();
-    if (selected.lastLocationAt != null &&
-        selected.lastLatitude != null &&
-        selected.lastLongitude != null) {
-      final elapsed = math.max(
-        0.001,
-        timestamp.difference(selected.lastLocationAt!).inMilliseconds / 1000,
-      );
-      final distance = _distanceMeters(
-        selected.lastLatitude!,
-        selected.lastLongitude!,
-        latitude,
-        longitude,
-      );
-      final speed = distance / elapsed;
-      selected.rollingSpeedMps = speed.clamp(0.0, 15.0).toDouble();
-      if (selected.rollingSpeedMps < 0.5) {
-        selected.stoppedDurationSeconds += elapsed;
-      }
-    }
-    selected.lastLocationAt = timestamp;
-    selected.lastLatitude = latitude;
-    selected.lastLongitude = longitude;
     _scheduledOrder = _scheduledOrder.copyWith(
       cleanerLatitude: latitude,
       cleanerLongitude: longitude,
@@ -242,23 +253,8 @@ class OrderController extends ChangeNotifier {
     await refreshEta();
   }
 
-  void _startTripTracking() {
-    final now = DateTime.now();
-    _selected.departedAt ??= now;
-    _selected.lastLocationAt ??= now;
-    _selected.lastLatitude ??= _scheduledOrder.cleanerLatitude;
-    _selected.lastLongitude ??= _scheduledOrder.cleanerLongitude;
-  }
-
   void _resetTripTracking() {
     _selected.tripRevision += 1;
-    _selected.departedAt = null;
-    _selected.lastLocationAt = null;
-    _selected.lastLatitude = null;
-    _selected.lastLongitude = null;
-    _selected.initialDistanceM = null;
-    _selected.stoppedDurationSeconds = 0;
-    _selected.rollingSpeedMps = 5.8;
     _selected.etaError = null;
     _scheduledOrder = _scheduledOrder.copyWith(
       distanceKm: 'Menunggu keberangkatan',
@@ -271,26 +267,6 @@ class OrderController extends ChangeNotifier {
       travelDescription: 'Menunggu cleaner ditugaskan.',
     );
   }
-
-  static double _distanceMeters(
-    double latitudeA,
-    double longitudeA,
-    double latitudeB,
-    double longitudeB,
-  ) {
-    const earthRadiusM = 6371000.0;
-    final latitudeDelta = _toRadians(latitudeB - latitudeA);
-    final longitudeDelta = _toRadians(longitudeB - longitudeA);
-    final a =
-        math.sin(latitudeDelta / 2) * math.sin(latitudeDelta / 2) +
-        math.cos(_toRadians(latitudeA)) *
-            math.cos(_toRadians(latitudeB)) *
-            math.sin(longitudeDelta / 2) *
-            math.sin(longitudeDelta / 2);
-    return earthRadiusM * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-  }
-
-  static double _toRadians(double degrees) => degrees * math.pi / 180;
 
   bool get canModifyScheduledOrder {
     final schedule = _scheduledOrder.scheduledAt;
@@ -311,12 +287,17 @@ class OrderController extends ChangeNotifier {
   }
 
   void setStage(OrderStatusStage stage) {
-    if (!_hasSelectedOrder) return;
+    if (!_hasSelectedOrder || _scheduledOrder.backendBookingId != null) return;
     final previousStage = _activeStage;
     _scheduledOrder = _scheduledOrder.copyWith(stage: stage);
     _stageUpdatedAt.removeWhere((key, _) => key.index > stage.index);
     if (stage != previousStage) {
       _stageUpdatedAt[stage] = DateTime.now();
+      if (stage == OrderStatusStage.sedangDikerjakan) {
+        _scheduledOrder = _scheduledOrder.copyWith(
+          workStartedAt: _stageUpdatedAt[stage],
+        );
+      }
     }
     if (stage == OrderStatusStage.dikonfirmasi) {
       _resetTripTracking();
@@ -325,7 +306,6 @@ class OrderController extends ChangeNotifier {
           previousStage.index > stage.index) {
         _resetTripTracking();
       }
-      _startTripTracking();
     }
     _scheduledOrder = _scheduledOrder.copyWith(
       stage: stage,
@@ -368,7 +348,7 @@ class OrderController extends ChangeNotifier {
   }
 
   void completeScheduledOrder() {
-    if (!_hasSelectedOrder) return;
+    if (!_hasSelectedOrder || _scheduledOrder.backendBookingId != null) return;
     setStage(OrderStatusStage.selesai);
     if (!_history.any((item) => item.orderId == _scheduledOrder.orderNumber)) {
       _history.insert(0, _toHistory(status: 'SELESAI', canReview: true));
@@ -496,7 +476,11 @@ class OrderController extends ChangeNotifier {
   ScheduledOrderModel _fromBooking(CustomerBookingSummary booking) {
     final stage = _stageFor(booking.status);
     return OrderData.scheduledOrder.copyWith(
+      backendBookingId: booking.id,
+      hasCleanerCoordinates: false,
       serviceName: booking.service,
+      serviceDurationMinutes: booking.serviceDurationMinutes,
+      workStartedAt: booking.startedAt,
       price: BookingController.formatRupiah(booking.totalAmount),
       orderNumber: '#${booking.code}',
       stage: stage,
@@ -527,7 +511,9 @@ class OrderController extends ChangeNotifier {
       orderId: '#${booking.code}',
       serviceName: booking.service,
       serviceAssetPath: OrderData.scheduledOrder.serviceImagePath,
-      schedule: scheduled == null ? 'Jadwal layanan' : _formatDateTime(scheduled),
+      schedule: scheduled == null
+          ? 'Jadwal layanan'
+          : _formatDateTime(scheduled),
       status: booking.status.toUpperCase(),
       customerName: OrderData.scheduledOrder.customerName,
       price: BookingController.formatRupiah(booking.totalAmount),
@@ -541,6 +527,7 @@ class OrderController extends ChangeNotifier {
   }
 
   void createOrderFromBooking({
+    int? serviceDurationMinutes,
     required String serviceName,
     required String serviceImagePath,
     required String price,
@@ -560,6 +547,7 @@ class OrderController extends ChangeNotifier {
     final createdAt = DateTime.now();
     _selected = _ActiveOrderState(
       OrderData.scheduledOrder.copyWith(
+        serviceDurationMinutes: serviceDurationMinutes,
         serviceName: serviceName,
         serviceImagePath: serviceImagePath,
         price: price,
@@ -717,12 +705,5 @@ class _ActiveOrderState {
   bool etaLoading = false;
   bool etaRefreshPending = false;
   String? etaError;
-  DateTime? departedAt;
-  DateTime? lastLocationAt;
-  double? lastLatitude;
-  double? lastLongitude;
-  double? initialDistanceM;
-  double stoppedDurationSeconds = 0;
-  double rollingSpeedMps = 5.8;
   int tripRevision = 0;
 }

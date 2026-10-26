@@ -103,6 +103,8 @@ class ScheduledOrderModel {
     this.destinationLatitude = -7.93980,
     this.destinationLongitude = 112.62650,
     this.hasDestinationCoordinates = true,
+    this.backendBookingId,
+    this.hasCleanerCoordinates = true,
     this.etaSource = 'Lokasi cleaner belum dibagikan',
     this.etaUpdatedAt,
     this.routePoints = const [],
@@ -114,6 +116,8 @@ class ScheduledOrderModel {
     this.discountAmount = 0,
     this.customerName = 'Krisna Pratama',
     this.customerPhone = '(+62) 81223728077',
+    this.serviceDurationMinutes,
+    this.workStartedAt,
   });
 
   final String status;
@@ -142,6 +146,8 @@ class ScheduledOrderModel {
   final double destinationLatitude;
   final double destinationLongitude;
   final bool hasDestinationCoordinates;
+  final String? backendBookingId;
+  final bool hasCleanerCoordinates;
   final String etaSource;
   final DateTime? etaUpdatedAt;
   final List<RoutePoint> routePoints;
@@ -153,6 +159,8 @@ class ScheduledOrderModel {
   final int discountAmount;
   final String customerName;
   final String customerPhone;
+  final int? serviceDurationMinutes;
+  final DateTime? workStartedAt;
 
   ScheduledOrderModel copyWith({
     String? status,
@@ -181,6 +189,8 @@ class ScheduledOrderModel {
     double? destinationLatitude,
     double? destinationLongitude,
     bool? hasDestinationCoordinates,
+    String? backendBookingId,
+    bool? hasCleanerCoordinates,
     String? etaSource,
     DateTime? etaUpdatedAt,
     List<RoutePoint>? routePoints,
@@ -193,8 +203,13 @@ class ScheduledOrderModel {
     int? discountAmount,
     String? customerName,
     String? customerPhone,
+    int? serviceDurationMinutes,
+    DateTime? workStartedAt,
   }) {
     return ScheduledOrderModel(
+      serviceDurationMinutes:
+          serviceDurationMinutes ?? this.serviceDurationMinutes,
+      workStartedAt: workStartedAt ?? this.workStartedAt,
       status: status ?? this.status,
       arrivalEstimate: arrivalEstimate ?? this.arrivalEstimate,
       travelDescription: travelDescription ?? this.travelDescription,
@@ -224,6 +239,9 @@ class ScheduledOrderModel {
       destinationLongitude: destinationLongitude ?? this.destinationLongitude,
       hasDestinationCoordinates:
           hasDestinationCoordinates ?? this.hasDestinationCoordinates,
+      backendBookingId: backendBookingId ?? this.backendBookingId,
+      hasCleanerCoordinates:
+          hasCleanerCoordinates ?? this.hasCleanerCoordinates,
       etaSource: etaSource ?? this.etaSource,
       etaUpdatedAt: clearEtaUpdatedAt
           ? null

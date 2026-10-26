@@ -41,7 +41,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
       widget.order.stage == OrderStatusStage.dalamPerjalanan;
 
   bool get _isTravelActive =>
-      _isTravelStage && widget.order.hasDestinationCoordinates;
+      _isTravelStage &&
+      widget.order.hasDestinationCoordinates &&
+      widget.order.hasCleanerCoordinates;
 
   List<LatLng> get _remainingRoutePoints {
     final points = widget.order.routePoints
@@ -113,7 +115,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
   }
 
   void _toggleSimulation() {
-    if (!_isTravelActive) return;
+    if (!_isTravelActive || widget.order.backendBookingId != null) return;
     if (_isSimulating) {
       _simulationTimer?.cancel();
       setState(() {
@@ -165,7 +167,8 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
                       _destinationPoint.longitude) /
                   2,
             )
-          : _isTravelStage || !widget.order.hasDestinationCoordinates
+          : (_isTravelStage && widget.order.hasCleanerCoordinates) ||
+                !widget.order.hasDestinationCoordinates
           ? _currentCleanerPosition
           : _destinationPoint,
       14.3,
@@ -179,6 +182,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
     if (widget.order.stage == OrderStatusStage.dikonfirmasi) {
       return 'Menunggu cleaner berangkat';
     }
+    if (_isTravelStage && !widget.order.hasCleanerCoordinates) {
+      return 'Menunggu lokasi cleaner';
+    }
     if (!_isTravelActive) return 'Cleaner sudah tiba';
     return widget.order.distanceKm;
   }
@@ -191,7 +197,8 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
             (_currentCleanerPosition.longitude + _destinationPoint.longitude) /
                 2,
           )
-        : _isTravelStage || !widget.order.hasDestinationCoordinates
+        : (_isTravelStage && widget.order.hasCleanerCoordinates) ||
+              !widget.order.hasDestinationCoordinates
         ? _currentCleanerPosition
         : _destinationPoint;
 
@@ -231,7 +238,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.example.cleango_app',
                 ),
-                if (_isTravelActive)
+                if (_isTravelActive &&
+                    _displayRoutePoints.length >= 2 &&
+                    (widget.order.routePoints.length >= 2 || _isSimulating))
                   PolylineLayer(
                     polylines: [
                       Polyline(
@@ -256,7 +265,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
                         height: 70,
                         child: _buildDestinationMarker(),
                       ),
-                    if (_isTravelStage)
+                    if (_isTravelStage && widget.order.hasCleanerCoordinates)
                       Marker(
                         point: _currentCleanerPosition,
                         width: 120,
@@ -279,7 +288,8 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
               bottom: widget.controlsBottomInset,
               child: Row(
                 children: [
-                  if (_isTravelActive) ...[
+                  if (_isTravelActive &&
+                      widget.order.backendBookingId == null) ...[
                     _buildMapActionPill(
                       icon: _isSimulating
                           ? Icons.pause_rounded

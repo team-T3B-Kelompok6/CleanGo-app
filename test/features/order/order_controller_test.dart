@@ -8,8 +8,6 @@ import 'package:cleango_app/features/service/controllers/service_controller.dart
 
 class FakeEtaRepository extends EtaRepository {
   int calls = 0;
-  double? lastInitialDistanceM;
-  double? lastElapsedSeconds;
   Future<EtaEstimate>? pendingResult;
 
   @override
@@ -18,22 +16,16 @@ class FakeEtaRepository extends EtaRepository {
     required double cleanerLongitude,
     required double destinationLatitude,
     required double destinationLongitude,
-    required double initialDistanceM,
-    required double elapsedSeconds,
-    required double stoppedDurationSeconds,
-    required double rollingSpeedMps,
   }) async {
     calls += 1;
-    lastInitialDistanceM = initialDistanceM;
-    lastElapsedSeconds = elapsedSeconds;
     if (pendingResult != null) return pendingResult!;
     return EtaEstimate(
       distanceMeters: calls == 1 ? 4200 : 2100,
-      baselineEtaSeconds: calls == 1 ? 900 : 450,
+      baselineEtaSeconds: calls == 1 ? 720 : 360,
       etaSeconds: calls == 1 ? 720 : 360,
       etaMinutes: calls == 1 ? 12 : 6,
-      source: 'ml',
-      modelVersion: 'eta-v1',
+      source: 'osrm',
+      modelVersion: null,
       updatedAt: DateTime(2026, 10, 16, 9),
       path: const [
         RoutePoint(latitude: -7.97, longitude: 112.61),
@@ -48,6 +40,39 @@ class FakeEtaRepository extends EtaRepository {
 
 void main() {
   group('OrderController Tests', () {
+    test('work completion uses actual start plus service duration without marking the order finished', () {
+      final tracking = OrderController(etaRepository: FakeEtaRepository());
+      addTearDown(tracking.dispose);
+      tracking.createOrderFromBooking(
+        serviceName: 'Layanan uji',
+        serviceImagePath: 'assets/images/service_deep_cleaning.jpeg',
+        price: 'Rp100.000',
+        address: 'Alamat uji',
+        serviceDurationMinutes: 120,
+      );
+      expect(tracking.estimatedWorkCompletedAt, isNull);
+      tracking.setStage(OrderStatusStage.sedangDikerjakan);
+      final start = tracking.scheduledOrder.workStartedAt!;
+      expect(
+        tracking.estimatedWorkCompletedAt,
+        start.add(const Duration(minutes: 120)),
+      );
+      expect(tracking.etaCardTitle, 'Perkiraan Selesai');
+      expect(
+        tracking.stageTimeLabel(OrderStatusStage.selesai),
+        startsWith('Estimasi'),
+      );
+      expect(tracking.currentStage, OrderStatusStage.sedangDikerjakan);
+      tracking.setStage(OrderStatusStage.selesai);
+      expect(tracking.estimatedWorkCompletedAt, isNull);
+    });
+    test('does not invent a duration for a service without SOP', () {
+      final tracking = OrderController(etaRepository: FakeEtaRepository());
+      addTearDown(tracking.dispose);
+      tracking.setStage(OrderStatusStage.sedangDikerjakan);
+      expect(tracking.estimatedWorkCompletedAt, isNull);
+      expect(tracking.etaMinutesLabel, 'Belum tersedia');
+    });
     late OrderController controller;
 
     setUp(() {
@@ -179,8 +204,8 @@ void main() {
           baselineEtaSeconds: 900,
           etaSeconds: 720,
           etaMinutes: 12,
-          source: 'ml',
-          modelVersion: 'eta-v1',
+          source: 'osrm',
+          modelVersion: null,
           updatedAt: DateTime.now(),
           path: const [],
         ),
@@ -304,8 +329,6 @@ void main() {
         trackingController.setStage(OrderStatusStage.ditugaskan);
         await trackingController.refreshEta();
         expect(repository.calls, 1);
-        expect(repository.lastInitialDistanceM, 1);
-        expect(repository.lastElapsedSeconds, lessThan(2));
         expect(trackingController.etaAvailable, isTrue);
         expect(trackingController.scheduledOrder.routePoints, hasLength(2));
 

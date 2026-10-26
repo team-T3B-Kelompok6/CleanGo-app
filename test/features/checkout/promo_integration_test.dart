@@ -4,7 +4,11 @@ import 'package:cleango_app/features/checkout/domain/models/promo_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakePromoApi extends CustomerPromoApi {
-  _FakePromoApi({this.promos = const [], this.validated, this.failValidate = false});
+  _FakePromoApi({
+    this.promos = const [],
+    this.validated,
+    this.failValidate = false,
+  });
 
   final List<PromoModel> promos;
   final PromoModel? validated;
@@ -95,7 +99,11 @@ void main() {
     });
 
     test('never exceeds the price', () {
-      const promo = PromoModel(code: 'X', discountType: 'fixed', discountValue: 900000);
+      const promo = PromoModel(
+        code: 'X',
+        discountType: 'fixed',
+        discountValue: 900000,
+      );
 
       expect(promo.discountAmount(100000), 100000);
     });
@@ -113,8 +121,24 @@ void main() {
   });
 
   group('CheckoutController promo integration', () {
+    test('selects a loaded backend promo from the promo page', () async {
+      final promo = PromoModel(code: 'AWAL20', discountPercent: 20);
+      final controller = CheckoutController(
+        promoApi: _FakePromoApi(promos: [promo]),
+      );
+      await controller.loadPromos();
+
+      controller.applyPromo(' awal20 ');
+
+      expect(controller.appliedPromo, same(promo));
+      expect(controller.discountAmount(150000), 30000);
+      expect(controller.promoError, isNull);
+    });
+
     test('loads the promo list from the backend', () async {
-      final api = _FakePromoApi(promos: [PromoModel(code: 'AWAL20', discountPercent: 20)]);
+      final api = _FakePromoApi(
+        promos: [PromoModel(code: 'AWAL20', discountPercent: 20)],
+      );
       final controller = CheckoutController(promoApi: api);
 
       await controller.loadPromos();
@@ -143,7 +167,11 @@ void main() {
       );
       final controller = CheckoutController(promoApi: api);
 
-      await controller.applyPromoRemote(code: 'awal20', servicePrice: 150000, serviceId: '7');
+      await controller.applyPromoRemote(
+        code: 'awal20',
+        servicePrice: 150000,
+        serviceId: '7',
+      );
 
       expect(api.validateCalls, 1);
       expect(api.lastCode, 'AWAL20');
@@ -158,7 +186,10 @@ void main() {
         promoApi: _FakePromoApi(failValidate: true),
       );
 
-      await controller.applyPromoRemote(code: 'CLEANHEMAT', servicePrice: 150000);
+      await controller.applyPromoRemote(
+        code: 'CLEANHEMAT',
+        servicePrice: 150000,
+      );
 
       expect(controller.appliedPromo?.code, 'CLEANHEMAT');
       expect(controller.discountAmount(150000), 52500);
@@ -178,7 +209,10 @@ void main() {
     test('works without an api (local-only mode)', () async {
       final controller = CheckoutController();
 
-      await controller.applyPromoRemote(code: 'cleanhemat', servicePrice: 150000);
+      await controller.applyPromoRemote(
+        code: 'cleanhemat',
+        servicePrice: 150000,
+      );
 
       expect(controller.appliedPromo?.code, 'CLEANHEMAT');
     });

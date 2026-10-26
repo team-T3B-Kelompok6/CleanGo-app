@@ -46,14 +46,20 @@ class ApiClient {
 
   void close() => _client.close();
 
-  Future<Map<String, dynamic>> get(String path, {String? token}) async {
+  Future<Map<String, dynamic>> get(
+    String path, {
+    String? token,
+    Duration? timeout,
+  }) async {
     final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
     final headers = <String, String>{'Accept': 'application/json'};
     if (token != null && token.isNotEmpty) {
       headers['Authorization'] = 'Bearer $token';
     }
 
-    final response = await _client.get(uri, headers: headers);
+    var pending = _client.get(uri, headers: headers);
+    if (timeout != null) pending = pending.timeout(timeout);
+    final response = await pending;
     return _handleResponse(response);
   }
 

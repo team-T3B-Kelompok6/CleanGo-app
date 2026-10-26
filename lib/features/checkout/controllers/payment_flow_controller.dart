@@ -64,6 +64,7 @@ class PaymentFlowController {
     await booking.createBookingOnServer();
     await booking.clearDraft();
     orders.createOrderFromBooking(
+      serviceDurationMinutes: booking.service?.durationMinutes,
       serviceName: booking.service?.title ?? 'Deep Cleaning',
       serviceImagePath:
           booking.service?.imagePath ??

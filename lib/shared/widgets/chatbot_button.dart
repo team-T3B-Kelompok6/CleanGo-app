@@ -49,7 +49,7 @@ class _ChatbotButtonState extends State<ChatbotButton>
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
-      label: 'Tanya Boo, buka chatbot CleanGo',
+      label: 'Buka Customer Service AI CleanGo, Boo',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -76,7 +76,7 @@ class _ChatbotButtonState extends State<ChatbotButton>
                 ),
                 child: Text.rich(
                   const TextSpan(
-                    text: 'Tanya Boo! ',
+                    text: 'CS AI Boo ',
                     children: [TextSpan(text: '✨')],
                   ),
                   style: TextStyle(

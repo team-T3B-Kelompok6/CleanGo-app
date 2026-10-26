@@ -28,18 +28,18 @@ class CreatedBooking {
   final int totalAmount;
 
   static CreatedBooking fromJson(Map<String, dynamic> json) => CreatedBooking(
-        id: '${json['id'] ?? ''}',
-        code: json['code'] as String? ?? '',
-        status: json['status'] as String? ?? '',
-        totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
-      );
+    id: '${json['id'] ?? ''}',
+    code: json['code'] as String? ?? '',
+    status: json['status'] as String? ?? '',
+    totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
+  );
 }
 
 /// Booking availability and creation against the CleanGo backend.
 class CustomerBookingApi {
   CustomerBookingApi({ApiClient? client, TokenStorage? tokenStorage})
-      : _client = client ?? ApiClient(),
-        _tokens = tokenStorage;
+    : _client = client ?? ApiClient(),
+      _tokens = tokenStorage;
 
   final ApiClient _client;
   final TokenStorage? _tokens;
@@ -67,13 +67,16 @@ class CustomerBookingApi {
     );
     final data = res['data'] as Map<String, dynamic>? ?? const {};
     final slots = data['slots'] as List<dynamic>? ?? const [];
-    return slots.whereType<Map<String, dynamic>>().map((slot) {
-      return BookingSlotInfo(
-        time: slot['time'] as String? ?? '',
-        available: slot['available'] == true,
-        reason: slot['reason'] as String?,
-      );
-    }).toList(growable: false);
+    return slots
+        .whereType<Map<String, dynamic>>()
+        .map((slot) {
+          return BookingSlotInfo(
+            time: slot['time'] as String? ?? '',
+            available: slot['available'] == true,
+            reason: slot['reason'] as String?,
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<List<CustomerBookingSummary>> fetchBookings() async {
@@ -148,6 +151,8 @@ class CustomerBookingSummary {
     this.addressLabel = '',
     this.latitude,
     this.longitude,
+    this.serviceDurationMinutes,
+    this.startedAt,
   });
 
   final String id;
@@ -165,6 +170,8 @@ class CustomerBookingSummary {
   final String addressLabel;
   final double? latitude;
   final double? longitude;
+  final int? serviceDurationMinutes;
+  final DateTime? startedAt;
 
   DateTime? get scheduledAt {
     final parsed = DateTime.tryParse('${date}T$time:00');
@@ -190,6 +197,9 @@ class CustomerBookingSummary {
       addressLabel: json['addressLabel'] as String? ?? '',
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      serviceDurationMinutes: (json['serviceDurationMinutes'] as num?)?.toInt(),
+      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? '')
+          ?.toLocal(),
     );
   }
 }

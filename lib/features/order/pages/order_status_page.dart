@@ -27,6 +27,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   double _sheetSize = 0.56;
+  Timer? _trackingTimer;
 
   @override
   void initState() {
@@ -34,6 +35,17 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     _sheetController.addListener(_syncMapControlsWithSheet);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<OrderController>().refreshEta();
+    });
+    _trackingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      final controller = context.read<OrderController>();
+      if (controller.scheduledOrder.backendBookingId != null &&
+          !controller.etaLoading) {
+        unawaited(controller.refreshEta());
+      }
     });
   }
 
@@ -46,6 +58,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
 
   @override
   void dispose() {
+    _trackingTimer?.cancel();
     _sheetController.removeListener(_syncMapControlsWithSheet);
     _sheetController.dispose();
     super.dispose();
@@ -769,19 +782,21 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
             final isLast = index == OrderStatusStage.values.length - 1;
 
             return InkWell(
-              onTap: () {
-                if (stage != OrderStatusStage.selesai) {
-                  _hasNavigatedToRating = false;
-                }
-                if (stage == OrderStatusStage.selesai) {
-                  controller.completeScheduledOrder();
-                } else {
-                  controller.setStage(stage);
-                  if (controller.canCalculateEta) {
-                    unawaited(controller.refreshEta());
-                  }
-                }
-              },
+              onTap: order.backendBookingId != null
+                  ? null
+                  : () {
+                      if (stage != OrderStatusStage.selesai) {
+                        _hasNavigatedToRating = false;
+                      }
+                      if (stage == OrderStatusStage.selesai) {
+                        controller.completeScheduledOrder();
+                      } else {
+                        controller.setStage(stage);
+                        if (controller.canCalculateEta) {
+                          unawaited(controller.refreshEta());
+                        }
+                      }
+                    },
               child: _buildStageStepItem(
                 stage: stage,
                 description: controller.stageDescription(stage),

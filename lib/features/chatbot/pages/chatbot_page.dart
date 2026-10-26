@@ -184,7 +184,7 @@ class _ChatbotHeader extends StatelessWidget {
                   ChatbotIcon(size: 32),
                   SizedBox(width: 9),
                   Text(
-                    'Boo',
+                    'Boo · CS AI',
                     style: TextStyle(
                       color: AppColors.heading,
                       fontSize: 17,
@@ -258,7 +258,7 @@ class _ChatbotWelcome extends StatelessWidget {
                   constraints: const BoxConstraints(maxWidth: 310),
                   child: const Text.rich(
                     TextSpan(
-                      text: 'Hai, saya adalah Boo, asisten rumah pribadi Anda dari ',
+                      text: 'Hai, saya Boo, Customer Service AI dari ',
                       children: [
                         TextSpan(
                           text: 'CleanGo',
@@ -268,8 +268,7 @@ class _ChatbotWelcome extends StatelessWidget {
                           ),
                         ),
                         TextSpan(
-                          text:
-                              '. Apa yang bisa saya bantu untuk Anda hari ini?',
+                          text: '. Saya siap membantu layanan, booking, dan kendala Anda. Ada yang bisa saya bantu?',
                         ),
                       ],
                     ),

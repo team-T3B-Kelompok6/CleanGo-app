@@ -1,6 +1,7 @@
 import 'package:cleango_app/features/booking/data/customer_booking_api.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/data/order_data.dart';
+import 'package:cleango_app/features/order/data/eta_repository.dart';
 import 'package:cleango_app/features/order/domain/models/order_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -17,6 +18,36 @@ class _FakeBookingApi extends CustomerBookingApi {
     if (fail) throw StateError('jaringan mati');
     return bookings;
   }
+}
+
+class _OwnedTracking extends EtaRepository {
+  int calls = 0;
+  @override
+  Future<EtaEstimate> calculateForBooking(String id) async {
+    calls++;
+    return EtaEstimate(
+      distanceMeters: 1200,
+      baselineEtaSeconds: 121,
+      etaSeconds: 121,
+      etaMinutes: 3,
+      source: 'osrm',
+      modelVersion: null,
+      updatedAt: DateTime.now(),
+      path: const [],
+      cleanerLatitude: -7.97,
+      cleanerLongitude: 112.61,
+    );
+  }
+
+  @override
+  Future<EtaEstimate> calculate({
+    required double cleanerLatitude,
+    required double cleanerLongitude,
+    required double destinationLatitude,
+    required double destinationLongitude,
+  }) => throw StateError('Real bookings must not use preview coordinates');
+  @override
+  void dispose() {}
 }
 
 CustomerBookingSummary _booking({
@@ -50,6 +81,8 @@ void main() {
         'date': '2026-10-25',
         'time': '14:00',
         'service': 'Sofa Cleaning',
+        'serviceDurationMinutes': 120,
+        'startedAt': '2026-10-25T07:00:00.000Z',
         'servicePrice': 150000,
         'platformFee': 5000,
         'discountAmount': 20000,
@@ -64,6 +97,11 @@ void main() {
       expect(booking.id, '77');
       expect(booking.code, 'CG-TEST');
       expect(booking.totalAmount, 135000);
+      expect(booking.serviceDurationMinutes, 120);
+      expect(
+        booking.startedAt,
+        DateTime.parse('2026-10-25T07:00:00.000Z').toLocal(),
+      );
       expect(booking.isFinished, isFalse);
       expect(booking.scheduledAt, DateTime(2026, 10, 25, 14));
     });
@@ -76,6 +114,47 @@ void main() {
   });
 
   group('OrderController.loadFromApi', () {
+    test('owned bookings wait for departure and use saved GPS instead of demo positions', () async {
+      final tracking = _OwnedTracking();
+      final api = _FakeBookingApi(
+        bookings: [_booking(code: '9', status: 'Menunggu Lokasi')],
+      );
+      final controller = OrderController(
+        bookingApi: api,
+        etaRepository: tracking,
+      );
+      addTearDown(controller.dispose);
+      await controller.loadFromApi();
+      expect(controller.scheduledOrder.backendBookingId, '9');
+      expect(controller.scheduledOrder.hasCleanerCoordinates, isFalse);
+      expect(controller.canCalculateEta, isFalse);
+      await controller.refreshEta();
+      expect(tracking.calls, 0);
+    });
+
+    test('in-transit owned booking reads real GPS and cannot be moved by demo controls', () async {
+      final tracking = _OwnedTracking();
+      final controller = OrderController(
+        etaRepository: tracking,
+        bookingApi: _FakeBookingApi(
+          bookings: [_booking(code: '9', status: 'Menuju Lokasi')],
+        ),
+      );
+      addTearDown(controller.dispose);
+      await controller.loadFromApi();
+      await controller.refreshEta();
+      expect(tracking.calls, 1);
+      expect(controller.scheduledOrder.hasCleanerCoordinates, isTrue);
+      expect(controller.scheduledOrder.cleanerLatitude, -7.97);
+      await controller.updateCleanerLocation(0, 0);
+      expect(controller.scheduledOrder.cleanerLatitude, -7.97);
+      expect(tracking.calls, 1);
+      controller.setStage(OrderStatusStage.sedangDikerjakan);
+      controller.completeScheduledOrder();
+      expect(controller.currentStage, OrderStatusStage.dalamPerjalanan);
+      expect(controller.estimatedWorkCompletedAt, isNull);
+      expect(controller.hasScheduledOrder, isTrue);
+    });
     test('maps active bookings into scheduled orders', () async {
       final api = _FakeBookingApi(
         bookings: [
@@ -115,16 +194,24 @@ void main() {
       await controller.loadFromApi();
 
       expect(controller.scheduledOrders.length, 1);
-      expect(controller.scheduledOrder.orderNumber, OrderData.scheduledOrder.orderNumber);
+      expect(
+        controller.scheduledOrder.orderNumber,
+        OrderData.scheduledOrder.orderNumber,
+      );
       expect(controller.historyOrders.length, OrderData.history.length);
     });
 
     test('keeps the demo orders when the request fails', () async {
-      final controller = OrderController(bookingApi: _FakeBookingApi(fail: true));
+      final controller = OrderController(
+        bookingApi: _FakeBookingApi(fail: true),
+      );
 
       await controller.loadFromApi();
 
-      expect(controller.scheduledOrder.orderNumber, OrderData.scheduledOrder.orderNumber);
+      expect(
+        controller.scheduledOrder.orderNumber,
+        OrderData.scheduledOrder.orderNumber,
+      );
     });
 
     test('does nothing without a configured api', () async {
@@ -132,7 +219,10 @@ void main() {
 
       await controller.loadFromApi();
 
-      expect(controller.scheduledOrder.orderNumber, OrderData.scheduledOrder.orderNumber);
+      expect(
+        controller.scheduledOrder.orderNumber,
+        OrderData.scheduledOrder.orderNumber,
+      );
     });
   });
 }

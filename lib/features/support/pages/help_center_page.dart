@@ -70,8 +70,8 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
         return AppDialog(
           title: 'Pusat Dukungan',
           message:
-              'Customer Service tersedia setiap hari pukul 07.00–22.00 WIB. '
-              'Untuk pertanyaan seputar layanan, Anda juga dapat bertanya kepada Boo.',
+              'Boo adalah Customer Service AI CleanGo untuk panduan layanan dan kendala aplikasi. '
+              'Jawaban otomatis memerlukan koneksi internet. Untuk tindak lanjut petugas, gunakan kontak resmi yang tersedia di Pusat Bantuan.',
           confirmLabel: 'Mengerti',
           onConfirm: () => Navigator.pop(context),
         );
@@ -249,7 +249,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
           fontWeight: FontWeight.w500,
         ),
         decoration: InputDecoration(
-          hintText: 'Tanyakan ke Boo tentang CleanGo...',
+          hintText: 'Tanyakan ke CS AI Boo...',
           hintStyle: const TextStyle(
             color: Color(0xFF94A3B8),
             fontFamily: AppTheme.fontFamily,
@@ -422,10 +422,7 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
   }
 
   /// White card holding a list of questions.
-  Widget _buildFaqCard(
-    SupportController controller,
-    List<FaqItemModel> faqs,
-  ) {
+  Widget _buildFaqCard(SupportController controller, List<FaqItemModel> faqs) {
     if (faqs.isEmpty) {
       return const SizedBox.shrink();
     }

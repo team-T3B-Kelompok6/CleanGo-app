@@ -7,9 +7,11 @@ import 'service_repository.dart';
 /// Reads the customer service catalogue from the CleanGo backend and maps it to
 /// the existing [ServiceModel] so the Flutter UI keeps its current structure.
 class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
-  CustomerServiceRemoteDataSource({ApiClient? client, TokenStorage? tokenStorage})
-      : _client = client ?? ApiClient(),
-        _tokens = tokenStorage;
+  CustomerServiceRemoteDataSource({
+    ApiClient? client,
+    TokenStorage? tokenStorage,
+  }) : _client = client ?? ApiClient(),
+       _tokens = tokenStorage;
 
   final ApiClient _client;
   final TokenStorage? _tokens;
@@ -47,6 +49,7 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
       title: json['name'] as String? ?? 'Layanan',
       description: json['description'] as String? ?? '',
       duration: _formatDuration(minutes),
+      durationMinutes: minutes > 0 ? minutes : null,
       price: _formatRupiah((json['price'] as num?)?.toInt() ?? 0),
       category: category,
       imagePath: resolveImageUrl(imageUrl),
@@ -62,7 +65,9 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
     final value = raw?.trim() ?? '';
     if (value.isEmpty) return null;
     if (value.startsWith('assets/')) return value;
-    if (value.startsWith('http://') || value.startsWith('https://')) return value;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
     if (value.startsWith('/')) return '${ApiConfig.baseUrl}$value';
     return null;
   }
@@ -93,8 +98,8 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
 /// facility list the backend already provides.
 class CustomerServiceDetailApi {
   CustomerServiceDetailApi({ApiClient? client, TokenStorage? tokenStorage})
-      : _client = client ?? ApiClient(),
-        _tokens = tokenStorage;
+    : _client = client ?? ApiClient(),
+      _tokens = tokenStorage;
 
   final ApiClient _client;
   final TokenStorage? _tokens;
@@ -131,6 +136,7 @@ class CustomerServiceDetailApi {
       title: base.title,
       description: base.description,
       duration: base.duration,
+      durationMinutes: base.durationMinutes,
       price: base.price,
       category: base.category,
       imagePath: base.imagePath,

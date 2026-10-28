@@ -29,6 +29,7 @@ class ChangePasswordController extends ChangeNotifier {
 
   // Criteria rules
   bool get hasMinLength => _newPassword.length >= 8;
+  bool get hasMaxLength => _newPassword.length <= 32;
   bool get hasUppercase => RegExp(r'[A-Z]').hasMatch(_newPassword);
   bool get hasLowercase => RegExp(r'[a-z]').hasMatch(_newPassword);
   bool get hasUpperAndLower => hasUppercase && hasLowercase;
@@ -132,7 +133,10 @@ class ChangePasswordController extends ChangeNotifier {
     if (_newPassword.trim().isEmpty) {
       _newPasswordError = 'Kata sandi baru wajib diisi.';
       isValid = false;
-    } else if (!hasMinLength || !hasUpperAndLower || !hasNumber) {
+    } else if (!hasMinLength ||
+        !hasMaxLength ||
+        !hasUpperAndLower ||
+        !hasNumber) {
       _newPasswordError = 'Kata sandi baru belum memenuhi semua kriteria.';
       isValid = false;
     } else if (_newPassword == _currentPassword) {

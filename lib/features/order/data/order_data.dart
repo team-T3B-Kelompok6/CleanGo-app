@@ -10,7 +10,7 @@ abstract final class OrderData {
     serviceImagePath: 'assets/images/deep_cleaning.jpeg',
     orderNumber: '#CG-82910',
     price: 'Rp305.000',
-    paymentStatus: 'QRIS Terbayar',
+    paymentStatus: '',
     stage: OrderStatusStage.dikonfirmasi,
   );
 
@@ -21,7 +21,7 @@ abstract final class OrderData {
       serviceAssetPath: 'assets/icons/ac_wash.svg',
       schedule: 'Kamis, 15 Sep 2024 • 09:00',
       status: 'SELESAI',
-      customerName: 'Krisna pratama',
+      customerName: '',
       price: 'Rp305.000',
       canReview: true,
     ),
@@ -31,7 +31,7 @@ abstract final class OrderData {
       serviceAssetPath: 'assets/images/deep_cleaning.jpeg',
       schedule: 'Selasa, 10 Sep 2024 • 10:00',
       status: 'SELESAI',
-      customerName: 'Krisna pratama',
+      customerName: '',
       price: 'Rp155.000',
       servicePrice: 150000,
       platformFee: 5000,

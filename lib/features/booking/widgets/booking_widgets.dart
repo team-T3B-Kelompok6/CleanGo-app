@@ -278,24 +278,25 @@ class CleaningAddressCard extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE8FAF7),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      address.label,
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                  if (address.label.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8FAF7),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        address.label,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                  ),
                   const Spacer(),
                   SvgPicture.asset(
                     'assets/icons/detail_chevron.svg',
@@ -306,9 +307,13 @@ class CleaningAddressCard extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                address.fullAddress,
-                style: const TextStyle(
-                  color: AppColors.slate900,
+                address.fullAddress.isEmpty
+                    ? 'Belum ada alamat. Ketuk untuk memilih atau menambah alamat.'
+                    : address.fullAddress,
+                style: TextStyle(
+                  color: address.fullAddress.isEmpty
+                      ? AppColors.slate500
+                      : AppColors.slate900,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   height: 1.5,

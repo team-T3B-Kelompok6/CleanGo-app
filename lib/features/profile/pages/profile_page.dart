@@ -7,9 +7,11 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../address/controllers/address_controller.dart';
 import '../../address/pages/address_list_page.dart';
 import '../../auth/controllers/auth_session_controller.dart';
+import '../../booking/controllers/booking_controller.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../../support/pages/help_center_page.dart';
 import '../controllers/profile_controller.dart';
@@ -188,10 +190,8 @@ class ProfilePage extends StatelessWidget {
 
   void _handleNavigation(BuildContext context, int index) {
     if (index == 0) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.home,
-        (route) => false,
-      );
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
     } else if (index == 1) {
       Navigator.pushReplacementNamed(context, AppRoutes.services);
     } else if (index == 2) {
@@ -202,8 +202,12 @@ class ProfilePage extends StatelessWidget {
   }
 
   Future<void> _logout(BuildContext context) async {
+    final addresses = context.read<AddressController>();
+    final booking = context.read<BookingController>();
     try {
       await context.read<AuthSessionController>().signOut();
+      await addresses.clearLocal();
+      await booking.clearDraft();
     } catch (_) {
       if (context.mounted) {
         AppNotice.show(
@@ -239,17 +243,10 @@ class _ProfileIdentityCard extends StatelessWidget {
     return _ProfileCard(
       child: Row(
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            padding: const EdgeInsets.all(2),
-            decoration: const BoxDecoration(
-              color: AppColors.primaryBorder,
-              shape: BoxShape.circle,
-            ),
-            child: CircleAvatar(
-              backgroundImage: AssetImage(profile.avatarAsset),
-            ),
+          UserAvatar(
+            source: profile.avatarUrl,
+            size: 56,
+            borderColor: AppColors.primaryBorder,
           ),
           const SizedBox(width: 14),
           Expanded(

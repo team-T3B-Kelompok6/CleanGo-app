@@ -92,6 +92,7 @@ class ServiceRepository {
             'comment': review.comment,
             'rating': review.rating,
             'date': review.date,
+            'avatarUrl': review.avatarUrl,
             'imagePaths': review.imagePaths,
           },
         )
@@ -136,6 +137,7 @@ class ServiceRepository {
               comment: review['comment']! as String,
               rating: review['rating']! as int,
               date: review['date']! as String,
+              avatarUrl: review['avatarUrl'] as String?,
               imagePaths: (review['imagePaths']! as List).cast<String>(),
             );
           })

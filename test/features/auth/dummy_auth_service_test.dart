@@ -54,6 +54,14 @@ void main() {
       );
     });
 
+    test('caps passwords at 32 characters', () {
+      expect(
+        AuthValidators.registerPassword('a'.padRight(33, 'a')),
+        'Password maksimal 32 karakter.',
+      );
+      expect(AuthValidators.registerPassword('a'.padRight(32, 'a')), isNull);
+    });
+
     test('rejects names that contain no valid name characters', () {
       expect(AuthValidators.name('12345'), 'Masukkan nama yang valid.');
       expect(AuthValidators.name('---'), 'Masukkan nama yang valid.');

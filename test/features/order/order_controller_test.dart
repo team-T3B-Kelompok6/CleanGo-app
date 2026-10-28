@@ -149,35 +149,38 @@ void main() {
       expect(controller.scheduledOrder.scheduledAt, secondSchedule);
     });
 
-    test('completing and reviewing one order leaves the other active', () {
-      controller.completeScheduledOrder();
-      final firstId = addOrder('Pesanan pertama');
-      final secondId = addOrder('Pesanan kedua');
-      controller.selectScheduledOrder(firstId);
-      controller.completeScheduledOrder();
-      controller.completeScheduledOrder();
+    test(
+      'completing and reviewing one order leaves the other active',
+      () async {
+        controller.completeScheduledOrder();
+        final firstId = addOrder('Pesanan pertama');
+        final secondId = addOrder('Pesanan kedua');
+        controller.selectScheduledOrder(firstId);
+        controller.completeScheduledOrder();
+        controller.completeScheduledOrder();
 
-      expect(controller.scheduledOrder.orderNumber, firstId);
-      expect(controller.currentStage, OrderStatusStage.selesai);
-      expect(controller.scheduledOrders.single.orderNumber, secondId);
-      expect(controller.hasScheduledOrder, isTrue);
-      expect(
-        controller.historyOrders.where((order) => order.orderId == firstId),
-        hasLength(1),
-      );
-      expect(
-        controller.submitReview(
-          orderId: firstId,
-          rating: 4,
-          tags: [],
-          comment: 'Pekerjaan rapi',
-        ),
-        isTrue,
-      );
-      expect(controller.selectScheduledOrder(secondId), isTrue);
-      expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
-      expect(controller.scheduledOrder.note, 'Catatan Pesanan kedua');
-    });
+        expect(controller.scheduledOrder.orderNumber, firstId);
+        expect(controller.currentStage, OrderStatusStage.selesai);
+        expect(controller.scheduledOrders.single.orderNumber, secondId);
+        expect(controller.hasScheduledOrder, isTrue);
+        expect(
+          controller.historyOrders.where((order) => order.orderId == firstId),
+          hasLength(1),
+        );
+        expect(
+          await controller.submitReview(
+            orderId: firstId,
+            rating: 4,
+            tags: [],
+            comment: 'Pekerjaan rapi',
+          ),
+          isTrue,
+        );
+        expect(controller.selectScheduledOrder(secondId), isTrue);
+        expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
+        expect(controller.scheduledOrder.note, 'Catatan Pesanan kedua');
+      },
+    );
 
     test('a late ETA response cannot update another selected order', () async {
       final repository = FakeEtaRepository();
@@ -224,7 +227,9 @@ void main() {
       expect(controller.currentStepNumber, 1);
       expect(controller.currentStepLabel, 'Langkah 1 dari 5');
       expect(controller.scheduledOrder.orderNumber, '#CG-82910');
-      expect(controller.scheduledOrder.cleanerName, 'Siti Rahmawati');
+      expect(controller.scheduledOrder.cleanerName, isEmpty);
+      expect(controller.scheduledOrder.cleanerPhone, isEmpty);
+      expect(controller.scheduledOrder.destinationSubAddress, isEmpty);
       expect(controller.etaAvailable, isFalse);
       expect(controller.scheduledOrder.estimatedMinutes, 'Belum tersedia');
       expect(
@@ -366,13 +371,13 @@ void main() {
       },
     );
 
-    test('submitReview records review data and sets canReview to false on matching history item', () {
+    test('submitReview records review data and keeps it editable', () async {
       final initialReviewable = controller.historyOrders.firstWhere(
         (o) => o.canReview,
       );
       expect(initialReviewable.canReview, true);
 
-      controller.submitReview(
+      await controller.submitReview(
         orderId: initialReviewable.orderId,
         rating: 5,
         tags: ['Bersih Maksimal ✨', 'Tepat Waktu ⏰'],
@@ -383,7 +388,8 @@ void main() {
       final target = updatedOrders.firstWhere(
         (o) => o.serviceName == initialReviewable.serviceName,
       );
-      expect(target.canReview, false);
+      expect(target.canReview, true);
+      expect(target.hasReview, true);
       expect(target.rating, 5.0);
       expect(target.review, isNotNull);
       expect(target.review?.rating, 5);
@@ -401,10 +407,10 @@ void main() {
     });
 
     test(
-      'review rejects unknown orders, invalid ratings and repeated submissions',
-      () {
+      'review rejects unknown orders and invalid ratings but allows an edit',
+      () async {
         expect(
-          controller.submitReview(
+          await controller.submitReview(
             orderId: 'unknown',
             rating: 5,
             tags: [],
@@ -413,7 +419,7 @@ void main() {
           isFalse,
         );
         expect(
-          controller.submitReview(
+          await controller.submitReview(
             orderId: '#CG-82910',
             rating: 5,
             tags: [],
@@ -425,7 +431,7 @@ void main() {
           (item) => item.canReview,
         );
         expect(
-          controller.submitReview(
+          await controller.submitReview(
             orderId: order.orderId,
             rating: 0,
             tags: [],
@@ -434,7 +440,7 @@ void main() {
           isFalse,
         );
         expect(
-          controller.submitReview(
+          await controller.submitReview(
             orderId: order.orderId,
             rating: 5,
             tags: [],
@@ -443,25 +449,25 @@ void main() {
           isTrue,
         );
         expect(
-          controller.submitReview(
+          await controller.submitReview(
             orderId: order.orderId,
             rating: 4,
             tags: [],
             comment: 'Kedua',
           ),
-          isFalse,
+          isTrue,
         );
         final review = controller.historyOrders
             .firstWhere((item) => item.orderId == order.orderId)
             .review!;
-        expect(review.rating, 5);
-        expect(review.comment, isEmpty);
+        expect(review.rating, 4);
+        expect(review.comment, 'Kedua');
       },
     );
 
-    test('submitReview on scheduled order (#CG-82910) does NOT overwrite Cuci AC review status', () {
+    test('submitReview on scheduled order (#CG-82910) does NOT overwrite Cuci AC review status', () async {
       controller.completeScheduledOrder();
-      controller.submitReview(
+      await controller.submitReview(
         orderId: '#CG-82910',
         rating: 5,
         tags: ['Bersih Maksimal ✨'],
@@ -477,7 +483,7 @@ void main() {
       final scheduledHistory = controller.historyOrders.firstWhere(
         (o) => o.orderId == '#CG-82910',
       );
-      expect(scheduledHistory.canReview, false);
+      expect(scheduledHistory.canReview, true);
       expect(scheduledHistory.rating, 5.0);
     });
   });

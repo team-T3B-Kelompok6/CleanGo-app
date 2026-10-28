@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>CleanGo menggunakan kamera untuk foto profil dan foto hasil pengerjaan.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CleanGo memilih foto profil dan foto hasil pengerjaan dari galeri.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -12,6 +12,7 @@ import '../controllers/auth_session_controller.dart';
 import '../data/api_auth_service.dart';
 import '../data/dummy_auth_service.dart';
 import '../data/google_sign_in_service.dart';
+import '../../service/controllers/service_controller.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
 
@@ -30,7 +31,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmationController = TextEditingController();
-  late final ApiAuthService _authService = widget.authService ?? ApiAuthService();
+  late final ApiAuthService _authService =
+      widget.authService ?? ApiAuthService();
   final _googleSignInService = GoogleSignInService();
 
   bool _obscurePassword = true;
@@ -258,9 +260,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      AuthSocialButtons(
-                        onGoogleTap: _handleGoogleRegister,
-                      ),
+                      AuthSocialButtons(onGoogleTap: _handleGoogleRegister),
                     ],
                   ),
                 ),
@@ -292,16 +292,26 @@ class _RegisterPageState extends State<RegisterPage> {
         idToken: googleUser.idToken,
       );
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      await context.read<AuthSessionController>().createSession(
+        result.token,
+        expiresInSeconds: result.expiresIn,
+      );
       try {
         if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) {
+          await context.read<ServiceController>().refreshServices();
+        }
       } catch (_) {}
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on ApiException catch (e) {
       if (mounted) setState(() => _serverError = e.message);
     } catch (e) {
-      if (mounted) setState(() => _serverError = 'Gagal daftar dengan Google: $e');
+      if (mounted) {
+        setState(() => _serverError = 'Gagal daftar dengan Google: $e');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -332,7 +342,10 @@ class _RegisterPageState extends State<RegisterPage> {
         password: _passwordController.text,
       );
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      await context.read<AuthSessionController>().createSession(
+        result.token,
+        expiresInSeconds: result.expiresIn,
+      );
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {

@@ -74,14 +74,12 @@ void main() {
       controller = ProfileController();
     });
 
-    test('Initial state contains default profile data', () {
-      expect(controller.fullName, 'Krisna Pratama');
-      expect(controller.customerId, 'CG-8829104');
-      expect(controller.phoneNumber, '+62 812–3456–7890');
+    test('Initial state has no identity before the account is loaded', () {
+      expect(controller.fullName, isEmpty);
+      expect(controller.customerId, isEmpty);
+      expect(controller.phoneNumber, isEmpty);
+      expect(controller.email, isEmpty);
       expect(controller.isPhoneVerified, true);
-      expect(controller.email, 'krisna.pratama@email.com');
-      expect(controller.gender, 'Laki-laki');
-      expect(controller.formattedBirthDate, '14 Mei 1995');
     });
 
     test('updateProfile updates profile properties and notifies listeners', () {

@@ -10,13 +10,13 @@ abstract final class HomeData {
 
   static const List<ServiceCategoryModel> categories = [
     ServiceCategoryModel(
-      iconPath: 'assets/icons/daily_cleaning.svg',
+      iconPath: 'assets/icons/service_rumah.png',
       label: 'Cleaning',
       accentText: 'harian',
       serviceId: 'daily-cleaning',
     ),
     ServiceCategoryModel(
-      iconPath: 'assets/icons/ac_wash.svg',
+      iconPath: 'assets/icons/service_ac.png',
       label: 'Cuci AC',
       serviceId: 'ac-care',
     ),
@@ -35,7 +35,7 @@ abstract final class HomeData {
       accentText: 'bulanan',
     ),
     ServiceCategoryModel(
-      iconPath: 'assets/icons/sofa_mattress.svg',
+      iconPath: 'assets/icons/service_sofa.png',
       label: 'Sofa &\nKasur',
       serviceId: 'sofa-mattress',
     ),
@@ -44,7 +44,7 @@ abstract final class HomeData {
       label: 'Pasang AC',
     ),
     ServiceCategoryModel(
-      iconPath: 'assets/icons/office.svg',
+      iconPath: 'assets/icons/service_office.png',
       label: 'Kantor',
       serviceId: 'office-cleaning',
     ),
@@ -54,6 +54,7 @@ abstract final class HomeData {
     PopularServiceModel(
       serviceId: 'deep-cleaning',
       imagePath: 'assets/images/deep_cleaning.jpeg',
+      iconPath: 'assets/icons/service_rumah.png',
       badge: 'Terlaris',
       badgeStyle: PopularServiceBadgeStyle.primary,
       rating: '4.9',
@@ -66,6 +67,7 @@ abstract final class HomeData {
     PopularServiceModel(
       serviceId: 'sofa-mattress',
       imagePath: 'assets/images/sofa_cleaning.jpeg',
+      iconPath: 'assets/icons/service_sofa.png',
       badge: 'Promo',
       badgeStyle: PopularServiceBadgeStyle.soft,
       rating: '4.8',
@@ -78,6 +80,7 @@ abstract final class HomeData {
     PopularServiceModel(
       serviceId: 'ac-care',
       imagePath: 'assets/images/ac_service.jpeg',
+      iconPath: 'assets/icons/service_ac.png',
       badge: 'Cepat',
       badgeStyle: PopularServiceBadgeStyle.dark,
       rating: '4.9',

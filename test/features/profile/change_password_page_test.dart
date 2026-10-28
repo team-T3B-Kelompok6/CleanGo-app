@@ -10,9 +10,11 @@ void main() {
   testWidgets('reset dialog only clears fields after confirmation', (
     tester,
   ) async {
+    final profile = ProfileController()
+      ..updateProfile(email: 'uji@cleango.id');
     await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => ProfileController(),
+      ChangeNotifierProvider.value(
+        value: profile,
         child: MaterialApp(
           theme: AppTheme.light,
           home: const ChangePasswordPage(),
@@ -42,7 +44,7 @@ void main() {
     await tester.tap(find.text('Lupa Sandi?'));
     await tester.pumpAndSettle();
     expect(find.byType(AppSheet), findsOneWidget);
-    expect(find.textContaining('krisna.pratama@email.com'), findsOneWidget);
+    expect(find.textContaining('uji@cleango.id'), findsOneWidget);
     await tester.tap(find.byTooltip('Tutup'));
     await tester.pumpAndSettle();
     expect(find.byType(AppSheet), findsNothing);

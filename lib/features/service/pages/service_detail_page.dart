@@ -8,9 +8,10 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../../booking/pages/booking_page.dart';
+import '../data/service_icon_catalog.dart';
 import '../domain/models/service_model.dart';
+import '../widgets/service_icon.dart';
 import '../controllers/service_controller.dart';
-import '../widgets/review_card.dart';
 import 'all_reviews_page.dart';
 import '../../../shared/widgets/remote_or_asset_image.dart';
 
@@ -122,7 +123,23 @@ class _Hero extends StatelessWidget {
               if (imagePath != null)
                 RemoteOrAssetImage(source: imagePath)
               else
-                const ColoredBox(color: AppColors.slate200),
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFF0FDFA), Color(0xFFCCFBF1)],
+                    ),
+                  ),
+                  child: Center(
+                    child: ServiceIcon(
+                      path:
+                          service.iconPath ??
+                          ServiceIconCatalog.forCategory(service.category),
+                      size: 88,
+                    ),
+                  ),
+                ),
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -187,6 +204,13 @@ class _BackButton extends StatelessWidget {
   }
 }
 
+bool _hasReviews(String value) {
+  final match = RegExp(r'\d+').firstMatch(value);
+  return match != null &&
+      int.tryParse(match.group(0)!) != null &&
+      int.parse(match.group(0)!) > 0;
+}
+
 class _DetailContent extends StatelessWidget {
   const _DetailContent({required this.service});
 
@@ -245,37 +269,18 @@ class _DetailContent extends StatelessWidget {
             ),
           ),
         ],
-        if (detail != null && detail.reviews.isNotEmpty) ...[
+        if (detail != null && _hasReviews(detail.reviewCount)) ...[
           const SizedBox(height: 12),
-          _DetailCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ReviewHeader(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => AllReviewsPage(service: service),
-                      ),
-                    );
-                  },
+          _ReviewEntry(
+            rating: detail.rating,
+            reviewCount: detail.reviewCount,
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AllReviewsPage(service: service),
                 ),
-                const SizedBox(height: 14),
-                ...detail.reviews
-                    .take(2)
-                    .indexed
-                    .map(
-                      (entry) => Padding(
-                        padding: EdgeInsets.only(
-                          bottom: entry.$1 == detail.reviews.take(2).length - 1
-                              ? 0
-                              : 10,
-                        ),
-                        child: _ReviewItem(review: entry.$2),
-                      ),
-                    ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ],
@@ -476,92 +481,67 @@ class _BenefitItem extends StatelessWidget {
   }
 }
 
-class _ReviewHeader extends StatelessWidget {
-  const _ReviewHeader({required this.onPressed});
+class _ReviewEntry extends StatelessWidget {
+  const _ReviewEntry({
+    required this.rating,
+    required this.reviewCount,
+    required this.onPressed,
+  });
 
+  final String rating;
+  final String reviewCount;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Expanded(child: _SectionTitle('Ulasan Pengguna')),
-        InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Lihat Semua',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SvgPicture.asset(
-                  'assets/icons/detail_chevron.svg',
-                  width: 5,
-                  height: 8,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReviewItem extends StatelessWidget {
-  const _ReviewItem({required this.review});
-
-  final ServiceReviewModel review;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: AppColors.screenBackground.withValues(alpha: 0.8),
+    return _DetailCard(
+      child: InkWell(
+        onTap: onPressed,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ServiceDetailPage._cardBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
             children: [
+              const Icon(
+                Icons.star_rounded,
+                color: Color(0xFFF59E0B),
+                size: 22,
+              ),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  review.name,
-                  style: const TextStyle(
-                    color: AppColors.slate900,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    height: 1.45,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionTitle('Ulasan Pengguna'),
+                    const SizedBox(height: 3),
+                    Text(
+                      '$rating • $reviewCount',
+                      style: const TextStyle(
+                        color: AppColors.slate500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              RatingStars(rating: review.rating),
+              const Text(
+                'Lihat Review',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 8),
+              SvgPicture.asset(
+                'assets/icons/detail_chevron.svg',
+                width: 5,
+                height: 8,
+              ),
             ],
           ),
-          const SizedBox(height: 7),
-          Text(
-            '“${review.comment}”',
-            style: const TextStyle(
-              color: AppColors.slate600,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              height: 1.58,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -10,6 +10,7 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../data/home_data.dart';
 import '../domain/models/popular_service_model.dart';
@@ -42,8 +43,9 @@ class HomePage extends StatelessWidget {
     final catalogCategories = rankedCategories.isNotEmpty
         ? rankedCategories
         : (derivedCategories.isEmpty ? HomeData.categories : derivedCategories);
-    final catalogPopular =
-        derivedPopular.isEmpty ? HomeData.popularServices : derivedPopular;
+    final catalogPopular = derivedPopular.isEmpty
+        ? HomeData.popularServices
+        : derivedPopular;
     final mediaQuery = MediaQuery.of(context);
     final double screenWidth = mediaQuery.size.width;
     final double cardWidth = math.min(256, math.max(224, screenWidth * 0.70));
@@ -178,9 +180,7 @@ class _HomeIntroSection extends StatelessWidget {
       child: Column(
         children: [
           _HomeHeader(),
-          _PromoSection(
-            bannerPaths: context.watch<HomeController>().banners,
-          ),
+          _PromoSection(bannerPaths: context.watch<HomeController>().banners),
         ],
       ),
     );
@@ -257,7 +257,9 @@ class _HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileController>().profile;
-    final greetingName = profile.fullName.isNotEmpty ? profile.fullName : 'Pengguna';
+    final greetingName = profile.fullName.isNotEmpty
+        ? profile.fullName
+        : 'Pengguna';
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Row(
@@ -280,12 +282,7 @@ class _HomeHeader extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const ClipOval(
-                    child: Image(
-                      image: AssetImage('assets/images/user_profile.jpeg'),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  child: UserAvatar(source: profile.avatarUrl, size: 44),
                 ),
                 const SizedBox(width: 12),
                 Expanded(

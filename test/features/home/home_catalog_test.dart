@@ -2,18 +2,22 @@ import 'package:cleango_app/features/home/data/home_catalog.dart';
 import 'package:cleango_app/features/service/domain/models/service_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-ServiceModel _service(String id, String category, {String? rating, String? image}) =>
-    ServiceModel(
-      id: id,
-      title: 'Layanan $id',
-      description: 'Deskripsi $id',
-      duration: '2 jam',
-      price: 'Rp100.000',
-      category: category,
-      iconPath: 'assets/icons/$category.svg',
-      imagePath: image,
-      rating: rating,
-    );
+ServiceModel _service(
+  String id,
+  String category, {
+  String? rating,
+  String? image,
+}) => ServiceModel(
+  id: id,
+  title: 'Layanan $id',
+  description: 'Deskripsi $id',
+  duration: '2 jam',
+  price: 'Rp100.000',
+  category: category,
+  iconPath: 'assets/icons/$category.svg',
+  imagePath: image,
+  rating: rating,
+);
 
 void main() {
   group('HomeCatalog.categories', () {
@@ -62,6 +66,7 @@ void main() {
       expect(popular.single.price, 'Rp100.000');
       expect(popular.single.duration, '2 jam');
       expect(popular.single.rating, '4.9');
+      expect(popular.single.iconPath, 'assets/icons/Rumah.svg');
     });
 
     test('limits the number of cards', () {

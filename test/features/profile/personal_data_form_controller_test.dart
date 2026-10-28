@@ -19,10 +19,9 @@ void main() {
 
     test('loads editable values from the current profile', () {
       expect(formController.name.text, profileController.fullName);
-      expect(formController.phone.text, '81234567890');
+      expect(formController.phone.text, profileController.phoneNumber);
       expect(formController.email.text, profileController.email);
       expect(formController.selectedGender, profileController.gender);
-      expect(formController.formattedBirthDate, '14 Mei 1995');
     });
 
     test('saves trimmed form values through ProfileController', () {

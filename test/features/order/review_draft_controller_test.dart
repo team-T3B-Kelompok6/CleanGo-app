@@ -1,7 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:cleango_app/features/booking/domain/models/review_photo_model.dart';
 import 'package:cleango_app/features/order/controllers/review_draft_controller.dart';
-
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -31,16 +31,31 @@ void main() {
       expect(controller.selectedChips, contains('Ramah & Sopan 😊'));
     });
 
-    test('limits attached photos to three and removes by index', () {
-      expect(controller.addMockPhoto(), isTrue);
-      expect(controller.addMockPhoto(), isTrue);
-      expect(controller.addMockPhoto(), isTrue);
-      expect(controller.addMockPhoto(), isFalse);
-      expect(controller.attachedPhotos, hasLength(3));
-      expect(File(controller.attachedPhotos.first).existsSync(), isTrue);
+    test('limits photos to three and tracks removed server photos', () {
+      final photo = ReviewPhotoModel(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        contentType: 'image/jpeg',
+      );
+      expect(controller.addPhoto(photo), isTrue);
+      expect(controller.addPhoto(photo), isTrue);
+      expect(controller.addPhoto(photo), isTrue);
+      expect(controller.addPhoto(photo), isFalse);
+      expect(controller.photos, hasLength(3));
 
-      controller.removePhoto(1);
-      expect(controller.attachedPhotos, hasLength(2));
+      final removed = controller.removePhoto(1);
+      expect(removed, same(photo));
+      expect(controller.photos, hasLength(2));
+      expect(controller.removedPhotoIds, isEmpty);
+    });
+
+    test('keeps existing photo ids when they are removed during edit', () {
+      final existing = ReviewPhotoModel(id: '9', url: '/uploads/a.jpg');
+      controller = ReviewDraftController(initialPhotos: [existing]);
+
+      controller.removePhoto(0);
+
+      expect(controller.photos, isEmpty);
+      expect(controller.removedPhotoIds, ['9']);
     });
   });
 }

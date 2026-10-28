@@ -1,6 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/storage/token_storage.dart';
+import '../domain/models/review_photo_model.dart';
 
 class BookingSlotInfo {
   const BookingSlotInfo({
@@ -106,6 +107,86 @@ class CustomerBookingApi {
     return CreatedBooking.fromJson(data);
   }
 
+  Future<void> createReview({
+    required String bookingId,
+    required int rating,
+    String? comment,
+  }) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    await _client.post(
+      '${ApiConfig.customerBookings}/$bookingId/review',
+      body: {
+        'rating': rating,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
+      },
+      token: token,
+    );
+  }
+
+  Future<void> updateReview({
+    required String bookingId,
+    required int rating,
+    String? comment,
+  }) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    await _client.patch(
+      '${ApiConfig.customerBookings}/$bookingId/review',
+      body: {
+        'rating': rating,
+        if (comment != null && comment.trim().isNotEmpty)
+          'comment': comment.trim(),
+      },
+      token: token,
+    );
+  }
+
+  Future<CustomerReview?> fetchReview(String bookingId) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    final res = await _client.get(
+      '${ApiConfig.customerBookings}/$bookingId/review',
+      token: token,
+    );
+    final data = res['data'];
+    if (data is! Map<String, dynamic>) return null;
+    return CustomerReview.fromJson(data);
+  }
+
+  Future<ReviewPhotoModel> uploadReviewPhoto({
+    required String bookingId,
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    final res = await _client.postBytes(
+      '${ApiConfig.customerBookings}/$bookingId/review/photos',
+      bytes: bytes,
+      contentType: contentType,
+      token: token,
+    );
+    final data = res['data'] as Map<String, dynamic>? ?? const {};
+    return ReviewPhotoModel(
+      id: '${data['id'] ?? ''}',
+      url: ApiConfig.mediaUrl(data['url'] as String?),
+    );
+  }
+
+  Future<void> deleteReviewPhoto({
+    required String bookingId,
+    required String photoId,
+  }) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    await _client.delete(
+      '${ApiConfig.customerBookings}/$bookingId/review/photos/$photoId',
+      token: token,
+    );
+  }
+
   Future<CreatedBooking> create({
     required String serviceId,
     required String date,
@@ -133,6 +214,41 @@ class CustomerBookingApi {
   }
 }
 
+class CustomerReview {
+  const CustomerReview({
+    required this.id,
+    required this.rating,
+    required this.comment,
+    required this.editable,
+    required this.photos,
+  });
+
+  final String id;
+  final int rating;
+  final String comment;
+  final bool editable;
+  final List<ReviewPhotoModel> photos;
+
+  static CustomerReview fromJson(Map<String, dynamic> json) {
+    final rawPhotos = json['photos'] as List<dynamic>? ?? const [];
+    return CustomerReview(
+      id: '${json['id'] ?? ''}',
+      rating: (json['rating'] as num?)?.toInt() ?? 0,
+      comment: json['comment'] as String? ?? '',
+      editable: json['editable'] == true,
+      photos: rawPhotos
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (photo) => ReviewPhotoModel(
+              id: '${photo['id'] ?? ''}',
+              url: ApiConfig.mediaUrl(photo['url'] as String?),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+}
+
 /// One booking as listed by `GET /api/customer/bookings`.
 class CustomerBookingSummary {
   const CustomerBookingSummary({
@@ -149,6 +265,16 @@ class CustomerBookingSummary {
     required this.notes,
     required this.address,
     this.addressLabel = '',
+    this.recipientName = '',
+    this.recipientPhone = '',
+    this.landmark = '',
+    this.cleanerName = '',
+    this.paymentStatus,
+    this.hasReview = false,
+    this.reviewEditable = false,
+    this.reviewRating,
+    this.reviewComment,
+    this.reviewPhotos = const [],
     this.latitude,
     this.longitude,
     this.serviceDurationMinutes,
@@ -168,6 +294,16 @@ class CustomerBookingSummary {
   final String notes;
   final String address;
   final String addressLabel;
+  final String recipientName;
+  final String recipientPhone;
+  final String landmark;
+  final String cleanerName;
+  final String? paymentStatus;
+  final bool hasReview;
+  final bool reviewEditable;
+  final int? reviewRating;
+  final String? reviewComment;
+  final List<ReviewPhotoModel> reviewPhotos;
   final double? latitude;
   final double? longitude;
   final int? serviceDurationMinutes;
@@ -195,6 +331,24 @@ class CustomerBookingSummary {
       notes: json['notes'] as String? ?? '',
       address: json['address'] as String? ?? '',
       addressLabel: json['addressLabel'] as String? ?? '',
+      recipientName: json['recipientName'] as String? ?? '',
+      recipientPhone: json['recipientPhone'] as String? ?? '',
+      landmark: json['landmark'] as String? ?? '',
+      cleanerName: json['cleanerName'] as String? ?? '',
+      paymentStatus: json['paymentStatus'] as String?,
+      hasReview: json['hasReview'] == true,
+      reviewEditable: json['reviewEditable'] == true,
+      reviewRating: (json['reviewRating'] as num?)?.toInt(),
+      reviewComment: json['reviewComment'] as String?,
+      reviewPhotos: (json['reviewPhotos'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (photo) => ReviewPhotoModel(
+              id: '${photo['id'] ?? ''}',
+              url: ApiConfig.mediaUrl(photo['url'] as String?),
+            ),
+          )
+          .toList(growable: false),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       serviceDurationMinutes: (json['serviceDurationMinutes'] as num?)?.toInt(),

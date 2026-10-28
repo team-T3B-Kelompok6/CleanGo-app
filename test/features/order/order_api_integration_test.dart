@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cleango_app/core/network/api_config.dart';
 import 'package:cleango_app/features/booking/data/customer_booking_api.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/data/order_data.dart';
@@ -22,9 +25,11 @@ class _FakeBookingApi extends CustomerBookingApi {
 
 class _OwnedTracking extends EtaRepository {
   int calls = 0;
+  Future<EtaEstimate>? pendingResult;
   @override
   Future<EtaEstimate> calculateForBooking(String id) async {
     calls++;
+    if (pendingResult != null) return pendingResult!;
     return EtaEstimate(
       distanceMeters: 1200,
       baselineEtaSeconds: 121,
@@ -55,6 +60,13 @@ CustomerBookingSummary _booking({
   required String status,
   String time = '10:00',
   int total = 105000,
+  bool reviewEditable = false,
+  bool hasReview = false,
+  int? reviewRating,
+  String reviewComment = '',
+  String cleanerName = '',
+  String recipientName = '',
+  String recipientPhone = '',
 }) => CustomerBookingSummary(
   id: code,
   code: code,
@@ -70,6 +82,13 @@ CustomerBookingSummary _booking({
   address: 'Jl. Uji No. 1, Malang',
   latitude: -7.98,
   longitude: 112.63,
+  reviewEditable: reviewEditable,
+  hasReview: hasReview,
+  reviewRating: reviewRating,
+  reviewComment: reviewComment,
+  cleanerName: cleanerName,
+  recipientName: recipientName,
+  recipientPhone: recipientPhone,
 );
 
 void main() {
@@ -106,6 +125,34 @@ void main() {
       expect(booking.scheduledAt, DateTime(2026, 10, 25, 14));
     });
 
+    test('parses review photos with their ids for editing', () {
+      final booking = CustomerBookingSummary.fromJson({
+        'id': 77,
+        'code': 'CG-TEST',
+        'date': '2026-10-25',
+        'time': '14:00',
+        'service': 'Sofa Cleaning',
+        'servicePrice': 150000,
+        'platformFee': 5000,
+        'discountAmount': 0,
+        'totalAmount': 155000,
+        'status': 'Selesai',
+        'notes': '',
+        'address': 'Jl. A, Malang',
+        'hasReview': true,
+        'reviewPhotos': [
+          {'id': '4', 'url': '/uploads/review-photos/a.jpg'},
+        ],
+      });
+
+      expect(booking.reviewPhotos, hasLength(1));
+      expect(booking.reviewPhotos.first.id, '4');
+      expect(
+        booking.reviewPhotos.first.url,
+        '${ApiConfig.baseUrl}/uploads/review-photos/a.jpg',
+      );
+    });
+
     test('flags finished bookings', () {
       expect(_booking(code: 'A', status: 'Selesai').isFinished, isTrue);
       expect(_booking(code: 'B', status: 'Batal').isFinished, isTrue);
@@ -114,6 +161,81 @@ void main() {
   });
 
   group('OrderController.loadFromApi', () {
+    test(
+      'status polling keeps the selected order and its last GPS estimate',
+      () async {
+        final api = _FakeBookingApi(
+          bookings: [
+            _booking(code: '9', status: 'Menuju Lokasi'),
+            _booking(code: '10', status: 'Menuju Lokasi'),
+          ],
+        );
+        final controller = OrderController(
+          bookingApi: api,
+          etaRepository: _OwnedTracking(),
+        );
+        addTearDown(controller.dispose);
+        await controller.loadFromApi();
+        controller.selectScheduledOrder('#9');
+        await controller.refreshEta();
+        final updatedAt = controller.scheduledOrder.etaUpdatedAt;
+        await controller.loadFromApi();
+        expect(controller.scheduledOrder.orderNumber, '#9');
+        expect(controller.etaAvailable, isTrue);
+        expect(controller.scheduledOrder.etaUpdatedAt, updatedAt);
+        expect(controller.scheduledOrder.cleanerLatitude, -7.97);
+      },
+    );
+
+    test(
+      'an ETA response remains valid when status polling keeps the same trip',
+      () async {
+        final pending = Completer<EtaEstimate>();
+        final tracking = _OwnedTracking()..pendingResult = pending.future;
+        final api = _FakeBookingApi(
+          bookings: [_booking(code: '9', status: 'Menuju Lokasi')],
+        );
+        final controller = OrderController(
+          bookingApi: api,
+          etaRepository: tracking,
+        );
+        addTearDown(controller.dispose);
+        await controller.loadFromApi();
+        final refresh = controller.refreshEta();
+        await controller.loadFromApi();
+        pending.complete(
+          EtaEstimate(
+            distanceMeters: 1200,
+            baselineEtaSeconds: 121,
+            etaSeconds: 121,
+            etaMinutes: 3,
+            source: 'osrm',
+            modelVersion: null,
+            updatedAt: DateTime.now(),
+            path: const [],
+            cleanerLatitude: -7.97,
+            cleanerLongitude: 112.61,
+          ),
+        );
+        await refresh;
+        expect(controller.etaAvailable, isTrue);
+      },
+    );
+
+    test('status polling removes an active order when the server reports completion', () async {
+      final bookings = [_booking(code: '9', status: 'Menuju Lokasi')];
+      final controller = OrderController(
+        bookingApi: _FakeBookingApi(bookings: bookings),
+        etaRepository: _OwnedTracking(),
+      );
+      addTearDown(controller.dispose);
+      await controller.loadFromApi();
+      bookings[0] = _booking(code: '9', status: 'Selesai');
+      await controller.loadFromApi();
+      expect(controller.hasScheduledOrder, isFalse);
+      expect(controller.currentStage, OrderStatusStage.selesai);
+      expect(controller.historyOrders.single.orderId, '#9');
+    });
     test('owned bookings wait for departure and use saved GPS instead of demo positions', () async {
       final tracking = _OwnedTracking();
       final api = _FakeBookingApi(
@@ -176,7 +298,16 @@ void main() {
 
     test('maps finished bookings into history', () async {
       final api = _FakeBookingApi(
-        bookings: [_booking(code: 'CG-9', status: 'Selesai')],
+        bookings: [
+          _booking(
+            code: 'CG-9',
+            status: 'Selesai',
+            reviewEditable: true,
+            cleanerName: 'Budi Santoso',
+            recipientName: 'Timothy',
+            recipientPhone: '082140636747',
+          ),
+        ],
       );
       final controller = OrderController(bookingApi: api);
 
@@ -186,6 +317,9 @@ void main() {
       expect(controller.historyOrders.first.orderId, '#CG-9');
       expect(controller.historyOrders.first.status, 'SELESAI');
       expect(controller.historyOrders.first.canReview, isTrue);
+      expect(controller.historyOrders.first.hasReview, isFalse);
+      expect(controller.historyOrders.first.cleanerName, 'Budi Santoso');
+      expect(controller.historyOrders.first.customerName, 'Timothy');
     });
 
     test('keeps the demo orders when the backend returns nothing', () async {

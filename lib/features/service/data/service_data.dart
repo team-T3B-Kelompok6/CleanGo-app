@@ -28,7 +28,7 @@ abstract final class ServiceData {
             'debu di tempat tersembunyi, serta sanitasi penuh untuk seluruh '
             'ruangan agar kembali segar, sehat, dan higienis.',
         rating: '4.8',
-        reviewCount: '230 ulasan',
+        reviewCount: '0 ulasan',
         satisfactionPercentage: 98,
         benefits: [
           'Pembersihan debu & kerak menyeluruh',
@@ -95,7 +95,7 @@ abstract final class ServiceData {
             'evaporator, blower, dan saluran pembuangan sekaligus memeriksa '
             'tekanan freon agar udara kembali sejuk, bersih, dan hemat energi.',
         rating: '4.9',
-        reviewCount: '184 ulasan',
+        reviewCount: '0 ulasan',
         satisfactionPercentage: 99,
         benefits: [
           'Pembersihan filter, evaporator & blower',
@@ -157,7 +157,7 @@ abstract final class ServiceData {
             'ekstraksi untuk mengangkat debu, tungau, bau, serta noda membandel '
             'tanpa merusak warna dan tekstur kain.',
         rating: '4.8',
-        reviewCount: '156 ulasan',
+        reviewCount: '0 ulasan',
         satisfactionPercentage: 97,
         benefits: [
           'Vakum debu dan tungau secara menyeluruh',
@@ -219,7 +219,7 @@ abstract final class ServiceData {
             'area kerja, meja, lantai, kaca, serta ruang bersama agar lingkungan '
             'tetap rapi, higienis, dan nyaman digunakan.',
         rating: '4.9',
-        reviewCount: '92 ulasan',
+        reviewCount: '0 ulasan',
         satisfactionPercentage: 99,
         benefits: [
           'Pembersihan meja dan area kerja',
@@ -281,7 +281,7 @@ abstract final class ServiceData {
             'kegiatan menyapu, mengepel, membersihkan debu, dan merapikan area '
             'utama sesuai kebutuhan harian.',
         rating: '4.7',
-        reviewCount: '318 ulasan',
+        reviewCount: '0 ulasan',
         satisfactionPercentage: 96,
         benefits: [
           'Menyapu dan mengepel lantai',

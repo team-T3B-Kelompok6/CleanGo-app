@@ -1,44 +1,86 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../controllers/review_sort.dart';
+import '../data/customer_service_reviews_api.dart';
 import '../domain/models/service_model.dart';
 import '../widgets/review_card.dart';
 
 class AllReviewsPage extends StatefulWidget {
-  const AllReviewsPage({super.key, required this.service});
+  const AllReviewsPage({super.key, required this.service, this.api});
 
   final ServiceModel service;
+  final CustomerServiceReviewsApi? api;
 
   @override
   State<AllReviewsPage> createState() => _AllReviewsPageState();
 }
 
 class _AllReviewsPageState extends State<AllReviewsPage> {
-  static const _filters = ReviewSort.filters;
+  late final CustomerServiceReviewsApi _api;
+  final List<ServiceReviewModel> _reviews = [];
+  double? _rating;
+  int _reviewCount = 0;
+  int _satisfaction = 0;
+  int _page = 1;
+  bool _hasMore = false;
+  bool _loading = true;
+  bool _loadingMore = false;
+  String? _error;
 
-  String _selectedFilter = _filters.first;
+  @override
+  void initState() {
+    super.initState();
+    _api = widget.api ?? CustomerServiceReviewsApi();
+    _load(reset: true);
+  }
 
-  List<ServiceReviewModel> get _visibleReviews {
-    return ReviewSort.apply(
-      widget.service.detail?.reviews ?? const [],
-      _selectedFilter,
-    );
+  Future<void> _load({required bool reset}) async {
+    if (!reset && (_loadingMore || !_hasMore)) return;
+    setState(() {
+      if (reset) {
+        _loading = true;
+        _error = null;
+      } else {
+        _loadingMore = true;
+      }
+    });
+    try {
+      final result = await _api.fetchReviews(
+        widget.service.id,
+        page: reset ? 1 : _page + 1,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (reset) _reviews.clear();
+        _reviews.addAll(result.reviews);
+        _rating = result.rating;
+        _reviewCount = result.reviewCount;
+        _satisfaction = result.satisfactionPercentage;
+        _page = result.page;
+        _hasMore = result.hasMore;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Ulasan belum dapat dimuat. Periksa koneksi lalu coba lagi.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final detail = widget.service.detail;
-    final visibleReviews = _visibleReviews;
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: AppColors.screenBackground,
@@ -48,52 +90,8 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
               constraints: const BoxConstraints(maxWidth: 480),
               child: Column(
                 children: [
-                  _ReviewsHeader(serviceName: widget.service.title),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-                      itemCount: visibleReviews.length + 3,
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return _RatingSummary(
-                            rating:
-                                detail?.rating ??
-                                widget.service.rating ??
-                                '0.0',
-                            reviewCount: detail?.reviewCount ?? '0 ulasan',
-                            satisfactionPercentage:
-                                detail?.satisfactionPercentage ?? 0,
-                          );
-                        }
-
-                        if (index == 1) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            child: _ReviewFilters(
-                              filters: _filters,
-                              selectedFilter: _selectedFilter,
-                              onSelected: (filter) {
-                                setState(() => _selectedFilter = filter);
-                              },
-                            ),
-                          );
-                        }
-
-                        if (index == visibleReviews.length + 2) {
-                          return const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: _LoadMoreButton(),
-                          );
-                        }
-
-                        final review = visibleReviews[index - 2];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: ServiceReviewCard(review: review),
-                        );
-                      },
-                    ),
-                  ),
+                  _Header(serviceName: widget.service.title),
+                  Expanded(child: _body()),
                 ],
               ),
             ),
@@ -102,43 +100,101 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
       ),
     );
   }
+
+  Widget _body() {
+    if (_loading && _reviews.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _reviews.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.slate500),
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton(
+                onPressed: () => _load(reset: true),
+                child: const Text('Coba Lagi'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_reviews.isEmpty) {
+      return const Center(
+        child: Text(
+          'Belum ada ulasan untuk layanan ini.',
+          style: TextStyle(color: AppColors.slate500),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _load(reset: true),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+        itemCount: _reviews.length + 2,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: _RatingSummary(
+                rating: _rating,
+                reviewCount: _reviewCount,
+                satisfactionPercentage: _satisfaction,
+              ),
+            );
+          }
+          if (index == _reviews.length + 1) {
+            if (!_hasMore) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: OutlinedButton(
+                onPressed: _loadingMore ? null : () => _load(reset: false),
+                child: _loadingMore
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Muat Lebih Banyak'),
+              ),
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: ServiceReviewCard(review: _reviews[index - 1]),
+          );
+        },
+      ),
+    );
+  }
 }
 
-class _ReviewsHeader extends StatelessWidget {
-  const _ReviewsHeader({required this.serviceName});
+class _Header extends StatelessWidget {
+  const _Header({required this.serviceName});
 
   final String serviceName;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppColors.slate100)),
-      ),
       child: Row(
         children: [
-          Material(
-            color: AppColors.screenBackground,
-            shape: const CircleBorder(),
-            child: InkWell(
-              onTap: () => Navigator.pop(context),
-              customBorder: const CircleBorder(),
-              child: SizedBox.square(
-                dimension: 40,
-                child: Center(
-                  child: SvgPicture.asset(
-                    'assets/icons/detail_back.svg',
-                    width: 15,
-                    height: 15,
-                  ),
-                ),
-              ),
-            ),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'Kembali',
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,20 +203,19 @@ class _ReviewsHeader extends StatelessWidget {
                   'Ulasan Pengguna',
                   style: TextStyle(
                     color: AppColors.slate900,
-                    fontSize: 16,
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    height: 1.35,
                   ),
                 ),
-                const SizedBox(height: 2),
                 Text(
                   serviceName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: AppColors.slate400,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
+                    color: AppColors.slate500,
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 12,
                   ),
                 ),
               ],
@@ -179,139 +234,52 @@ class _RatingSummary extends StatelessWidget {
     required this.satisfactionPercentage,
   });
 
-  final String rating;
-  final String reviewCount;
+  final double? rating;
+  final int reviewCount;
   final int satisfactionPercentage;
 
   @override
   Widget build(BuildContext context) {
+    final value = rating ?? 0;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.slate100),
       ),
       child: Row(
         children: [
+          Text(
+            value.toStringAsFixed(1),
+            style: const TextStyle(
+              color: AppColors.slate900,
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 34,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                RatingStars(rating: value.round(), size: 15),
+                const SizedBox(height: 5),
                 Text(
-                  rating,
+                  '$reviewCount ulasan • $satisfactionPercentage% puas',
                   style: const TextStyle(
-                    color: AppColors.slate900,
-                    fontSize: 27,
-                    fontWeight: FontWeight.w700,
-                    height: 1.1,
+                    color: AppColors.slate500,
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 5),
-                const RatingStars(rating: 5, size: 13),
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '$satisfactionPercentage% Pelanggan Puas',
-                style: const TextStyle(
-                  color: AppColors.slate900,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '$reviewCount terverifikasi',
-                style: const TextStyle(
-                  color: AppColors.slate400,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _ReviewFilters extends StatelessWidget {
-  const _ReviewFilters({
-    required this.filters,
-    required this.selectedFilter,
-    required this.onSelected,
-  });
-
-  final List<String> filters;
-  final String selectedFilter;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: filters.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final filter = filters[index];
-          final isSelected = filter == selectedFilter;
-
-          return ChoiceChip(
-            label: Text(filter),
-            selected: isSelected,
-            onSelected: (_) => onSelected(filter),
-            showCheckmark: false,
-            backgroundColor: Colors.white,
-            selectedColor: AppColors.primaryAction,
-            side: BorderSide(
-              color: isSelected ? AppColors.primaryAction : AppColors.slate200,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 9),
-            labelStyle: TextStyle(
-              color: isSelected ? Colors.white : AppColors.slate500,
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-            ),
-            visualDensity: VisualDensity.compact,
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _LoadMoreButton extends StatelessWidget {
-  const _LoadMoreButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 42,
-      child: OutlinedButton.icon(
-        onPressed: () {},
-        iconAlignment: IconAlignment.end,
-        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 17),
-        label: const Text('Tampilkan Lebih Banyak'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.slate600,
-          backgroundColor: Colors.white,
-          side: const BorderSide(color: AppColors.slate200),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-        ),
       ),
     );
   }

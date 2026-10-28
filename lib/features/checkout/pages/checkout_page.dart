@@ -152,7 +152,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     required BookingController booking,
     required String formattedTotal,
   }) async {
-    final error = booking.validateSchedule();
+    final error = booking.addressError ?? booking.validateSchedule();
     if (error != null) {
       AppNotice.show(context, error, type: AppNoticeType.error);
       return;

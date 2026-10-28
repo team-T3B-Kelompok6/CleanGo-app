@@ -2,6 +2,7 @@ import 'package:cleango_app/core/constants/app_routes.dart';
 import 'package:cleango_app/core/theme/app_theme.dart';
 import 'package:cleango_app/features/address/controllers/address_controller.dart';
 import 'package:cleango_app/features/booking/controllers/booking_controller.dart';
+import 'package:cleango_app/features/booking/domain/models/cleaning_address.dart';
 import 'package:cleango_app/features/booking/pages/booking_page.dart';
 import 'package:cleango_app/features/checkout/pages/checkout_page.dart';
 import 'package:cleango_app/features/home/pages/home_page.dart';
@@ -76,9 +77,27 @@ void main() {
     await finishNavigation(tester);
     expect(find.byType(BookingPage), findsOneWidget);
 
-    tester.element(find.byType(BookingPage)).read<BookingController>()
+    final bookingController = tester.element(find.byType(BookingPage)).read<BookingController>()
       ..selectDate(DateTime.now().add(const Duration(days: 1)))
       ..selectTime('10:00');
+    await tester.pump();
+
+    await tester.tap(find.text('Lanjut ke Checkout'));
+    await finishNavigation(tester);
+    expect(find.byType(CheckoutPage), findsNothing);
+    expect(find.text('Tambahkan alamat terlebih dahulu.'), findsOneWidget);
+
+    bookingController.updateAddress(
+      const CleaningAddress(
+        label: 'Rumah',
+        street: 'Jl. Uji No. 1',
+        city: 'Kota Uji',
+        landmark: '',
+        customerName: 'Pemilik Uji',
+        phoneNumber: '081200000001',
+      ),
+      addressId: 'uji-1',
+    );
     await tester.pump();
 
     await tester.tap(find.text('Lanjut ke Checkout'));

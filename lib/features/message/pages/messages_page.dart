@@ -75,28 +75,30 @@ class _MessagesPageState extends State<MessagesPage> {
                               duration: const Duration(milliseconds: 180),
                               switchInCurve: Curves.easeOut,
                               switchOutCurve: Curves.easeIn,
-                              child: ListView.separated(
-                                key: ValueKey(_controller.selectedTab),
-                                padding: EdgeInsets.fromLTRB(
-                                  16,
-                                  16,
-                                  16,
-                                  bottomSpacing,
-                                ),
-                                itemCount: visibleMessages.length,
-                                separatorBuilder: (_, _) =>
-                                    const SizedBox(height: 12),
-                                itemBuilder: (context, index) {
-                                  final message = visibleMessages[index];
-                                  return _MessageNotificationCard(
-                                    message: message,
-                                    onTap: () {
-                                      _controller.markAsRead(message.id);
-                                      widget.onMessageTap?.call(message);
-                                    },
-                                  );
-                                },
-                              ),
+                              child: visibleMessages.isEmpty
+                                  ? _EmptyMessages(tab: _controller.selectedTab)
+                                  : ListView.separated(
+                                      key: ValueKey(_controller.selectedTab),
+                                      padding: EdgeInsets.fromLTRB(
+                                        16,
+                                        16,
+                                        16,
+                                        bottomSpacing,
+                                      ),
+                                      itemCount: visibleMessages.length,
+                                      separatorBuilder: (_, _) =>
+                                          const SizedBox(height: 12),
+                                      itemBuilder: (context, index) {
+                                        final message = visibleMessages[index];
+                                        return _MessageNotificationCard(
+                                          message: message,
+                                          onTap: () {
+                                            _controller.markAsRead(message.id);
+                                            widget.onMessageTap?.call(message);
+                                          },
+                                        );
+                                      },
+                                    ),
                             ),
                           ),
                         ],
@@ -128,10 +130,8 @@ class _MessagesPageState extends State<MessagesPage> {
 
   void _handleNavigation(BuildContext context, int index) {
     if (index == 0) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.home,
-        (route) => false,
-      );
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
     } else if (index == 1) {
       Navigator.pushReplacementNamed(context, AppRoutes.services);
     } else if (index == 2) {
@@ -194,6 +194,65 @@ class _MessagesHeader extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _EmptyMessages extends StatelessWidget {
+  const _EmptyMessages({required this.tab});
+
+  final MessageTab tab;
+
+  @override
+  Widget build(BuildContext context) {
+    final (title, description) = switch (tab) {
+      MessageTab.orders => (
+        'Belum ada pesan pesanan',
+        'Perubahan status pesanan dan pembayaran akan muncul di sini.',
+      ),
+      MessageTab.promo => (
+        'Belum ada promo',
+        'Promo dan penawaran baru untuk Anda akan muncul di sini.',
+      ),
+      MessageTab.all => (
+        'Belum ada notifikasi',
+        'Pesan tentang pesanan, pembayaran, dan promo akan muncul di sini.',
+      ),
+    };
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.notifications_none_rounded,
+              size: 56,
+              color: AppColors.slate400,
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.slate900,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              description,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.slate500,
+                fontSize: 12,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

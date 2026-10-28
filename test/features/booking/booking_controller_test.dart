@@ -1,5 +1,6 @@
 import 'package:cleango_app/features/address/domain/models/address_model.dart';
 import 'package:cleango_app/features/booking/controllers/booking_controller.dart';
+import 'package:cleango_app/features/booking/domain/models/cleaning_address.dart';
 import 'package:cleango_app/features/booking/domain/models/booking_draft.dart';
 import 'package:cleango_app/features/service/data/service_data.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +32,17 @@ void main() {
     expect(booking.selectedTime, '16:00');
   });
 
+  test('treats a slot within the 60 minute lead time as unavailable', () {
+    final booking = BookingController()
+      ..startBooking(ServiceData.services.first)
+      ..selectDate(DateTime(2030, 1, 2));
+    addTearDown(booking.dispose);
+
+    final now = DateTime(2030, 1, 2, 11, 30);
+    expect(booking.isTimeAvailable('12:00', now: now), isFalse);
+    expect(booking.isTimeAvailable('13:00', now: now), isTrue);
+  });
+
   test('rejects elapsed hours and dates when submitting a booking', () {
     final booking = BookingController()
       ..startBooking(ServiceData.services.first)
@@ -38,11 +50,11 @@ void main() {
       ..selectTime('09:00');
     addTearDown(booking.dispose);
     expect(
-      booking.isTimeAvailable('08:00', now: DateTime(2030, 1, 2, 9)),
+      booking.isTimeAvailable('08:00', now: DateTime(2030, 1, 2, 8)),
       isFalse,
     );
     expect(
-      booking.isTimeAvailable('09:00', now: DateTime(2030, 1, 2, 9)),
+      booking.isTimeAvailable('09:00', now: DateTime(2030, 1, 2, 8)),
       isTrue,
     );
     expect(
@@ -51,7 +63,7 @@ void main() {
     );
     expect(booking.validateSchedule(now: DateTime(2030, 1, 2, 8)), isNull);
     expect(
-      booking.validateSchedule(now: DateTime(2030, 1, 2, 9, 1)),
+      booking.validateSchedule(now: DateTime(2030, 1, 2, 8, 1)),
       contains('Jam mulai sudah lewat'),
     );
     expect(
@@ -90,9 +102,32 @@ void main() {
       address.toCleaningAddress().fullAddress.split(address.title),
       hasLength(2),
     );
-    expect(
-      BookingController.initialAddress.fullAddress,
-      contains('Kota Malang'),
+    expect(BookingController.emptyAddress.fullAddress, isEmpty);
+    expect(BookingController.emptyAddress.customerName, isEmpty);
+  });
+
+  test('blocks continuing until an owned address is chosen', () {
+    final booking = BookingController()
+      ..startBooking(ServiceData.services.first)
+      ..selectDate(DateTime(2030, 1, 2));
+    addTearDown(booking.dispose);
+
+    expect(booking.hasAddress, isFalse);
+    expect(booking.addressError, 'Tambahkan alamat terlebih dahulu.');
+
+    booking.updateAddress(
+      const CleaningAddress(
+        label: 'Rumah',
+        street: 'Jl. Uji No. 1',
+        city: 'Kota Uji',
+        landmark: '',
+        customerName: 'Pemilik Uji',
+        phoneNumber: '081200000001',
+      ),
+      addressId: 'uji-1',
     );
+
+    expect(booking.hasAddress, isTrue);
+    expect(booking.addressError, isNull);
   });
 }

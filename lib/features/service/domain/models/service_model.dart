@@ -58,6 +58,7 @@ class ServiceReviewModel {
     required this.comment,
     required this.rating,
     required this.date,
+    this.avatarUrl,
     this.imagePaths = const [],
   });
 
@@ -65,5 +66,6 @@ class ServiceReviewModel {
   final String comment;
   final int rating;
   final String date;
+  final String? avatarUrl;
   final List<String> imagePaths;
 }

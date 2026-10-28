@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../controllers/personal_data_form_controller.dart';
 import '../controllers/profile_controller.dart';
 import '../controllers/profile_form_validator.dart';
@@ -18,6 +20,8 @@ class PersonalDataPage extends StatefulWidget {
 class _PersonalDataPageState extends State<PersonalDataPage> {
   final _formKey = GlobalKey<FormState>();
   bool _hasSubmitted = false;
+  Uint8List? _pendingAvatarBytes;
+  String? _pendingAvatarType;
 
   late final PersonalDataFormController _personalDataForm;
   final FocusNode _phoneFocusNode = FocusNode();
@@ -68,6 +72,74 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     }
   }
 
+  Future<void> _pickAvatar() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Ambil dari kamera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Pilih dari galeri'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 82,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    if (bytes.length > 2 * 1024 * 1024) {
+      AppNotice.show(
+        context,
+        'Ukuran foto maksimal 2 MB.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    final type = _imageType(picked);
+    if (type == null) {
+      AppNotice.show(
+        context,
+        'Format foto harus JPEG, PNG, atau WebP.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    setState(() {
+      _pendingAvatarBytes = bytes;
+      _pendingAvatarType = type;
+    });
+  }
+
+  String? _imageType(XFile file) {
+    final type = file.mimeType?.toLowerCase();
+    if (type == 'image/jpeg' || type == 'image/png' || type == 'image/webp') {
+      return type;
+    }
+    final name = file.name.toLowerCase();
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return null;
+  }
+
   Future<void> _handleSave() async {
     FocusScope.of(context).unfocus();
 
@@ -87,7 +159,8 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     final profileController = context.read<ProfileController>();
     final token = await profileController.updateProfileRemote(
       fullName: _personalDataForm.name.text.trim(),
-      phoneNumber: '+62 ${PersonalDataFormController.localPhoneDigits(_personalDataForm.phone.text)}',
+      phoneNumber:
+          '+62 ${PersonalDataFormController.localPhoneDigits(_personalDataForm.phone.text)}',
       email: _personalDataForm.email.text.trim(),
     );
     if (!mounted) return;
@@ -98,6 +171,23 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
       return;
     }
     _personalDataForm.saveTo(profileController);
+
+    final pendingBytes = _pendingAvatarBytes;
+    if (pendingBytes != null) {
+      final uploaded = await profileController.uploadProfilePhotoRemote(
+        bytes: pendingBytes,
+        contentType: _pendingAvatarType ?? 'image/jpeg',
+      );
+      if (!mounted) return;
+      if (!uploaded) {
+        AppNotice.show(
+          context,
+          'Data diri tersimpan, tetapi foto profil gagal diunggah. Coba simpan lagi.',
+          type: AppNoticeType.error,
+        );
+        return;
+      }
+    }
 
     AppNotice.show(context, 'Data diri berhasil disimpan.');
 
@@ -238,6 +328,26 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     );
   }
 
+  Widget _buildProfileAvatar(dynamic profile) {
+    final pending = _pendingAvatarBytes;
+    if (pending != null) {
+      return Container(
+        width: 86,
+        height: 86,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFF00685F), width: 2.5),
+        ),
+        child: ClipOval(child: Image.memory(pending, fit: BoxFit.cover)),
+      );
+    }
+    return UserAvatar(
+      source: profile.avatarUrl as String?,
+      size: 86,
+      borderColor: const Color(0xFF00685F),
+    );
+  }
+
   Widget _buildIdentityCard(dynamic profile) {
     return Container(
       width: double.infinity,
@@ -256,71 +366,59 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
       ),
       child: Column(
         children: [
-          // Foto profil dengan border teal & badge kamera
-          Stack(
-            children: [
-              Container(
-                width: 86,
-                height: 86,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF00685F),
-                    width: 2.5,
-                  ),
-                ),
-                child: ClipOval(
-                  child: Image.asset(
-                    profile.avatarAsset,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.person,
-                      size: 48,
-                      color: Color(0xFF00685F),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: () {
-                    AppNotice.show(
-                      context,
-                      'Fitur ubah foto profil belum tersedia.',
-                      type: AppNoticeType.info,
-                    );
-                  },
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: const Color(0xFFCBD5E1),
-                        width: 1.2,
-                      ),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x14000000),
-                          blurRadius: 4,
-                          offset: Offset(0, 1),
+          // Seluruh foto profil bisa ditekan untuk mengganti foto.
+          Semantics(
+            button: true,
+            label: 'Ubah foto profil',
+            child: GestureDetector(
+              onTap: _pickAvatar,
+              behavior: HitTestBehavior.opaque,
+              child: Stack(
+                children: [
+                  _buildProfileAvatar(profile),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: const Color(0xFFCBD5E1),
+                          width: 1.2,
                         ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.photo_camera_outlined,
-                      size: 15,
-                      color: Color(0xFF0F766E),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x14000000),
+                            blurRadius: 4,
+                            offset: Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.photo_camera_outlined,
+                        size: 15,
+                        color: Color(0xFF0F766E),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          const Text(
+            'Ketuk foto untuk mengubah',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             profile.fullName,
             style: const TextStyle(

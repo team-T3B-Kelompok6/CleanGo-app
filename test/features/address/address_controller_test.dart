@@ -57,22 +57,51 @@ void main() {
     late AddressController controller;
 
     setUp(() {
-      controller = AddressController();
+      controller = AddressController(
+        initialAddresses: const [
+          AddressModel(
+            id: 'uji-1',
+            title: 'Rumah Uji',
+            fullAddress: 'Jl. Uji No. 1, Kota Uji',
+            type: 'Rumah',
+            contactName: 'Pemilik Uji',
+            phoneNumber: '081200000001',
+            isPrimary: true,
+          ),
+          AddressModel(
+            id: 'uji-2',
+            title: 'Kantor Uji',
+            fullAddress: 'Jl. Uji No. 2, Kota Uji',
+            type: 'Kantor',
+            contactName: 'Pemilik Uji',
+            phoneNumber: '081200000001',
+          ),
+        ],
+      );
     });
 
-    test('Initial addresses has 2 items with primary selected', () {
+    test('Initial addresses keep the given list with primary selected', () {
       expect(controller.addresses.length, 2);
       expect(controller.primaryAddress, isNotNull);
       expect(controller.primaryAddress!.type, 'Rumah');
       expect(controller.selectedAddressId, controller.primaryAddress!.id);
     });
 
-    test('empty initial snapshot safely falls back to seeded addresses', () {
+    test('empty initial snapshot stays empty and has no fake address', () {
       final emptyController = AddressController(initialAddresses: const []);
 
-      expect(emptyController.addresses, isNotEmpty);
-      expect(emptyController.selectedAddress, isNotNull);
+      expect(emptyController.addresses, isEmpty);
+      expect(emptyController.selectedAddress, isNull);
+      expect(emptyController.primaryAddress, isNull);
       emptyController.dispose();
+    });
+
+    test('no initial list starts empty without a seeded address', () {
+      final blankController = AddressController();
+
+      expect(blankController.addresses, isEmpty);
+      expect(blankController.selectedAddress, isNull);
+      blankController.dispose();
     });
 
     test('selectAddress updates selectedAddressId', () {

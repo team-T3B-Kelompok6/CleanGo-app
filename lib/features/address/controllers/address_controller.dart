@@ -17,10 +17,7 @@ class AddressController extends ChangeNotifier {
     CustomerAddressService? remote,
   })  : tokenStorage = tokenStorage,
         _remote = remote ?? CustomerAddressService() {
-    final seed = initialAddresses == null || initialAddresses.isEmpty
-        ? defaultAddresses
-        : initialAddresses;
-    _addresses = seed.map(_withDefaultCoordinates).toList();
+    _addresses = List<AddressModel>.of(initialAddresses ?? const []);
     _selectedAddressId = _addresses.isEmpty
         ? ''
         : _addresses
@@ -29,37 +26,13 @@ class AddressController extends ChangeNotifier {
     _subscription = repository?.watchAddresses().listen(_applySnapshot);
   }
 
-  static const List<AddressModel> defaultAddresses = [
-    AddressModel(
-      id: 'addr-1',
-      title: 'Blk. N No.521, Mojolangu, Kec. Lowokwaru',
-      fullAddress: 'Blk. N No.521, Mojolangu, Kec. Lowokwaru, Kota Malang, Jawa Timur 65141, Indonesia',
-      note: 'Patokan pagar hitam sebelah minimarket',
-      type: 'Rumah',
-      contactName: 'krisna',
-      phoneNumber: '(+62) 081223728077',
-      isPrimary: true,
-      latitude: -7.93980,
-      longitude: 112.62650,
-    ),
-    AddressModel(
-      id: 'addr-2',
-      title: 'Jl. Sudirman No. 123, Lantai 4',
-      fullAddress: 'Jl. Sudirman No. 123, Lantai 4, Gedung Equity Tower, Jakarta Selatan, DKI Jakarta 12190, Indonesia',
-      note: '',
-      type: 'Kantor',
-      contactName: 'krisna',
-      phoneNumber: '(+62) 081223728077',
-      isPrimary: false,
-    ),
-  ];
-
   late List<AddressModel> _addresses;
   late String _selectedAddressId;
   final AddressRepository? repository;
   final TokenStorage? tokenStorage;
   final CustomerAddressService _remote;
   StreamSubscription<AddressSnapshot>? _subscription;
+  bool _updatingFromRemote = false;
   String? _error;
   String? get error => _error;
   Future<bool> _usingRemote() async { final t = await tokenStorage?.readAccessToken(); return t != null && t.isNotEmpty; }
@@ -67,7 +40,21 @@ class AddressController extends ChangeNotifier {
   Future<void> loadFromApi() async {
     final token = await tokenStorage?.readAccessToken();
     if (token == null || token.isEmpty) return;
-    try { _addresses = await _remote.fetchAddresses(token); if (_addresses.isNotEmpty) _selectedAddressId = _addresses.firstWhere((a) => a.isPrimary, orElse: () => _addresses.first).id; _error = null; notifyListeners(); } catch (e) { _error = e.toString(); }
+    _updatingFromRemote = true;
+    try {
+      final remote = await _remote.fetchAddresses(token);
+      _addresses = List<AddressModel>.of(remote);
+      _selectedAddressId = _addresses.isEmpty
+          ? ''
+          : _addresses.firstWhere((a) => a.isPrimary, orElse: () => _addresses.first).id;
+      _error = null;
+      notifyListeners();
+      await _persist();
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _updatingFromRemote = false;
+    }
   }
 
   Future<AddressModel?> createRemote(AddressModel address) async {
@@ -229,24 +216,24 @@ class AddressController extends ChangeNotifier {
   }
 
   void _applySnapshot(AddressSnapshot snapshot) {
-    _addresses = snapshot.addresses.map(_withDefaultCoordinates).toList();
+    if (_updatingFromRemote) return;
+    _addresses = List<AddressModel>.of(snapshot.addresses);
     _selectedAddressId = snapshot.selectedAddressId;
     notifyListeners();
   }
 
-  static AddressModel _withDefaultCoordinates(AddressModel address) {
-    if (address.latitude != null && address.longitude != null) return address;
-    for (final seed in defaultAddresses) {
-      if (seed.id == address.id &&
-          seed.latitude != null &&
-          seed.longitude != null) {
-        return address.copyWith(
-          latitude: seed.latitude,
-          longitude: seed.longitude,
-        );
-      }
+  Future<void> clearLocal() async {
+    _updatingFromRemote = true;
+    try {
+      _addresses = const [];
+      _selectedAddressId = '';
+      notifyListeners();
+      await repository?.saveSnapshot(
+        const AddressSnapshot(addresses: [], selectedAddressId: ''),
+      );
+    } finally {
+      _updatingFromRemote = false;
     }
-    return address;
   }
 
   Future<void> _persist() async {

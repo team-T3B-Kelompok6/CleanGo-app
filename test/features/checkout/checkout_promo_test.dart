@@ -20,10 +20,21 @@ void main() {
   }) async {
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => BookingController()
-          ..startBooking(ServiceData.services.first)
-          ..selectDate(DateTime.now().add(const Duration(days: 1)))
-          ..selectTime('12:00'),
+        create: (_) {
+          const uji = AddressModel(
+            id: 'uji-1',
+            title: 'Rumah Uji',
+            fullAddress: 'Jl. Uji No. 1, Kota Uji',
+            type: 'Rumah',
+            contactName: 'Pemilik Uji',
+            phoneNumber: '081200000001',
+          );
+          return BookingController()
+            ..startBooking(ServiceData.services.first)
+            ..updateAddress(uji.toCleaningAddress(), addressId: uji.id)
+            ..selectDate(DateTime.now().add(const Duration(days: 1)))
+            ..selectTime('12:00');
+        },
         child: MaterialApp(
           theme: AppTheme.light,
           home: CheckoutPage(onApplyPromo: onApplyPromo),
@@ -65,7 +76,9 @@ void main() {
     final booking = BookingController(
       initialService: ServiceData.services.first,
       initialAddress: address.toCleaningAddress(),
-    )..selectDate(DateTime.now().add(const Duration(days: 1)));
+    )
+      ..updateAddress(address.toCleaningAddress(), addressId: address.id)
+      ..selectDate(DateTime.now().add(const Duration(days: 1)));
     addTearDown(booking.dispose);
     await tester.pumpWidget(
       ChangeNotifierProvider.value(

@@ -44,6 +44,28 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> postBytes(
+    String path, {
+    required List<int> bytes,
+    required String contentType,
+    String? token,
+    Duration? timeout,
+  }) async {
+    final uri = Uri.parse('${_root.replaceAll(RegExp(r'/$'), '')}$path');
+    final headers = <String, String>{
+      'Content-Type': contentType,
+      'Accept': 'application/json',
+    };
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    var request = _client.post(uri, headers: headers, body: bytes);
+    if (timeout != null) request = request.timeout(timeout);
+    final response = await request;
+    return _handleResponse(response);
+  }
+
   void close() => _client.close();
 
   Future<Map<String, dynamic>> get(

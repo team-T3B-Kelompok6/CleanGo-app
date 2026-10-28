@@ -28,6 +28,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
       DraggableScrollableController();
   double _sheetSize = 0.56;
   Timer? _trackingTimer;
+  Timer? _statusTimer;
 
   @override
   void initState() {
@@ -35,6 +36,14 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     _sheetController.addListener(_syncMapControlsWithSheet);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<OrderController>().refreshEta();
+    });
+    unawaited(context.read<OrderController>().loadFromApi());
+    _statusTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      unawaited(context.read<OrderController>().loadFromApi());
     });
     _trackingTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted ||
@@ -59,6 +68,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   @override
   void dispose() {
     _trackingTimer?.cancel();
+    _statusTimer?.cancel();
     _sheetController.removeListener(_syncMapControlsWithSheet);
     _sheetController.dispose();
     super.dispose();
@@ -92,6 +102,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
         MaterialPageRoute<void>(
           builder: (_) => ReviewRatingPage(
             orderId: order.orderNumber,
+            bookingId: order.backendBookingId,
             serviceName: order.serviceName,
             serviceImagePath: order.serviceImagePath,
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../address/controllers/address_controller.dart';
@@ -168,13 +169,11 @@ class _PaymentPageState extends State<PaymentPage> {
     } catch (error) {
       if (!context.mounted) return;
       setState(() => _isSubmitting = false);
-      AppNotice.show(
-        context,
-        error is StateError
-            ? error.message.toString()
-            : 'Pesanan belum berhasil diproses. Silakan coba lagi.',
-        type: AppNoticeType.error,
-      );
+      AppNotice.show(context, switch (error) {
+        StateError() => error.message.toString(),
+        ApiException() => error.message,
+        _ => 'Pesanan belum berhasil diproses. Silakan coba lagi.',
+      }, type: AppNoticeType.error);
     }
   }
 }

@@ -10,6 +10,7 @@ import '../controllers/auth_session_controller.dart';
 import '../data/api_auth_service.dart';
 import '../data/dummy_auth_service.dart';
 import '../data/google_sign_in_service.dart';
+import '../../service/controllers/service_controller.dart';
 import 'register_page.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
@@ -28,7 +29,8 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  late final ApiAuthService _authService = widget.authService ?? ApiAuthService();
+  late final ApiAuthService _authService =
+      widget.authService ?? ApiAuthService();
   final _googleSignInService = GoogleSignInService();
 
   bool _obscurePassword = true;
@@ -236,9 +238,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           const SizedBox(height: 24),
-                          AuthSocialButtons(
-                            onGoogleTap: _handleGoogleLogin,
-                          ),
+                          AuthSocialButtons(onGoogleTap: _handleGoogleLogin),
                         ],
                       ),
                     ),
@@ -273,9 +273,17 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      await context.read<AuthSessionController>().createSession(
+        result.token,
+        expiresInSeconds: result.expiresIn,
+      );
       try {
         if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) {
+          await context.read<ServiceController>().refreshServices();
+        }
       } catch (_) {}
       try {
         if (mounted) await context.read<AddressController>().loadFromApi();
@@ -340,9 +348,17 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (!mounted) return;
-      await context.read<AuthSessionController>().createSession(result.token, expiresInSeconds: result.expiresIn);
+      await context.read<AuthSessionController>().createSession(
+        result.token,
+        expiresInSeconds: result.expiresIn,
+      );
       try {
         if (mounted) await context.read<ProfileController>().loadFromApi();
+      } catch (_) {}
+      try {
+        if (mounted) {
+          await context.read<ServiceController>().refreshServices();
+        }
       } catch (_) {}
       try {
         if (mounted) await context.read<AddressController>().loadFromApi();

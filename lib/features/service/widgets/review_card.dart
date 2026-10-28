@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../domain/models/service_model.dart';
 
 class ServiceReviewCard extends StatelessWidget {
@@ -32,7 +34,7 @@ class ServiceReviewCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ReviewerAvatar(name: review.name),
+              UserAvatar(source: review.avatarUrl, size: 34),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -65,17 +67,19 @@ class ServiceReviewCard extends StatelessWidget {
               RatingStars(rating: review.rating),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            review.comment,
-            textAlign: TextAlign.justify,
-            style: const TextStyle(
-              color: AppColors.slate600,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              height: 1.55,
+          if (review.comment.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              review.comment,
+              textAlign: TextAlign.justify,
+              style: const TextStyle(
+                color: AppColors.slate600,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                height: 1.55,
+              ),
             ),
-          ),
+          ],
           if (review.imagePaths.isNotEmpty) ...[
             const SizedBox(height: 12),
             Wrap(
@@ -120,40 +124,6 @@ class RatingStars extends StatelessWidget {
   }
 }
 
-class _ReviewerAvatar extends StatelessWidget {
-  const _ReviewerAvatar({required this.name});
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    final initials = parts
-        .take(2)
-        .map((part) => part.isEmpty ? '' : part[0].toUpperCase())
-        .join();
-
-    return Container(
-      width: 34,
-      height: 34,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FDFA),
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primaryBorder),
-      ),
-      child: Text(
-        initials,
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-}
-
 class _ReviewImage extends StatelessWidget {
   const _ReviewImage({required this.imagePath});
 
@@ -163,7 +133,12 @@ class _ReviewImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(9),
-      child: Image.asset(imagePath, width: 82, height: 82, fit: BoxFit.cover),
+      child: RemoteOrAssetImage(
+        source: imagePath,
+        width: 82,
+        height: 82,
+        fit: BoxFit.cover,
+      ),
     );
   }
 }

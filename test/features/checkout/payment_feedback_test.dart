@@ -1,5 +1,6 @@
 import 'package:cleango_app/core/theme/app_theme.dart';
 import 'package:cleango_app/features/address/controllers/address_controller.dart';
+import 'package:cleango_app/features/address/domain/models/address_model.dart';
 import 'package:cleango_app/features/booking/controllers/booking_controller.dart';
 import 'package:cleango_app/features/checkout/domain/models/payment_method_model.dart';
 import 'package:cleango_app/features/checkout/pages/payment_page.dart';
@@ -22,9 +23,18 @@ void main() {
     WidgetTester tester, {
     BookingController? booking,
   }) async {
+    const uji = AddressModel(
+      id: 'uji-1',
+      title: 'Rumah Uji',
+      fullAddress: 'Jl. Uji No. 1, Kota Uji',
+      type: 'Rumah',
+      contactName: 'Pemilik Uji',
+      phoneNumber: '081200000001',
+    );
     final draft = booking ?? BookingController();
     draft
       ..startBooking(ServiceData.services.first)
+      ..updateAddress(uji.toCleaningAddress(), addressId: uji.id)
       ..selectDate(DateTime.now().add(const Duration(days: 1)))
       ..selectTime('10:00');
     final orders = OrderController()..completeScheduledOrder();
@@ -35,7 +45,9 @@ void main() {
         providers: [
           ChangeNotifierProvider.value(value: draft),
           ChangeNotifierProvider.value(value: orders),
-          ChangeNotifierProvider(create: (_) => AddressController()),
+          ChangeNotifierProvider(
+            create: (_) => AddressController(initialAddresses: const [uji]),
+          ),
           ChangeNotifierProvider(create: (_) => ProfileController()),
           ChangeNotifierProvider(create: (_) => ServiceController()),
         ],

@@ -1,3 +1,5 @@
+import '../../../booking/domain/models/review_photo_model.dart';
+
 enum OrderStatusStage {
   dikonfirmasi,
   ditugaskan,
@@ -87,14 +89,14 @@ class ScheduledOrderModel {
     required this.price,
     required this.paymentStatus,
     this.stage = OrderStatusStage.dikonfirmasi,
-    this.cleanerName = 'Siti Rahmawati',
+    this.cleanerName = '',
     this.cleanerRating = 4.9,
     this.cleanerCompletedTasks = '340+ tugas selesai',
     this.cleanerAvatarPath = 'assets/images/cleaner_siti.jpeg',
-    this.cleanerPhone = '+62 812-3456-7890',
-    this.destinationAddress = 'Blk. N No.521, Mojolangu, Malang',
-    this.destinationSubAddress = 'Jl. Bendungan Sigura-gura, Lowokwaru',
-    this.originLocation = 'Malang City Point',
+    this.cleanerPhone = '',
+    this.destinationAddress = '',
+    this.destinationSubAddress = '',
+    this.originLocation = '',
     this.distanceKm = 'Menunggu keberangkatan',
     this.estimatedMinutes = 'Belum tersedia',
     this.estimatedArrivalTime = 'Belum tersedia',
@@ -114,7 +116,7 @@ class ScheduledOrderModel {
     this.servicePrice = 300000,
     this.platformFee = 5000,
     this.discountAmount = 0,
-    this.customerName = 'Krisna Pratama',
+    this.customerName = '',
     this.customerPhone = '(+62) 81223728077',
     this.serviceDurationMinutes,
     this.workStartedAt,
@@ -265,7 +267,7 @@ class OrderReviewModel {
     required this.rating,
     required this.satisfactionTags,
     required this.comment,
-    this.photoPaths = const [],
+    this.photos = const [],
     required this.createdAt,
   });
 
@@ -273,8 +275,13 @@ class OrderReviewModel {
   final int rating;
   final List<String> satisfactionTags;
   final String comment;
-  final List<String> photoPaths;
+  final List<ReviewPhotoModel> photos;
   final DateTime createdAt;
+
+  List<String> get photoPaths => photos
+      .map((photo) => photo.url ?? '')
+      .where((url) => url.isNotEmpty)
+      .toList(growable: false);
 }
 
 class OrderHistoryModel {
@@ -287,8 +294,10 @@ class OrderHistoryModel {
     required this.customerName,
     required this.price,
     required this.canReview,
+    this.hasReview = false,
+    this.backendBookingId,
     this.rating,
-    this.cleanerName = 'Siti Rahmawati',
+    this.cleanerName = '',
     this.cleanerAvatarPath = 'assets/images/cleaner_siti.jpeg',
     this.review,
     this.address = '',
@@ -307,6 +316,8 @@ class OrderHistoryModel {
   final String customerName;
   final String price;
   final bool canReview;
+  final bool hasReview;
+  final String? backendBookingId;
   final double? rating;
   final String cleanerName;
   final String cleanerAvatarPath;
@@ -327,6 +338,8 @@ class OrderHistoryModel {
     String? customerName,
     String? price,
     bool? canReview,
+    bool? hasReview,
+    String? backendBookingId,
     double? rating,
     String? cleanerName,
     String? cleanerAvatarPath,
@@ -347,6 +360,8 @@ class OrderHistoryModel {
       customerName: customerName ?? this.customerName,
       price: price ?? this.price,
       canReview: canReview ?? this.canReview,
+      hasReview: hasReview ?? this.hasReview,
+      backendBookingId: backendBookingId ?? this.backendBookingId,
       rating: rating ?? this.rating,
       cleanerName: cleanerName ?? this.cleanerName,
       cleanerAvatarPath: cleanerAvatarPath ?? this.cleanerAvatarPath,

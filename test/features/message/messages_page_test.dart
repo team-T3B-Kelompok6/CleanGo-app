@@ -77,53 +77,50 @@ void main() {
     },
   );
 
-  testWidgets(
-    'read state stays read when leaving and reopening notifications',
-    (tester) async {
-      final controller = MessageController(
-        initialMessages: [_messages().first],
-      );
-      addTearDown(controller.dispose);
-      // The app registers AppRoutes.home; mirror it so the Beranda button in the
-      // bottom navigation resolves (it replaces the stack with Home).
-      Widget openNotifications() => Builder(
-        builder: (context) => Scaffold(
-          body: Center(
-            child: FilledButton(
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const MessagesPage()),
-              ),
-              child: const Text('Buka Notifikasi'),
+  testWidgets('read state stays read when leaving and reopening notifications', (
+    tester,
+  ) async {
+    final controller = MessageController(initialMessages: [_messages().first]);
+    addTearDown(controller.dispose);
+    // The app registers AppRoutes.home; mirror it so the Beranda button in the
+    // bottom navigation resolves (it replaces the stack with Home).
+    Widget openNotifications() => Builder(
+      builder: (context) => Scaffold(
+        body: Center(
+          child: FilledButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const MessagesPage()),
             ),
+            child: const Text('Buka Notifikasi'),
           ),
         ),
-      );
-      await tester.pumpWidget(
-        ChangeNotifierProvider.value(
-          value: controller,
-          child: MaterialApp(
-            theme: AppTheme.light,
-            home: openNotifications(),
-            routes: {AppRoutes.home: (_) => openNotifications()},
-          ),
+      ),
+    );
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          home: openNotifications(),
+          routes: {AppRoutes.home: (_) => openNotifications()},
         ),
-      );
-      await tester.tap(find.text('Buka Notifikasi'));
-      await _finishTransition(tester);
-      final card = find.byKey(const ValueKey('notification-delivery'));
-      await tester.tap(card);
-      await tester.pump();
-      expect(controller.unreadCount, 0);
-      await tester.tap(find.text('Beranda'));
-      await _finishTransition(tester);
-      await tester.tap(find.text('Buka Notifikasi'));
-      await _finishTransition(tester);
-      expect(tester.widget<Material>(card).color, Colors.white);
-      expect(find.text('1 Baru'), findsNothing);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-    },
-  );
+      ),
+    );
+    await tester.tap(find.text('Buka Notifikasi'));
+    await _finishTransition(tester);
+    final card = find.byKey(const ValueKey('notification-delivery'));
+    await tester.tap(card);
+    await tester.pump();
+    expect(controller.unreadCount, 0);
+    await tester.tap(find.text('Beranda'));
+    await _finishTransition(tester);
+    await tester.tap(find.text('Buka Notifikasi'));
+    await _finishTransition(tester);
+    expect(tester.widget<Material>(card).color, Colors.white);
+    expect(find.text('1 Baru'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets(
     'notification labels and cards fit a narrow screen with larger text',
@@ -155,4 +152,25 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('shows an explanation when there are no notifications', (
+    tester,
+  ) async {
+    final controller = MessageController(initialMessages: const []);
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: controller,
+        child: MaterialApp(theme: AppTheme.light, home: const MessagesPage()),
+      ),
+    );
+    await _finishTransition(tester);
+
+    expect(find.text('Belum ada notifikasi'), findsOneWidget);
+    expect(find.textContaining('akan muncul di sini'), findsOneWidget);
+
+    await tester.tap(find.text('Promo'));
+    await _finishTransition(tester);
+    expect(find.text('Belum ada promo'), findsOneWidget);
+  });
 }

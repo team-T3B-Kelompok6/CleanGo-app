@@ -13,22 +13,25 @@ class _FakeCategoryApi extends CustomerCategoryApi {
   int calls = 0;
 
   @override
-  Future<List<PopularCategoryModel>> fetchPopularCategories({int limit = 8}) async {
+  Future<List<PopularCategoryModel>> fetchPopularCategories({
+    int limit = 8,
+  }) async {
     calls++;
     if (fail) throw StateError('jaringan mati');
     return categories;
   }
 }
 
-ServiceModel _service(String id, String category, {String? icon}) => ServiceModel(
-  id: id,
-  title: 'Layanan $id',
-  description: 'D',
-  duration: '1 jam',
-  price: 'Rp1.000',
-  category: category,
-  iconPath: icon ?? 'assets/icons/$category.svg',
-);
+ServiceModel _service(String id, String category, {String? icon}) =>
+    ServiceModel(
+      id: id,
+      title: 'Layanan $id',
+      description: 'D',
+      duration: '1 jam',
+      price: 'Rp1.000',
+      category: category,
+      iconPath: icon ?? 'assets/icons/$category.svg',
+    );
 
 void main() {
   group('PopularCategoryModel.fromJson', () {
@@ -82,14 +85,21 @@ void main() {
       expect(HomeCatalog.fromPopularCategories(popular, const []).length, 8);
     });
 
-    test('falls back to the default icon when no service matches', () {
-      final models = HomeCatalog.fromPopularCategories(
-        const [PopularCategoryModel(id: '5', name: 'AC', serviceId: null)],
-        const [],
-      );
+    test('uses the category icon when no service matches', () {
+      final models = HomeCatalog.fromPopularCategories(const [
+        PopularCategoryModel(id: '5', name: 'AC', serviceId: null),
+      ], const []);
+
+      expect(models.single.iconPath, 'assets/icons/service_ac.png');
+      expect(models.single.serviceId, isNull);
+    });
+
+    test('falls back to the default icon for an unknown category', () {
+      final models = HomeCatalog.fromPopularCategories(const [
+        PopularCategoryModel(id: '9', name: 'Gudang', serviceId: null),
+      ], const []);
 
       expect(models.single.iconPath, 'assets/icons/services.svg');
-      expect(models.single.serviceId, isNull);
     });
   });
 
@@ -97,7 +107,12 @@ void main() {
     test('loads the ranking from the backend', () async {
       final api = _FakeCategoryApi(
         categories: const [
-          PopularCategoryModel(id: '3', name: 'Kantor', serviceId: '12', orderCount: 9),
+          PopularCategoryModel(
+            id: '3',
+            name: 'Kantor',
+            serviceId: '12',
+            orderCount: 9,
+          ),
         ],
       );
       final controller = HomeController(categoryApi: api);
@@ -110,7 +125,9 @@ void main() {
     });
 
     test('keeps an empty ranking when the request fails', () async {
-      final controller = HomeController(categoryApi: _FakeCategoryApi(fail: true));
+      final controller = HomeController(
+        categoryApi: _FakeCategoryApi(fail: true),
+      );
 
       await controller.loadFromApi();
 

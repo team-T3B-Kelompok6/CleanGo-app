@@ -20,7 +20,7 @@ void main() {
       expect(service.price, 'Rp100.000');
       expect(service.duration, '2 jam');
       expect(service.category, 'Rumah');
-      expect(service.iconPath, 'assets/icons/home.svg');
+      expect(service.iconPath, 'assets/icons/service_rumah.png');
       expect(service.imagePath, isNull);
     });
 
@@ -35,7 +35,7 @@ void main() {
 
       expect(service.category, 'Sofa dan Kasur');
       expect(service.duration, '1 jam 30 menit');
-      expect(service.iconPath, 'assets/icons/deep_cleaning.svg');
+      expect(service.iconPath, 'assets/icons/service_sofa.png');
     });
 
     test('keeps bundled asset images and falls back to an icon otherwise', () {
@@ -58,22 +58,23 @@ void main() {
 
       expect(withAsset.imagePath, 'assets/images/service_ac.jpeg');
       expect(withRemote.imagePath, '${ApiConfig.baseUrl}/uploads/ac.png');
-      expect(withRemote.iconPath, 'assets/icons/ac_wash.svg');
+      expect(withRemote.iconPath, 'assets/icons/service_ac.png');
     });
 
     test('reads inclusions from the backend object shape', () {
       final inclusions = CustomerServiceDetailApi.inclusionsFrom({
         'inclusions': [
-          {'id': 62, 'description': 'Menyapu dan mengepel lantai', 'sortOrder': 1},
+          {
+            'id': 62,
+            'description': 'Menyapu dan mengepel lantai',
+            'sortOrder': 1,
+          },
           {'id': 63, 'description': '  Membersihkan debu  ', 'sortOrder': 2},
           {'id': 64, 'description': '   ', 'sortOrder': 3},
         ],
       });
 
-      expect(inclusions, [
-        'Menyapu dan mengepel lantai',
-        'Membersihkan debu',
-      ]);
+      expect(inclusions, ['Menyapu dan mengepel lantai', 'Membersihkan debu']);
     });
 
     test('still accepts plain string inclusions', () {
@@ -86,6 +87,38 @@ void main() {
 
     test('returns an empty list when inclusions are missing', () {
       expect(CustomerServiceDetailApi.inclusionsFrom(const {}), isEmpty);
+    });
+
+    test('maps public reviews with avatar and photos', () {
+      final reviews = CustomerServiceDetailApi.reviewsFrom({
+        'reviews': [
+          {
+            'name': 'Budi Santoso',
+            'avatarUrl': '/uploads/avatars/a.png',
+            'rating': 5,
+            'comment': 'Bersih sekali',
+            'createdAt': DateTime.now()
+                .subtract(const Duration(days: 2))
+                .toIso8601String(),
+            'photos': [
+              '/uploads/review-photos/1.jpg',
+              'https://cdn.example.com/2.jpg',
+            ],
+          },
+        ],
+      });
+
+      expect(reviews, hasLength(1));
+      expect(reviews.first.name, 'Budi Santoso');
+      expect(
+        reviews.first.avatarUrl,
+        '${ApiConfig.baseUrl}/uploads/avatars/a.png',
+      );
+      expect(reviews.first.date, '2 hari lalu');
+      expect(reviews.first.imagePaths, [
+        '${ApiConfig.baseUrl}/uploads/review-photos/1.jpg',
+        'https://cdn.example.com/2.jpg',
+      ]);
     });
 
     test('handles unknown categories and zero duration safely', () {

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../shared/widgets/app_notice.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
+import '../../booking/domain/models/review_photo_model.dart';
 import '../controllers/order_controller.dart';
 import '../controllers/review_draft_controller.dart';
 import 'orders_page.dart';
@@ -11,26 +14,47 @@ class ReviewRatingPage extends StatefulWidget {
   const ReviewRatingPage({
     super.key,
     this.orderId = '#CG-82910',
+    this.bookingId,
     this.serviceName = 'Deep Cleaning',
     this.serviceImagePath = 'assets/images/service_deep_cleaning.jpeg',
+    this.initialRating,
+    this.initialComment = '',
+    this.initialPhotos = const [],
+    this.isEdit = false,
   });
 
   final String orderId;
+  final String? bookingId;
   final String serviceName;
   final String serviceImagePath;
+  final int? initialRating;
+  final String initialComment;
+  final List<ReviewPhotoModel> initialPhotos;
+  final bool isEdit;
 
   @override
   State<ReviewRatingPage> createState() => _ReviewRatingPageState();
 }
 
 class _ReviewRatingPageState extends State<ReviewRatingPage> {
-  final ReviewDraftController _draft = ReviewDraftController();
+  late final ReviewDraftController _draft;
   final TextEditingController _reviewController = TextEditingController();
   bool _isSubmitted = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _draft = ReviewDraftController(initialPhotos: widget.initialPhotos);
+    final rating = widget.initialRating;
+    if (rating != null) _draft.selectRating(rating);
+    if (widget.initialComment.trim().isNotEmpty) {
+      _reviewController.text = widget.initialComment;
+    }
+  }
+
   int get _selectedRating => _draft.selectedRating;
   List<String> get _selectedChips => _draft.selectedChips;
-  List<String> get _attachedPhotos => _draft.attachedPhotos;
+  List<ReviewPhotoModel> get _attachedPhotos => _draft.photos;
   List<String> get _availableChips => ReviewDraftController.availableChips;
 
   @override
@@ -45,8 +69,8 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
     setState(() => _draft.toggleChip(chip));
   }
 
-  void _addMockPhoto() {
-    if (!_draft.addMockPhoto()) {
+  Future<void> _pickPhoto() async {
+    if (_attachedPhotos.length >= ReviewDraftController.maxPhotos) {
       AppNotice.show(
         context,
         'Maksimal 3 foto yang dapat dilampirkan.',
@@ -54,10 +78,76 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
       );
       return;
     }
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Ambil dari kamera'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Pilih dari galeri'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
 
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 82,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    if (bytes.length > 2 * 1024 * 1024) {
+      AppNotice.show(
+        context,
+        'Ukuran foto maksimal 2 MB.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    final type = _imageType(picked);
+    if (type == null) {
+      AppNotice.show(
+        context,
+        'Format foto harus JPEG, PNG, atau WebP.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    if (!_draft.addPhoto(ReviewPhotoModel(bytes: bytes, contentType: type))) {
+      AppNotice.show(
+        context,
+        'Maksimal 3 foto yang dapat dilampirkan.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
     setState(() {});
+  }
 
-    AppNotice.show(context, 'Foto hasil pengerjaan berhasil ditambahkan.');
+  String? _imageType(XFile file) {
+    final type = file.mimeType?.toLowerCase();
+    if (type == 'image/jpeg' || type == 'image/png' || type == 'image/webp') {
+      return type;
+    }
+    final name = file.name.toLowerCase();
+    if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return null;
   }
 
   void _removePhoto(int index) {
@@ -74,18 +164,20 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
     );
   }
 
-  void _submitReview() {
+  Future<void> _submitReview() async {
     if (_isSubmitted) return;
     FocusManager.instance.primaryFocus?.unfocus();
     final orderController = context.read<OrderController>();
-    final success = orderController.submitReview(
+    final success = await orderController.submitReview(
       orderId: widget.orderId,
       rating: _selectedRating,
       tags: _draft.selectedChips,
       comment: _reviewController.text.trim(),
-      photos: _draft.attachedPhotos,
+      photos: _draft.photos,
+      removedPhotoIds: _draft.removedPhotoIds,
     );
 
+    if (!mounted) return;
     if (!success) {
       AppNotice.show(
         context,
@@ -95,9 +187,15 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
       return;
     }
     _isSubmitted = true;
+    final photoWarning = orderController.reviewPhotoUploadFailed;
     AppNotice.show(
       context,
-      'Ulasan berhasil dikirim. Terima kasih atas penilaian Anda.',
+      photoWarning
+          ? 'Ulasan tersimpan, tetapi sebagian foto gagal diunggah. Coba lagi lewat Edit Ulasan.'
+          : widget.isEdit
+          ? 'Ulasan berhasil diperbarui.'
+          : 'Ulasan berhasil dikirim. Terima kasih atas penilaian Anda.',
+      type: photoWarning ? AppNoticeType.error : AppNoticeType.success,
     );
     _navigateToHistoryOrders(context);
   }
@@ -521,6 +619,21 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
     );
   }
 
+  Widget _photoThumbnail(ReviewPhotoModel photo) {
+    final bytes = photo.bytes;
+    if (bytes != null) {
+      return Image.memory(bytes, fit: BoxFit.cover);
+    }
+    final url = photo.url;
+    if (url != null && url.isNotEmpty) {
+      return RemoteOrAssetImage(source: url, fit: BoxFit.cover);
+    }
+    return const ColoredBox(
+      color: Color(0xFFE8FAF7),
+      child: Icon(Icons.image_not_supported_outlined),
+    );
+  }
+
   Widget _buildPhotoAttachmentCard() {
     return Container(
       width: double.infinity,
@@ -549,13 +662,23 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 4),
+          const Text(
+            'Foto akan terlihat oleh pelanggan lain.',
+            style: TextStyle(
+              color: Color(0xFF64748B),
+              fontFamily: 'Inter',
+              fontSize: 11.5,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Tombol dashed "Tambah"
               GestureDetector(
-                onTap: _addMockPhoto,
+                onTap: _pickPhoto,
                 child: CustomPaint(
                   painter: _DashedRectPainter(
                     color: const Color(0xFF94A3B8),
@@ -618,10 +741,7 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(11),
-                                child: Image.asset(
-                                  _attachedPhotos[index],
-                                  fit: BoxFit.cover,
-                                ),
+                                child: _photoThumbnail(_attachedPhotos[index]),
                               ),
                             ),
                             Positioned(
@@ -686,13 +806,13 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
               ),
               elevation: 0,
             ),
-            child: const Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.send_rounded, size: 18),
                 SizedBox(width: 8),
                 Text(
-                  'Kirim Review',
+                  widget.isEdit ? 'Simpan Perubahan' : 'Kirim Review',
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 15,

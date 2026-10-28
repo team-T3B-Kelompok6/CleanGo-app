@@ -23,9 +23,21 @@ void main() {
     const controller = PaymentFlowController();
 
     setUp(() {
+      const uji = AddressModel(
+        id: 'uji-1',
+        title: 'Rumah Uji',
+        fullAddress: 'Jl. Uji No. 1, Kota Uji',
+        type: 'Rumah',
+        contactName: 'Pemilik Uji',
+        phoneNumber: '081200000001',
+        isPrimary: true,
+        latitude: -7.95,
+        longitude: 112.61,
+      );
       booking = BookingController()..startBooking(ServiceData.services.first);
       booking.selectDate(DateTime(2030, 1, 3));
-      addresses = AddressController();
+      booking.updateAddress(uji.toCleaningAddress(), addressId: uji.id);
+      addresses = AddressController(initialAddresses: const [uji]);
       orders = OrderController();
     });
 

@@ -4,6 +4,7 @@ class PopularServiceModel {
   const PopularServiceModel({
     required this.serviceId,
     required this.imagePath,
+    required this.iconPath,
     required this.badge,
     required this.badgeStyle,
     required this.rating,
@@ -17,6 +18,7 @@ class PopularServiceModel {
 
   final String serviceId;
   final String imagePath;
+  final String iconPath;
   final String badge;
   final PopularServiceBadgeStyle badgeStyle;
   final String rating;

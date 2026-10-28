@@ -7,7 +7,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_sheet.dart';
+import '../../address/controllers/address_controller.dart';
 import '../../auth/controllers/auth_session_controller.dart';
+import '../../booking/controllers/booking_controller.dart';
 import '../controllers/change_password_controller.dart';
 import '../controllers/profile_controller.dart';
 
@@ -70,16 +72,17 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     if (success) {
       // The server revoked every token issued before this change, so the app
       // must sign in again with the new password.
+      final addresses = _readOrNull<AddressController>();
+      final booking = _readOrNull<BookingController>();
       await context.read<AuthSessionController>().signOut();
+      await _clearLocalCustomerData(addresses, booking);
       if (!mounted) return;
       AppNotice.show(
         context,
         'Kata sandi diperbarui. Silakan masuk dengan kata sandi baru.',
       );
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.login,
-        (route) => false,
-      );
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
       return;
     }
 
@@ -92,6 +95,26 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       error ?? 'Kata sandi belum dapat diperbarui. Coba lagi.',
       type: AppNoticeType.error,
     );
+  }
+
+  Future<void> _clearLocalCustomerData(
+    AddressController? addresses,
+    BookingController? booking,
+  ) async {
+    try {
+      await addresses?.clearLocal();
+    } catch (_) {}
+    try {
+      await booking?.clearDraft();
+    } catch (_) {}
+  }
+
+  T? _readOrNull<T>() {
+    try {
+      return context.read<T>();
+    } catch (_) {
+      return null;
+    }
   }
 
   void _showForgotPasswordModal() {
@@ -230,7 +253,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                         const SizedBox(height: 8),
                         _buildPasswordField(
                           controller: _newPassTextController,
-                          hint: 'Minimal 8 karakter baru',
+                          hint: '8-32 karakter baru',
                           prefixIcon: Icons.vpn_key_outlined,
                           isVisible: _passwordController.isNewPasswordVisible,
                           onToggleVisibility:
@@ -617,7 +640,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           ),
           const SizedBox(height: 12),
           _buildCheckItem(
-            text: 'Minimal 8 karakter',
+            text: '8-32 karakter',
             isSatisfied: _passwordController.hasMinLength,
           ),
           const SizedBox(height: 10),
@@ -704,21 +727,25 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                       ),
                     )
                   : const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_rounded, color: Colors.white, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Simpan Kata Sandi',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Simpan Kata Sandi',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: AppTheme.fontFamily,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
             ),
           ),
           const SizedBox(height: 10),

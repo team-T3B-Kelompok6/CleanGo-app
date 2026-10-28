@@ -20,7 +20,7 @@ class BookingController extends ChangeNotifier {
        _service = initialService,
        _selectedDate = initialDraft?.selectedDate ?? initialDate,
        _selectedTime = initialDraft?.selectedTime ?? '12:00',
-       _address = initialAddress ?? BookingController.initialAddress,
+       _address = initialAddress ?? BookingController.emptyAddress,
        _addressId = initialDraft?.addressId,
        _note = initialDraft?.note ?? initialNote {
     _ensureTimeSelection();
@@ -29,6 +29,9 @@ class BookingController extends ChangeNotifier {
   static DateTime get initialDate => DateUtils.dateOnly(DateTime.now());
 
   static const int platformFee = 5000;
+
+  /// Same lead time the backend enforces for same-day slots.
+  static const int bookingLeadMinutes = 60;
 
   static const List<String> availableTimes = [
     '08:00',
@@ -42,13 +45,13 @@ class BookingController extends ChangeNotifier {
     '16:00',
   ];
 
-  static const CleaningAddress initialAddress = CleaningAddress(
-    label: 'Rumah (Utama)',
-    street: 'Blk. N No.521, Mojolangu, Kec. Lowokwaru',
-    city: 'Kota Malang, Jawa Timur 65141',
-    landmark: 'Patokan pagar hitam sebelah minimarket',
-    customerName: 'Krisna',
-    phoneNumber: '(+62) 081223728077',
+  static const CleaningAddress emptyAddress = CleaningAddress(
+    label: '',
+    street: '',
+    city: '',
+    landmark: '',
+    customerName: '',
+    phoneNumber: '',
   );
 
   static const String initialNote = '';
@@ -149,6 +152,7 @@ class BookingController extends ChangeNotifier {
       notes: _note,
     );
   }
+
   int get servicePriceValue => _parsePrice(_service?.price ?? '');
   int get totalPayment => servicePriceValue + platformFee;
   String get formattedServicePrice => formatRupiah(servicePriceValue);
@@ -195,8 +199,17 @@ class BookingController extends ChangeNotifier {
       _selectedDate.day,
       hour,
     );
-    return !scheduled.isBefore(now ?? DateTime.now());
+    // Mirrors the server rule: a slot needs at least 60 minutes of lead time.
+    final earliest = (now ?? DateTime.now()).add(
+      const Duration(minutes: bookingLeadMinutes),
+    );
+    return !scheduled.isBefore(earliest);
   }
+
+  bool get hasAddress => _addressId != null && _address.fullAddress.isNotEmpty;
+
+  String? get addressError =>
+      hasAddress ? null : 'Tambahkan alamat terlebih dahulu.';
 
   String? validateSchedule({DateTime? now}) {
     final current = now ?? DateTime.now();
@@ -240,7 +253,7 @@ class BookingController extends ChangeNotifier {
     _selectedDate = initialDate;
     _selectedTime = '12:00';
     _ensureTimeSelection();
-    _address = initialAddress;
+    _address = emptyAddress;
     _addressId = null;
     _note = initialNote;
     notifyListeners();

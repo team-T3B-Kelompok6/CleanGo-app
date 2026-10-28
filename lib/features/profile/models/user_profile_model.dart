@@ -1,3 +1,5 @@
+import '../../../core/network/api_config.dart';
+
 class UserProfileModel {
   const UserProfileModel({
     required this.id,
@@ -9,6 +11,7 @@ class UserProfileModel {
     required this.gender,
     required this.birthDate,
     this.avatarAsset = 'assets/images/user_profile.jpeg',
+    this.avatarUrl,
   });
 
   final String id;
@@ -20,6 +23,9 @@ class UserProfileModel {
   final String gender; // 'Laki-laki' | 'Perempuan'
   final DateTime birthDate;
   final String avatarAsset;
+  final String? avatarUrl;
+
+  String get avatarSource => avatarUrl ?? avatarAsset;
 
   String get formattedBirthDate => formatBirthDate(birthDate);
 
@@ -52,6 +58,7 @@ class UserProfileModel {
     String? gender,
     DateTime? birthDate,
     String? avatarAsset,
+    String? avatarUrl,
   }) {
     return UserProfileModel(
       id: id ?? this.id,
@@ -63,6 +70,7 @@ class UserProfileModel {
       gender: gender ?? this.gender,
       birthDate: birthDate ?? this.birthDate,
       avatarAsset: avatarAsset ?? this.avatarAsset,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
     );
   }
 
@@ -77,31 +85,35 @@ class UserProfileModel {
       'gender': gender,
       'birthDate': birthDate.toIso8601String(),
       'avatarAsset': avatarAsset,
+      'avatarUrl': avatarUrl,
     };
   }
 
   factory UserProfileModel.fromCustomerJson(Map<String, dynamic> json) {
     return UserProfileModel(
-      id: json['id']?.toString() ?? json['customerId']?.toString() ?? 'usr-001',
-      customerId: json['id']?.toString() ?? json['customerId']?.toString() ?? 'CG-8829104',
-      fullName: json['name'] as String? ?? json['fullName'] as String? ?? 'Krisna Pratama',
-      phoneNumber: json['phone'] as String? ?? json['phoneNumber'] as String? ?? '+62 812-3456-7890',
+      id: json['id']?.toString() ?? json['customerId']?.toString() ?? '',
+      customerId:
+          json['id']?.toString() ?? json['customerId']?.toString() ?? '',
+      fullName: json['name'] as String? ?? json['fullName'] as String? ?? '',
+      phoneNumber:
+          json['phone'] as String? ?? json['phoneNumber'] as String? ?? '',
       isPhoneVerified: true,
-      email: json['email'] as String? ?? 'krisna.pratama@email.com',
+      email: json['email'] as String? ?? '',
       gender: 'Laki-laki',
       birthDate: DateTime(1995, 5, 14),
       avatarAsset: 'assets/images/user_profile.jpeg',
+      avatarUrl: ApiConfig.mediaUrl(json['avatarUrl'] as String?),
     );
   }
 
   factory UserProfileModel.fromJson(Map<String, dynamic> json) {
     return UserProfileModel(
-      id: json['id'] as String? ?? 'usr-001',
-      customerId: json['customerId'] as String? ?? 'CG-8829104',
-      fullName: json['fullName'] as String? ?? 'Krisna Pratama',
-      phoneNumber: json['phoneNumber'] as String? ?? '+62 812–3456–7890',
+      id: json['id'] as String? ?? '',
+      customerId: json['customerId'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? '',
+      phoneNumber: json['phoneNumber'] as String? ?? '',
       isPhoneVerified: json['isPhoneVerified'] as bool? ?? true,
-      email: json['email'] as String? ?? 'krisna.pratama@email.com',
+      email: json['email'] as String? ?? '',
       gender: json['gender'] as String? ?? 'Laki-laki',
       birthDate: json['birthDate'] != null
           ? DateTime.tryParse(json['birthDate'] as String) ??
@@ -109,6 +121,7 @@ class UserProfileModel {
           : DateTime(1995, 5, 14),
       avatarAsset:
           json['avatarAsset'] as String? ?? 'assets/images/user_profile.jpeg',
+      avatarUrl: ApiConfig.mediaUrl(json['avatarUrl'] as String?),
     );
   }
 }

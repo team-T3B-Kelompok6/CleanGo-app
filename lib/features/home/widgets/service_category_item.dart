@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../service/widgets/service_icon.dart';
 
 import '../../../core/theme/app_theme.dart';
 
@@ -50,7 +51,7 @@ class ServiceCategoryItem extends StatelessWidget {
                 dimension: 24,
                 child: FittedBox(
                   fit: BoxFit.contain,
-                  child: SvgPicture.asset(iconPath),
+                  child: ServiceIcon(path: iconPath),
                 ),
               ),
             ),

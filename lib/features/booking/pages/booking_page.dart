@@ -209,7 +209,8 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   void _handleContinue() {
-    final error = context.read<BookingController>().validateSchedule();
+    final booking = context.read<BookingController>();
+    final error = booking.addressError ?? booking.validateSchedule();
     if (error != null) {
       AppNotice.show(context, error, type: AppNoticeType.error);
       return;

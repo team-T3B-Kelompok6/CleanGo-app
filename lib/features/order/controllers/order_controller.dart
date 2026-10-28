@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../booking/controllers/booking_controller.dart';
 import '../../booking/data/customer_booking_api.dart';
+import '../../booking/domain/models/review_photo_model.dart';
 import '../../../core/network/api_exception.dart';
 import '../data/order_data.dart';
 import '../data/eta_repository.dart';
@@ -32,6 +33,7 @@ class OrderController extends ChangeNotifier {
   final EtaRepository _etaRepository;
   final CustomerBookingApi? _bookingApi;
   bool _disposed = false;
+  bool _reviewPhotoUploadFailed = false;
   // shortcut: IDs are unique in this local session; use backend IDs on integration.
   int _nextOrderNumber = DateTime.now().millisecondsSinceEpoch % 1000000;
 
@@ -51,6 +53,7 @@ class OrderController extends ChangeNotifier {
   int get currentStepNumber => _activeStage.index + 1;
   String get currentStepLabel => 'Langkah $currentStepNumber dari 5';
   List<OrderHistoryModel> get historyOrders => List.unmodifiable(_history);
+  bool get reviewPhotoUploadFailed => _reviewPhotoUploadFailed;
   bool get hasScheduledOrder => _orders.isNotEmpty;
   bool get etaLoading => _selected.etaLoading;
   String? get etaError => _selected.etaError;
@@ -357,27 +360,85 @@ class OrderController extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool submitReview({
+  Future<bool> submitReview({
     required String orderId,
     required int rating,
     required List<String> tags,
     required String comment,
-    List<String> photos = const [],
-  }) {
+    List<ReviewPhotoModel> photos = const [],
+    List<String> removedPhotoIds = const [],
+  }) async {
     if (rating < 1 || rating > 5 || photos.length > 3) return false;
     final matching = _history.where((order) => order.orderId == orderId);
-    if (matching.isNotEmpty && !matching.first.canReview) return false;
-    if (matching.isEmpty &&
+    final existing = matching.isEmpty ? null : matching.first;
+    if (existing != null && !existing.canReview) return false;
+    if (existing == null &&
         (orderId != _scheduledOrder.orderNumber ||
             _activeStage != OrderStatusStage.selesai)) {
       return false;
     }
+    final bookingId =
+        existing?.backendBookingId ?? _scheduledOrder.backendBookingId;
+    final api = _bookingApi;
+    _reviewPhotoUploadFailed = false;
+    var savedPhotos = List<ReviewPhotoModel>.from(photos);
+
+    if (api != null && bookingId != null) {
+      try {
+        if (existing?.hasReview == true) {
+          await api.updateReview(
+            bookingId: bookingId,
+            rating: rating,
+            comment: comment,
+          );
+        } else {
+          await api.createReview(
+            bookingId: bookingId,
+            rating: rating,
+            comment: comment,
+          );
+        }
+      } catch (_) {
+        return false;
+      }
+
+      for (final photoId in removedPhotoIds) {
+        if (photoId.isEmpty) continue;
+        try {
+          await api.deleteReviewPhoto(bookingId: bookingId, photoId: photoId);
+        } catch (_) {
+          _reviewPhotoUploadFailed = true;
+        }
+      }
+
+      final uploaded = <ReviewPhotoModel>[];
+      for (final photo in photos) {
+        final bytes = photo.bytes;
+        if (!photo.isNew || bytes == null) {
+          uploaded.add(photo);
+          continue;
+        }
+        try {
+          uploaded.add(
+            await api.uploadReviewPhoto(
+              bookingId: bookingId,
+              bytes: bytes,
+              contentType: photo.contentType ?? 'image/jpeg',
+            ),
+          );
+        } catch (_) {
+          _reviewPhotoUploadFailed = true;
+        }
+      }
+      savedPhotos = uploaded;
+    }
+
     final reviewModel = OrderReviewModel(
       orderId: orderId,
       rating: rating,
       satisfactionTags: tags,
       comment: comment,
-      photoPaths: photos,
+      photos: savedPhotos,
       createdAt: DateTime.now(),
     );
 
@@ -386,7 +447,8 @@ class OrderController extends ChangeNotifier {
       if (order.orderId == orderId) {
         matched = true;
         return order.copyWith(
-          canReview: false,
+          canReview: true,
+          hasReview: true,
           rating: rating.toDouble(),
           review: reviewModel,
         );
@@ -403,9 +465,10 @@ class OrderController extends ChangeNotifier {
           serviceAssetPath: _scheduledOrder.serviceImagePath,
           schedule: 'Hari ini • Selesai',
           status: 'SELESAI',
-          customerName: 'Krisna pratama',
+          customerName: _scheduledOrder.customerName,
           price: _scheduledOrder.price,
-          canReview: false,
+          canReview: true,
+          hasReview: true,
           rating: rating.toDouble(),
           cleanerName: _scheduledOrder.cleanerName,
           cleanerAvatarPath: _scheduledOrder.cleanerAvatarPath,
@@ -416,6 +479,7 @@ class OrderController extends ChangeNotifier {
           servicePrice: _scheduledOrder.servicePrice,
           platformFee: _scheduledOrder.platformFee,
           discountAmount: _scheduledOrder.discountAmount,
+          backendBookingId: _scheduledOrder.backendBookingId,
         ),
       );
     }
@@ -468,8 +532,29 @@ class OrderController extends ChangeNotifier {
         return OrderStatusStage.sedangDikerjakan;
       case 'Selesai':
         return OrderStatusStage.selesai;
+      case 'Dibatalkan':
+      case 'Batal':
+      case 'Dijadwalkan Ulang':
+        return OrderStatusStage.dikonfirmasi;
+      case 'Menunggu Assign':
+        return OrderStatusStage.dikonfirmasi;
       default:
         return OrderStatusStage.dikonfirmasi;
+    }
+  }
+
+  static String _paymentLabel(String? status, String bookingStatus) {
+    switch (status) {
+      case 'paid':
+        return 'Lunas';
+      case 'pending':
+        return 'Menunggu pembayaran';
+      case 'failed':
+        return 'Pembayaran gagal';
+      case 'expired':
+        return 'Pembayaran kedaluwarsa';
+      default:
+        return bookingStatus == 'Selesai' ? 'Lunas (tunai)' : 'Belum dibayar';
     }
   }
 
@@ -482,6 +567,10 @@ class OrderController extends ChangeNotifier {
       serviceDurationMinutes: booking.serviceDurationMinutes,
       workStartedAt: booking.startedAt,
       price: BookingController.formatRupiah(booking.totalAmount),
+      cleanerName: booking.cleanerName,
+      customerName: booking.recipientName,
+      customerPhone: booking.recipientPhone,
+      paymentStatus: _paymentLabel(booking.paymentStatus, booking.status),
       orderNumber: '#${booking.code}',
       stage: stage,
       progress: stage.progress,
@@ -493,6 +582,7 @@ class OrderController extends ChangeNotifier {
       scheduledAt: booking.scheduledAt,
       note: booking.notes,
       destinationAddress: booking.address,
+      destinationSubAddress: booking.landmark,
       destinationLatitude: booking.latitude,
       destinationLongitude: booking.longitude,
       hasDestinationCoordinates:
@@ -515,9 +605,23 @@ class OrderController extends ChangeNotifier {
           ? 'Jadwal layanan'
           : _formatDateTime(scheduled),
       status: booking.status.toUpperCase(),
-      customerName: OrderData.scheduledOrder.customerName,
+      customerName: booking.recipientName,
+      cleanerName: booking.cleanerName,
       price: BookingController.formatRupiah(booking.totalAmount),
-      canReview: booking.status == 'Selesai',
+      canReview: booking.reviewEditable,
+      hasReview: booking.hasReview,
+      backendBookingId: booking.id,
+      rating: booking.reviewRating?.toDouble(),
+      review: booking.hasReview
+          ? OrderReviewModel(
+              orderId: '#${booking.code}',
+              rating: booking.reviewRating ?? 0,
+              satisfactionTags: const [],
+              comment: booking.reviewComment ?? '',
+              photos: booking.reviewPhotos,
+              createdAt: DateTime.now(),
+            )
+          : null,
       address: booking.address,
       note: booking.notes,
       servicePrice: booking.servicePrice,
@@ -541,8 +645,8 @@ class OrderController extends ChangeNotifier {
     int servicePrice = 300000,
     int platformFee = 5000,
     int discountAmount = 0,
-    String customerName = 'Krisna Pratama',
-    String customerPhone = '(+62) 81223728077',
+    String customerName = '',
+    String customerPhone = '',
   }) {
     final createdAt = DateTime.now();
     _selected = _ActiveOrderState(

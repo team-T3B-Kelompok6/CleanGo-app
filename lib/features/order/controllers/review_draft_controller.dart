@@ -1,6 +1,11 @@
+import '../../booking/domain/models/review_photo_model.dart';
+
 class ReviewDraftController {
+  ReviewDraftController({List<ReviewPhotoModel> initialPhotos = const []}) {
+    _photos.addAll(initialPhotos.take(maxPhotos));
+  }
+
   static const int maxPhotos = 3;
-  static const String mockPhotoPath = 'assets/images/ac_service.jpeg';
   static const List<String> availableChips = [
     'Bersih Maksimal ✨',
     'Tepat Waktu ⏰',
@@ -14,10 +19,12 @@ class ReviewDraftController {
     'Tepat Waktu ⏰',
     'Peralatan Lengkap 📦',
   ];
-  final List<String> _attachedPhotos = [];
+  final List<ReviewPhotoModel> _photos = [];
+  final List<String> _removedPhotoIds = [];
 
   List<String> get selectedChips => List.unmodifiable(_selectedChips);
-  List<String> get attachedPhotos => List.unmodifiable(_attachedPhotos);
+  List<ReviewPhotoModel> get photos => List.unmodifiable(_photos);
+  List<String> get removedPhotoIds => List.unmodifiable(_removedPhotoIds);
 
   String get ratingLabel => switch (selectedRating) {
     5 => 'Sempurna (5/5)',
@@ -40,11 +47,18 @@ class ReviewDraftController {
     }
   }
 
-  bool addMockPhoto() {
-    if (_attachedPhotos.length >= maxPhotos) return false;
-    _attachedPhotos.add(mockPhotoPath);
+  bool addPhoto(ReviewPhotoModel photo) {
+    if (_photos.length >= maxPhotos) return false;
+    _photos.add(photo);
     return true;
   }
 
-  void removePhoto(int index) => _attachedPhotos.removeAt(index);
+  ReviewPhotoModel? removePhoto(int index) {
+    if (index < 0 || index >= _photos.length) return null;
+    final removed = _photos.removeAt(index);
+    if (!removed.isNew && removed.id.isNotEmpty) {
+      _removedPhotoIds.add(removed.id);
+    }
+    return removed;
+  }
 }

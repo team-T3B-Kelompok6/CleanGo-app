@@ -5,7 +5,6 @@ import 'app.dart';
 import 'core/database/app_database.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/token_storage.dart';
-import 'features/address/controllers/address_controller.dart';
 import 'features/address/data/address_repository.dart';
 import 'features/address/domain/models/address_model.dart';
 import 'features/booking/data/booking_draft_repository.dart';
@@ -30,10 +29,8 @@ Future<void> main() async {
   // Local storage must never block the first frame: a slow or failing device
   // store falls back to sensible defaults instead of a black screen.
   final addressSnapshot = await _guard(
-    () => addressRepository.seedDefaultsIfEmpty(
-      AddressController.defaultAddresses,
-    ).then((_) => addressRepository.readAddresses()),
-    AddressSnapshot(addresses: AddressController.defaultAddresses, selectedAddressId: ''),
+    addressRepository.readAddresses,
+    const AddressSnapshot(addresses: [], selectedAddressId: ''),
   );
   final services = await _guard(() async {
     await serviceRepository.seedDefaultsIfEmpty(ServiceData.services);

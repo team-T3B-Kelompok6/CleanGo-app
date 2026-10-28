@@ -21,6 +21,30 @@ void main() {
       expect(response['data'], {'status': 'ok'});
     });
 
+    test('posts raw image bytes with the requested content type', () async {
+      late http.Request captured;
+      final client = ApiClient(
+        client: MockClient((request) async {
+          captured = request;
+          return http.Response('{"data":{"id":"1"}}', 201);
+        }),
+        baseUrl: 'http://localhost:3001',
+      );
+      addTearDown(client.close);
+
+      final response = await client.postBytes(
+        '/api/customer/profile/photo',
+        bytes: const [1, 2, 3],
+        contentType: 'image/png',
+        token: 'token',
+      );
+
+      expect(response['data'], {'id': '1'});
+      expect(captured.headers['Content-Type'], 'image/png');
+      expect(captured.headers['Authorization'], 'Bearer token');
+      expect(captured.bodyBytes, [1, 2, 3]);
+    });
+
     test('converts a non-JSON server response into ApiException', () async {
       final client = ApiClient(
         client: MockClient(
@@ -52,6 +76,7 @@ void main() {
         ApiConfig.customerAddresses,
         ApiConfig.customerFaqs,
         ApiConfig.customerServices,
+        ApiConfig.customerServiceReviews('7'),
         ApiConfig.customerBookings,
         ApiConfig.customerChat,
         ApiConfig.trackingEtaPreview,
@@ -62,5 +87,4 @@ void main() {
       expect(ApiConfig.baseUrl.endsWith('/api'), isFalse);
     });
   });
-
 }

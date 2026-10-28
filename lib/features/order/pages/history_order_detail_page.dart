@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../domain/models/order_model.dart';
 
@@ -134,18 +136,7 @@ class HistoryOrderDetailPage extends StatelessWidget {
                           title: 'Profil Pemesan',
                           child: Row(
                             children: [
-                              ClipOval(
-                                child: Image.asset(
-                                  profile.avatarAsset,
-                                  width: 42,
-                                  height: 42,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => const _RoundIcon(
-                                    icon: Icons.person_outline_rounded,
-                                    size: 42,
-                                  ),
-                                ),
-                              ),
+                              UserAvatar(source: profile.avatarUrl, size: 42),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
@@ -530,21 +521,11 @@ class _ReviewDetails extends StatelessWidget {
                 .map(
                   (path) => ClipRRect(
                     borderRadius: BorderRadius.circular(10),
-                    child: Image.asset(
-                      path,
+                    child: RemoteOrAssetImage(
+                      source: path,
                       width: 76,
                       height: 76,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        width: 76,
-                        height: 76,
-                        color: AppColors.slate100,
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.image_not_supported_outlined,
-                          color: AppColors.slate400,
-                        ),
-                      ),
                     ),
                   ),
                 )
@@ -569,21 +550,20 @@ String _formatRupiah(int value) {
 }
 
 class _RoundIcon extends StatelessWidget {
-  const _RoundIcon({required this.icon, this.size = 38});
+  const _RoundIcon({required this.icon});
 
   final IconData icon;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size,
-      height: size,
+      width: 38,
+      height: 38,
       decoration: const BoxDecoration(
         color: Color(0xFFE8FAF7),
         shape: BoxShape.circle,
       ),
-      child: Icon(icon, color: AppColors.primaryAction, size: size * .5),
+      child: Icon(icon, color: AppColors.primaryAction, size: 19),
     );
   }
 }

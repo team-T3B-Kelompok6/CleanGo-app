@@ -29,6 +29,9 @@ abstract final class AuthValidators {
     if (value!.length < 8) {
       return 'Password minimal 8 karakter.';
     }
+    if (value.length > 32) {
+      return 'Password maksimal 32 karakter.';
+    }
     return null;
   }
 

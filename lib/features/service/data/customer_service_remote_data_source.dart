@@ -2,6 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/storage/token_storage.dart';
 import '../domain/models/service_model.dart';
+import 'service_icon_catalog.dart';
 import 'service_repository.dart';
 
 /// Reads the customer service catalogue from the CleanGo backend and maps it to
@@ -15,14 +16,6 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
 
   final ApiClient _client;
   final TokenStorage? _tokens;
-
-  static const Map<String, String> _categoryIcons = {
-    'Rumah': 'assets/icons/home.svg',
-    'Kantor': 'assets/icons/office.svg',
-    'Sofa dan Kasur': 'assets/icons/deep_cleaning.svg',
-    'Sofa': 'assets/icons/deep_cleaning.svg',
-    'AC': 'assets/icons/ac_wash.svg',
-  };
 
   @override
   Future<List<ServiceModel>> fetchServices() async {
@@ -53,7 +46,7 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
       price: _formatRupiah((json['price'] as num?)?.toInt() ?? 0),
       category: category,
       imagePath: resolveImageUrl(imageUrl),
-      iconPath: _categoryIcons[categoryName] ?? 'assets/icons/services.svg',
+      iconPath: ServiceIconCatalog.forCategory(categoryName),
       popularity: 0,
       releaseOrder: (json['id'] as num?)?.toInt() ?? 0,
     );
@@ -131,6 +124,11 @@ class CustomerServiceDetailApi {
     if (data is! Map<String, dynamic>) return null;
     final base = CustomerServiceRemoteDataSource.toServiceModel(data);
     final inclusions = inclusionsFrom(data);
+    final reviews = reviewsFrom(data);
+    final reviewCount =
+        (data['reviewCount'] as num?)?.toInt() ?? reviews.length;
+    final averageRating = (data['rating'] as num?)?.toDouble();
+    final satisfaction = (data['satisfactionPercentage'] as num?)?.toInt() ?? 0;
     return ServiceModel(
       id: base.id,
       title: base.title,
@@ -142,18 +140,55 @@ class CustomerServiceDetailApi {
       imagePath: base.imagePath,
       iconPath: base.iconPath,
       badge: base.badge,
-      rating: base.rating,
+      rating: averageRating == null
+          ? base.rating
+          : averageRating.toStringAsFixed(1),
       popularity: base.popularity,
       releaseOrder: base.releaseOrder,
       detail: ServiceDetailModel(
         heroImagePath: base.imagePath ?? base.iconPath!,
         description: base.description,
-        rating: base.rating ?? '-',
-        reviewCount: '0',
-        satisfactionPercentage: 0,
+        rating: averageRating == null
+            ? (base.rating ?? '-')
+            : averageRating.toStringAsFixed(1),
+        reviewCount: '$reviewCount ulasan',
+        satisfactionPercentage: satisfaction,
         benefits: inclusions,
-        reviews: const [],
+        reviews: reviews,
       ),
     );
+  }
+
+  static List<ServiceReviewModel> reviewsFrom(Map<String, dynamic> data) {
+    final rawReviews = data['reviews'] as List<dynamic>? ?? const [];
+    return rawReviews
+        .whereType<Map<String, dynamic>>()
+        .map((json) {
+          final rawPhotos = json['photos'] as List<dynamic>? ?? const [];
+          return ServiceReviewModel(
+            name: json['name'] as String? ?? 'Pelanggan CleanGo',
+            comment: json['comment'] as String? ?? '',
+            rating: (json['rating'] as num?)?.toInt() ?? 0,
+            date: _reviewDate(json['createdAt']),
+            avatarUrl: ApiConfig.mediaUrl(json['avatarUrl'] as String?),
+            imagePaths: rawPhotos
+                .map((photo) => ApiConfig.mediaUrl(photo as String?))
+                .whereType<String>()
+                .toList(growable: false),
+          );
+        })
+        .toList(growable: false);
+  }
+
+  static String _reviewDate(Object? raw) {
+    final value = raw is String ? raw : '';
+    final date = DateTime.tryParse(value)?.toLocal();
+    if (date == null) return '';
+    final days = DateTime.now().difference(date).inDays;
+    if (days <= 0) return 'Hari ini';
+    if (days == 1) return '1 hari lalu';
+    if (days < 7) return '$days hari lalu';
+    if (days < 30) return '${days ~/ 7} minggu lalu';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

@@ -18,12 +18,25 @@ class ApiConfig {
       .replaceFirst(RegExp(r'/+$'), '')
       .replaceFirst(RegExp(r'/api$'), '');
 
+  static String? mediaUrl(String? raw) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return null;
+    if (value.startsWith('assets/')) return value;
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    if (value.startsWith('/')) return '$baseUrl$value';
+    return null;
+  }
+
   static const String apiPrefix = '/api';
   static String get customerAuth => '$apiPrefix/customer/auth';
   static String get customerProfile => '$apiPrefix/customer/profile';
   static String get customerAddresses => '$apiPrefix/customer/addresses';
   static String get customerFaqs => '$apiPrefix/customer/faqs';
   static String get customerServices => '$apiPrefix/customer/services';
+  static String customerServiceReviews(String serviceId) =>
+      '$customerServices/$serviceId/reviews';
   static String get customerBookings => '$apiPrefix/customer/bookings';
   static String get customerChat => '$apiPrefix/customer/chat';
   static String get trackingEtaPreview => '$apiPrefix/tracking/eta-preview';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -10,6 +12,7 @@ import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_sheet.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../../booking/pages/booking_page.dart';
@@ -38,6 +41,7 @@ class OrdersPage extends StatefulWidget {
 
 class _OrdersPageState extends State<OrdersPage> {
   late OrdersTab _selectedTab;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -46,6 +50,19 @@ class _OrdersPageState extends State<OrdersPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) context.read<OrderController>().loadFromApi();
     });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (!mounted ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      unawaited(context.read<OrderController>().loadFromApi());
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -154,10 +171,8 @@ class _OrdersPageState extends State<OrdersPage> {
 
   void _handleNavigation(BuildContext context, int index) {
     if (index == 0) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.home,
-        (route) => false,
-      );
+      Navigator.of(context)
+          .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
     } else if (index == 1) {
       Navigator.pushReplacementNamed(context, AppRoutes.services);
     } else if (index == 3) {
@@ -979,7 +994,7 @@ class _HistoryOrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCancelled = order.status == 'DIBATALKAN';
-    final profileAvatar = context.watch<ProfileController>().avatarAsset;
+    final profileAvatar = context.watch<ProfileController>().avatarUrl;
     return _OrderSurface(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -1051,24 +1066,7 @@ class _HistoryOrderCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                ClipOval(
-                  child: Image.asset(
-                    profileAvatar,
-                    width: 30,
-                    height: 30,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => Container(
-                      width: 30,
-                      height: 30,
-                      color: const Color(0xFFE8FAF7),
-                      child: const Icon(
-                        Icons.person_outline_rounded,
-                        size: 17,
-                        color: AppColors.primaryAction,
-                      ),
-                    ),
-                  ),
-                ),
+                UserAvatar(source: profileAvatar, size: 30),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
@@ -1118,11 +1116,11 @@ class _HistoryOrderCard extends StatelessWidget {
                         size: 17,
                         color: Color(0xFFF59E0B),
                       ),
-                      label: const Text(
-                        'Beri Ulasan',
+                      label: Text(
+                        order.hasReview ? 'Edit Ulasan' : 'Beri Ulasan',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: AppTheme.fontFamily,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -1240,8 +1238,13 @@ class _HistoryOrderCard extends StatelessWidget {
       MaterialPageRoute<void>(
         builder: (_) => ReviewRatingPage(
           orderId: order.orderId,
+          bookingId: order.backendBookingId,
           serviceName: order.serviceName,
           serviceImagePath: order.serviceAssetPath,
+          initialRating: order.hasReview ? (order.rating?.round() ?? 5) : null,
+          initialComment: order.review?.comment ?? '',
+          initialPhotos: order.review?.photos ?? const [],
+          isEdit: order.hasReview,
         ),
       ),
     );

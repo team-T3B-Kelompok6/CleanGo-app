@@ -1,3 +1,4 @@
+import 'package:cleango_app/core/network/api_config.dart';
 import 'package:cleango_app/features/booking/data/customer_booking_api.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/data/order_data.dart';
@@ -55,6 +56,13 @@ CustomerBookingSummary _booking({
   required String status,
   String time = '10:00',
   int total = 105000,
+  bool reviewEditable = false,
+  bool hasReview = false,
+  int? reviewRating,
+  String reviewComment = '',
+  String cleanerName = '',
+  String recipientName = '',
+  String recipientPhone = '',
 }) => CustomerBookingSummary(
   id: code,
   code: code,
@@ -70,6 +78,13 @@ CustomerBookingSummary _booking({
   address: 'Jl. Uji No. 1, Malang',
   latitude: -7.98,
   longitude: 112.63,
+  reviewEditable: reviewEditable,
+  hasReview: hasReview,
+  reviewRating: reviewRating,
+  reviewComment: reviewComment,
+  cleanerName: cleanerName,
+  recipientName: recipientName,
+  recipientPhone: recipientPhone,
 );
 
 void main() {
@@ -104,6 +119,34 @@ void main() {
       );
       expect(booking.isFinished, isFalse);
       expect(booking.scheduledAt, DateTime(2026, 10, 25, 14));
+    });
+
+    test('parses review photos with their ids for editing', () {
+      final booking = CustomerBookingSummary.fromJson({
+        'id': 77,
+        'code': 'CG-TEST',
+        'date': '2026-10-25',
+        'time': '14:00',
+        'service': 'Sofa Cleaning',
+        'servicePrice': 150000,
+        'platformFee': 5000,
+        'discountAmount': 0,
+        'totalAmount': 155000,
+        'status': 'Selesai',
+        'notes': '',
+        'address': 'Jl. A, Malang',
+        'hasReview': true,
+        'reviewPhotos': [
+          {'id': '4', 'url': '/uploads/review-photos/a.jpg'},
+        ],
+      });
+
+      expect(booking.reviewPhotos, hasLength(1));
+      expect(booking.reviewPhotos.first.id, '4');
+      expect(
+        booking.reviewPhotos.first.url,
+        '${ApiConfig.baseUrl}/uploads/review-photos/a.jpg',
+      );
     });
 
     test('flags finished bookings', () {
@@ -176,7 +219,16 @@ void main() {
 
     test('maps finished bookings into history', () async {
       final api = _FakeBookingApi(
-        bookings: [_booking(code: 'CG-9', status: 'Selesai')],
+        bookings: [
+          _booking(
+            code: 'CG-9',
+            status: 'Selesai',
+            reviewEditable: true,
+            cleanerName: 'Budi Santoso',
+            recipientName: 'Timothy',
+            recipientPhone: '082140636747',
+          ),
+        ],
       );
       final controller = OrderController(bookingApi: api);
 
@@ -186,6 +238,9 @@ void main() {
       expect(controller.historyOrders.first.orderId, '#CG-9');
       expect(controller.historyOrders.first.status, 'SELESAI');
       expect(controller.historyOrders.first.canReview, isTrue);
+      expect(controller.historyOrders.first.hasReview, isFalse);
+      expect(controller.historyOrders.first.cleanerName, 'Budi Santoso');
+      expect(controller.historyOrders.first.customerName, 'Timothy');
     });
 
     test('keeps the demo orders when the backend returns nothing', () async {

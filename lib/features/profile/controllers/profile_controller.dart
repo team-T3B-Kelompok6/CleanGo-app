@@ -5,9 +5,11 @@ import '../data/customer_profile_service.dart';
 import '../models/user_profile_model.dart';
 
 class ProfileController extends ChangeNotifier {
-  ProfileController({TokenStorage? tokenStorage, CustomerProfileService? service})
-      : _tokenStorage = tokenStorage,
-        _service = service ?? CustomerProfileService() {
+  ProfileController({
+    TokenStorage? tokenStorage,
+    CustomerProfileService? service,
+  }) : _tokenStorage = tokenStorage,
+       _service = service ?? CustomerProfileService() {
     _profile = _initialProfile;
   }
 
@@ -39,17 +41,62 @@ class ProfileController extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateProfileRemote({String? fullName, String? email, String? phoneNumber}) async {
+  Future<bool> updateProfileRemote({
+    String? fullName,
+    String? email,
+    String? phoneNumber,
+  }) async {
     final token = await _tokenStorage?.readAccessToken();
-    if (token == null || token.isEmpty) { updateProfile(fullName: fullName, email: email, phoneNumber: phoneNumber); return true; }
+    if (token == null || token.isEmpty) {
+      updateProfile(fullName: fullName, email: email, phoneNumber: phoneNumber);
+      return true;
+    }
     try {
-      _profile = await _service.updateProfile(token, fullName: fullName, email: email, phoneNumber: phoneNumber);
+      _profile = await _service.updateProfile(
+        token,
+        fullName: fullName,
+        email: email,
+        phoneNumber: phoneNumber,
+      );
       notifyListeners();
       return true;
-    } catch (e) { _error = e.toString(); notifyListeners(); return false; }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
   }
 
-  Future<bool> changePasswordRemote({required String currentPassword, required String newPassword}) async {
+  Future<bool> uploadProfilePhotoRemote({
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    final token = await _tokenStorage?.readAccessToken();
+    if (token == null || token.isEmpty) {
+      _error = 'Sesi tidak ditemukan. Silakan masuk kembali.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      _profile = await _service.uploadPhoto(
+        token,
+        bytes: bytes,
+        contentType: contentType,
+      );
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> changePasswordRemote({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
     final token = await _tokenStorage?.readAccessToken();
     if (token == null || token.isEmpty) {
       // Never pretend the password changed: without a session the server would
@@ -59,19 +106,27 @@ class ProfileController extends ChangeNotifier {
       return false;
     }
     try {
-      await _service.changePassword(token, currentPassword: currentPassword, newPassword: newPassword);
+      await _service.changePassword(
+        token,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
       _error = null;
       return true;
-    } catch (e) { _error = e.toString(); notifyListeners(); return false; }
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
   }
 
   static final UserProfileModel _initialProfile = UserProfileModel(
-    id: 'usr-001',
-    customerId: 'CG-8829104',
-    fullName: 'Krisna Pratama',
-    phoneNumber: '+62 812–3456–7890',
+    id: '',
+    customerId: '',
+    fullName: '',
+    phoneNumber: '',
     isPhoneVerified: true,
-    email: 'krisna.pratama@email.com',
+    email: '',
     gender: 'Laki-laki',
     birthDate: DateTime(1995, 5, 14),
     avatarAsset: 'assets/images/user_profile.jpeg',
@@ -93,6 +148,8 @@ class ProfileController extends ChangeNotifier {
   DateTime get birthDate => _profile.birthDate;
   String get formattedBirthDate => _profile.formattedBirthDate;
   String get avatarAsset => _profile.avatarAsset;
+  String? get avatarUrl => _profile.avatarUrl;
+  String get avatarSource => _profile.avatarSource;
   String get password => _password;
 
   bool verifyPassword(String input) => input == _password;
@@ -133,6 +190,13 @@ class ProfileController extends ChangeNotifier {
   void updateAvatar(String asset) {
     if (_profile.avatarAsset != asset) {
       _profile = _profile.copyWith(avatarAsset: asset);
+      notifyListeners();
+    }
+  }
+
+  void updateAvatarUrl(String url) {
+    if (_profile.avatarUrl != url) {
+      _profile = _profile.copyWith(avatarUrl: url);
       notifyListeners();
     }
   }

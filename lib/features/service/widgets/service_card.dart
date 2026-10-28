@@ -3,7 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../domain/models/service_model.dart';
-import '../../../shared/widgets/remote_or_asset_image.dart';
+import '../data/service_icon_catalog.dart';
+import 'service_icon.dart';
 
 class ServiceCard extends StatelessWidget {
   const ServiceCard({required this.service, required this.onTap, super.key});
@@ -139,19 +140,23 @@ class _ServiceVisual extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (service.imagePath case final imagePath?)
-              RemoteOrAssetImage(source: imagePath)
-            else
-              ColoredBox(
-                color: const Color(0xFFF0FDFA),
-                child: Center(
-                  child: SvgPicture.asset(
-                    service.iconPath!,
-                    width: 32,
-                    height: 32,
-                  ),
+            DecoratedBox(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFF0FDFA), Color(0xFFDDF7F2)],
                 ),
               ),
+              child: Center(
+                child: ServiceIcon(
+                  path:
+                      service.iconPath ??
+                      ServiceIconCatalog.forCategory(service.category),
+                  size: 36,
+                ),
+              ),
+            ),
             if (service.badge case final badge?)
               Positioned(
                 left: 7,

@@ -38,7 +38,11 @@ class HomeController extends ChangeNotifier {
       if (_bannerApi != null) {
         try {
           final banners = await _bannerApi.fetchBanners();
-          if (banners.isNotEmpty) _banners = banners;
+          if (banners.isNotEmpty) {
+            _banners = banners;
+          } else {
+            _banners = HomeData.promoBanners;
+          }
         } catch (error) {
           _error = error.toString();
         }

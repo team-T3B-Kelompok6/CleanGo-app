@@ -88,9 +88,10 @@ class ScheduledOrderModel {
     required this.orderNumber,
     required this.price,
     required this.paymentStatus,
+    this.paymentState,
     this.stage = OrderStatusStage.dikonfirmasi,
     this.cleanerName = '',
-    this.cleanerRating = 4.9,
+    this.cleanerRating,
     this.cleanerCompletedTasks = '340+ tugas selesai',
     this.cleanerAvatarPath = 'assets/images/cleaner_siti.jpeg',
     this.cleanerPhone = '',
@@ -106,6 +107,9 @@ class ScheduledOrderModel {
     this.destinationLongitude = 112.62650,
     this.hasDestinationCoordinates = true,
     this.backendBookingId,
+    this.holdUntil,
+    this.canCancel = false,
+    this.canReschedule = false,
     this.hasCleanerCoordinates = true,
     this.etaSource = 'Lokasi cleaner belum dibagikan',
     this.etaUpdatedAt,
@@ -131,9 +135,10 @@ class ScheduledOrderModel {
   final String orderNumber;
   final String price;
   final String paymentStatus;
+  final String? paymentState;
   final OrderStatusStage stage;
   final String cleanerName;
-  final double cleanerRating;
+  final double? cleanerRating;
   final String cleanerCompletedTasks;
   final String cleanerAvatarPath;
   final String cleanerPhone;
@@ -149,6 +154,9 @@ class ScheduledOrderModel {
   final double destinationLongitude;
   final bool hasDestinationCoordinates;
   final String? backendBookingId;
+  final DateTime? holdUntil;
+  final bool canCancel;
+  final bool canReschedule;
   final bool hasCleanerCoordinates;
   final String etaSource;
   final DateTime? etaUpdatedAt;
@@ -174,6 +182,7 @@ class ScheduledOrderModel {
     String? orderNumber,
     String? price,
     String? paymentStatus,
+    String? paymentState,
     OrderStatusStage? stage,
     String? cleanerName,
     double? cleanerRating,
@@ -192,6 +201,9 @@ class ScheduledOrderModel {
     double? destinationLongitude,
     bool? hasDestinationCoordinates,
     String? backendBookingId,
+    DateTime? holdUntil,
+    bool? canCancel,
+    bool? canReschedule,
     bool? hasCleanerCoordinates,
     String? etaSource,
     DateTime? etaUpdatedAt,
@@ -221,6 +233,7 @@ class ScheduledOrderModel {
       orderNumber: orderNumber ?? this.orderNumber,
       price: price ?? this.price,
       paymentStatus: paymentStatus ?? this.paymentStatus,
+      paymentState: paymentState ?? this.paymentState,
       stage: stage ?? this.stage,
       cleanerName: cleanerName ?? this.cleanerName,
       cleanerRating: cleanerRating ?? this.cleanerRating,
@@ -242,6 +255,9 @@ class ScheduledOrderModel {
       hasDestinationCoordinates:
           hasDestinationCoordinates ?? this.hasDestinationCoordinates,
       backendBookingId: backendBookingId ?? this.backendBookingId,
+      holdUntil: holdUntil ?? this.holdUntil,
+      canCancel: canCancel ?? this.canCancel,
+      canReschedule: canReschedule ?? this.canReschedule,
       hasCleanerCoordinates:
           hasCleanerCoordinates ?? this.hasCleanerCoordinates,
       etaSource: etaSource ?? this.etaSource,
@@ -296,6 +312,7 @@ class OrderHistoryModel {
     required this.canReview,
     this.hasReview = false,
     this.backendBookingId,
+    this.paymentStatus,
     this.rating,
     this.cleanerName = '',
     this.cleanerAvatarPath = 'assets/images/cleaner_siti.jpeg',
@@ -319,6 +336,13 @@ class OrderHistoryModel {
   final bool hasReview;
   final String? backendBookingId;
   final double? rating;
+  final String? paymentStatus;
+  bool get isCancelled =>
+      ['BATAL', 'DIBATALKAN', 'CANCELLED'].contains(status.toUpperCase());
+  bool get needsRefundContact =>
+      isCancelled &&
+      paymentMethod.toLowerCase() == 'qris' &&
+      paymentStatus == 'paid';
   final String cleanerName;
   final String cleanerAvatarPath;
   final OrderReviewModel? review;
@@ -340,6 +364,7 @@ class OrderHistoryModel {
     bool? canReview,
     bool? hasReview,
     String? backendBookingId,
+    String? paymentStatus,
     double? rating,
     String? cleanerName,
     String? cleanerAvatarPath,
@@ -362,6 +387,7 @@ class OrderHistoryModel {
       canReview: canReview ?? this.canReview,
       hasReview: hasReview ?? this.hasReview,
       backendBookingId: backendBookingId ?? this.backendBookingId,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
       rating: rating ?? this.rating,
       cleanerName: cleanerName ?? this.cleanerName,
       cleanerAvatarPath: cleanerAvatarPath ?? this.cleanerAvatarPath,

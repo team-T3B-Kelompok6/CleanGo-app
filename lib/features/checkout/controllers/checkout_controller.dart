@@ -2,18 +2,17 @@ import '../data/customer_promo_api.dart';
 import '../domain/models/promo_model.dart';
 
 class CheckoutController {
-  CheckoutController({CustomerPromoApi? promoApi}) : _promoApi = promoApi;
+  CheckoutController({CustomerPromoApi? promoApi})
+      : _promoApi = promoApi,
+        _promos = const [];
 
-  /// Bundled fallback used before the promo list is loaded from the backend.
   static const List<PromoModel> availablePromos = [
-    PromoModel(code: 'CLEANHEMAT', discountPercent: 35),
   ];
 
   final CustomerPromoApi? _promoApi;
-  List<PromoModel> _promos = availablePromos;
+  List<PromoModel> _promos;
   PromoModel? _appliedPromo;
   String? _promoError;
-
   /// Promos offered to the customer (backend list when loaded).
   List<PromoModel> get promos => List.unmodifiable(_promos);
 
@@ -23,14 +22,19 @@ class CheckoutController {
     if (api == null) return;
     try {
       final promos = await api.fetchPromos();
-      if (promos.isNotEmpty) _promos = promos;
-    } catch (_) {
-      // offline / no session: keep the bundled list
+      _promos = promos;
+      _promoError = null;
+    } catch (e) {
+      // Real API failed: never show the bundled demo list as if it were live.
+      _promos = const [];
+      _promoError = e.toString();
     }
   }
 
   /// Validates the code on the backend and stores the returned discount.
-  /// Falls back to the local list when no api is configured.
+  /// The backend is always authoritative; known entries cannot bypass
+  /// validation, and a server rejection is never masked by a local match.
+  /// Without a configured backend (pure local mode) the bundled list applies.
   Future<void> applyPromoRemote({
     required String code,
     required int servicePrice,
@@ -40,16 +44,14 @@ class CheckoutController {
     clearPromo();
     if (normalized.isEmpty) return;
 
-    // Codes from the (backend) promo list are already known locally, so apply
-    // them instantly. Only unknown codes need a server round-trip.
-    final known = _localMatch(normalized);
-    if (known != null) {
-      _appliedPromo = known;
-      return;
-    }
-
     final api = _promoApi;
     if (api == null) {
+      // Local-only mode: no backend is configured, so use the bundled list.
+      final local = _localMatch(normalized);
+      if (local != null) {
+        _appliedPromo = local;
+        return;
+      }
       _promoError = 'Kode promo tidak valid.';
       return;
     }
@@ -60,12 +62,6 @@ class CheckoutController {
         serviceId: serviceId,
       );
     } catch (error) {
-      // Offline or no session: keep working with the bundled promo list.
-      final local = _localMatch(normalized);
-      if (local != null) {
-        _appliedPromo = local;
-        return;
-      }
       _promoError = _messageFor(error);
     }
   }
@@ -112,7 +108,10 @@ class CheckoutController {
       return;
     }
 
-    for (final promo in [..._promos, ...availablePromos]) {
+    final candidates = _promoApi == null
+        ? <PromoModel>[..._promos, ...availablePromos]
+        : _promos;
+    for (final promo in candidates) {
       if (promo.code == normalizedCode) {
         _appliedPromo = promo;
         return;

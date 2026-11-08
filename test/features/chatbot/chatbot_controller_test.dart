@@ -141,7 +141,7 @@ void main() {
     () async {
       final store = FakeChatHistory()..failLoad = true;
       store.saved = [
-        const ChatMessage(content: 'Jangan tertimpa', isUser: true),
+        ChatMessage(content: 'Jangan tertimpa', isUser: true),
       ];
       final controller = ChatbotController(
         repository: FakeChatbot(),

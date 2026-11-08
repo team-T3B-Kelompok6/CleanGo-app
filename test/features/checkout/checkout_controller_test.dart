@@ -1,5 +1,34 @@
 import 'package:cleango_app/features/checkout/controllers/checkout_controller.dart';
+import 'package:cleango_app/features/checkout/data/customer_promo_api.dart';
+import 'package:cleango_app/features/checkout/domain/models/promo_model.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _FakePromoApi extends CustomerPromoApi {
+  final List<PromoModel> promos;
+  final bool shouldFail;
+
+  _FakePromoApi({this.promos = const [], this.shouldFail = false});
+
+  @override
+  Future<List<PromoModel>> fetchPromos() async {
+    if (shouldFail) throw Exception('network error');
+    return promos;
+  }
+
+  @override
+  Future<PromoModel> validate({
+    required String code,
+    required int amount,
+    String? serviceId,
+  }) async {
+    if (shouldFail) throw Exception('network error');
+    final promo = promos.firstWhere(
+      (p) => p.code.toUpperCase() == code.toUpperCase(),
+      orElse: () => throw Exception('Kode promo tidak valid.'),
+    );
+    return promo;
+  }
+}
 
 void main() {
   group('CheckoutController', () {
@@ -15,8 +44,18 @@ void main() {
       expect(controller.discountAmount(150000), 0);
     });
 
-    test('applies CLEANHEMAT case-insensitively with 35 percent discount', () {
-      controller.applyPromo(' cleanhemat ');
+    test('applies CLEANHEMAT case-insensitively with 35 percent discount', () async {
+      final api = _FakePromoApi(
+        promos: [
+          PromoModel(code: 'CLEANHEMAT', discountPercent: 35),
+        ],
+      );
+      final controller = CheckoutController(promoApi: api);
+      await controller.loadPromos();
+      await controller.applyPromoRemote(
+        code: ' cleanhemat ',
+        servicePrice: 150000,
+      );
 
       expect(controller.isPromoApplied, isTrue);
       expect(controller.promoError, isNull);
@@ -30,11 +69,14 @@ void main() {
 
     test(
       'rejects a code outside the available promos and clears selection',
-      () {
-        controller.applyPromo('CLEANHEMAT');
-        controller.applyPromo('SALAH');
+      () async {
+        final api = _FakePromoApi(promos: []);
+        final controller = CheckoutController(promoApi: api);
+        await controller.loadPromos();
+
+        await controller.applyPromoRemote(code: 'SALAH', servicePrice: 150000);
         expect(controller.isPromoApplied, isFalse);
-        expect(controller.promoError, 'Kode promo tidak valid.');
+        expect(controller.promoError, 'Kode promo tidak dapat digunakan.');
 
         controller.clearPromo();
         expect(controller.appliedPromo, isNull);
@@ -43,8 +85,13 @@ void main() {
       },
     );
 
-    test('allows an empty optional promo without an error', () {
-      controller.applyPromo('CLEANHEMAT');
+    test('allows an empty optional promo without an error', () async {
+      final api = _FakePromoApi(
+        promos: [PromoModel(code: 'CLEANHEMAT', discountPercent: 35)],
+      );
+      final controller = CheckoutController(promoApi: api);
+      await controller.loadPromos();
+
       controller.applyPromo('   ');
 
       expect(controller.isPromoApplied, isFalse);
@@ -56,9 +103,14 @@ void main() {
       );
     });
 
-    test('available promo calculates savings from the service price only', () {
-      final promo = CheckoutController.availablePromos.single;
-      controller.applyPromo(promo.code);
+    test('available promo calculates savings from the service price only', () async {
+      final api = _FakePromoApi(
+        promos: [PromoModel(code: 'CLEANHEMAT', discountPercent: 35)],
+      );
+      final controller = CheckoutController(promoApi: api);
+      await controller.loadPromos();
+      final promo = controller.promos.single;
+      await controller.applyPromoRemote(code: promo.code, servicePrice: 150001);
 
       expect(controller.appliedPromo, same(promo));
       expect(promo.discountAmount(150001), 52500);
@@ -68,9 +120,15 @@ void main() {
       );
     });
 
-    test('replaces an invalid promo error after a valid retry', () {
-      controller.applyPromo('SALAH');
-      controller.applyPromo('cleanhemat');
+    test('replaces an invalid promo error after a valid retry', () async {
+      final api = _FakePromoApi(
+        promos: [PromoModel(code: 'CLEANHEMAT', discountPercent: 35)],
+      );
+      final controller = CheckoutController(promoApi: api);
+      await controller.loadPromos();
+
+      await controller.applyPromoRemote(code: 'SALAH', servicePrice: 150000);
+      await controller.applyPromoRemote(code: 'cleanhemat', servicePrice: 150000);
 
       expect(controller.isPromoApplied, isTrue);
       expect(controller.promoError, isNull);

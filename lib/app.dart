@@ -92,6 +92,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
     return MultiProvider(
       providers: [
         Provider<AppPreferences>.value(value: widget.preferences),
+        Provider<TokenStorage>.value(value: widget.tokenStorage),
         ChangeNotifierProvider(
           create: (_) => AuthSessionController(widget.tokenStorage),
         ),

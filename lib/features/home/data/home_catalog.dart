@@ -71,6 +71,7 @@ abstract final class HomeCatalog {
           (service) => PopularServiceModel(
             serviceId: service.id,
             imagePath:
+                service.detail?.heroImagePath ??
                 service.imagePath ??
                 service.iconPath ??
                 ServiceIconCatalog.fallback,

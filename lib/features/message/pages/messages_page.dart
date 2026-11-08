@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
+import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../controllers/message_controller.dart';
@@ -92,9 +93,18 @@ class _MessagesPageState extends State<MessagesPage> {
                                         final message = visibleMessages[index];
                                         return _MessageNotificationCard(
                                           message: message,
-                                          onTap: () {
-                                            _controller.markAsRead(message.id);
+                                          onTap: () async {
+                                            final result = _controller
+                                                .markAsRead(message.id);
                                             widget.onMessageTap?.call(message);
+                                            if (!await result &&
+                                                context.mounted) {
+                                              AppNotice.show(
+                                                context,
+                                                'Status baca belum tersimpan. Periksa koneksi lalu tekan pesan lagi.',
+                                                type: AppNoticeType.error,
+                                              );
+                                            }
                                           },
                                         );
                                       },

@@ -1,6 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-const booChatHistoryStorageKey = 'cleango_boo_history_v1';
+const booChatHistoryStorageKey = 'cleango_boo_history_v2';
+const booChatHistoryStorageKeyLegacy = 'cleango_boo_history_v1';
 
 abstract interface class TokenStorage {
   Future<void> writeAccessToken(String token);
@@ -72,6 +73,7 @@ final class SecureTokenStorage implements TokenStorage {
       _storage.delete(key: _refreshTokenKey),
       _storage.delete(key: _expiresAtKey),
       _storage.delete(key: booChatHistoryStorageKey),
+      _storage.delete(key: booChatHistoryStorageKeyLegacy),
     ]);
   }
 }

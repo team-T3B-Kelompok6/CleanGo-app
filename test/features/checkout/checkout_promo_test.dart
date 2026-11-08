@@ -8,6 +8,32 @@ import 'package:cleango_app/features/service/data/service_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:cleango_app/features/checkout/data/customer_promo_api.dart';
+import 'package:cleango_app/features/checkout/domain/models/promo_model.dart';
+
+class _LocalPromoApi extends CustomerPromoApi {
+  @override
+  Future<List<PromoModel>> fetchPromos() async {
+    return const [
+      PromoModel(code: 'CLEANHEMAT', discountPercent: 35),
+    ];
+  }
+
+  @override
+  Future<PromoModel> validate({
+    required String code,
+    required int amount,
+    String? serviceId,
+  }) async {
+    if (code == 'CLEANHEMAT') {
+      return const PromoModel(
+        code: 'CLEANHEMAT',
+        discountPercent: 35,
+      );
+    }
+    throw Exception('Promo not found');
+  }
+}
 
 void main() {
   final promoSelector = find.byKey(const ValueKey('checkout-promo-selector'));
@@ -37,7 +63,10 @@ void main() {
         },
         child: MaterialApp(
           theme: AppTheme.light,
-          home: CheckoutPage(onApplyPromo: onApplyPromo),
+          home: CheckoutPage(
+            onApplyPromo: onApplyPromo,
+            promoApi: _LocalPromoApi(),
+          ),
         ),
       ),
     );

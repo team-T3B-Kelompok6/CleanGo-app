@@ -29,7 +29,7 @@ class ChatbotPage extends StatefulWidget {
   State<ChatbotPage> createState() => _ChatbotPageState();
 }
 
-class _ChatbotPageState extends State<ChatbotPage> {
+class _ChatbotPageState extends State<ChatbotPage> with WidgetsBindingObserver {
   late final ChatbotController _chatbotController = ChatbotController(
     repository: widget.repository,
     history: widget.history,
@@ -41,6 +41,7 @@ class _ChatbotPageState extends State<ChatbotPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addObserver(this);
       if (!mounted) return;
       final message = widget.initialMessage?.trim() ?? '';
       if (message.isNotEmpty) {

@@ -38,7 +38,7 @@ void main() {
       final store = ChatHistoryStore(tokens: tokens);
       await store.load();
       await store.save([
-        const ChatMessage(content: 'Pesanan pribadi', isUser: true),
+        ChatMessage(content: 'Pesanan pribadi', isUser: true),
       ]);
       tokens.token = 'session-two';
       expect(await ChatHistoryStore(tokens: tokens).load(), isEmpty);
@@ -47,9 +47,33 @@ void main() {
       expect(await ChatHistoryStore(tokens: tokens).load(), isEmpty);
     },
   );
+  test('legacy history is cleared and fresh history survives reopening', () async {
+    FlutterSecureStorage.setMockInitialValues({'cleango_boo_history_v1': 'legacy'});
+    final tokens = SessionTokens();
+    final store = ChatHistoryStore(tokens: tokens);
+    expect(await store.load(), isEmpty);
+    expect(await const FlutterSecureStorage().read(key: 'cleango_boo_history_v1'), isNull);
+    await store.save([ChatMessage(content: 'Fresh', isUser: true)]);
+    expect((await ChatHistoryStore(tokens: tokens).load()).single.content, 'Fresh');
+  });
+  test('expiry is exactly 72 hours and saving does not renew it', () async {
+    var now = DateTime.utc(2026, 10, 29);
+    final store = ChatHistoryStore(tokens: SessionTokens(), now: () => now);
+    await store.load();
+    await store.save([
+      ChatMessage(content: 'Expired', isUser: true, createdAt: now.subtract(const Duration(days: 3))),
+      ChatMessage(content: 'Recent', isUser: false, createdAt: now.subtract(const Duration(days: 3)).add(const Duration(milliseconds: 1))),
+    ]);
+    final restored = await store.load();
+    expect(restored.map((message) => message.content), ['Recent']);
+    await store.save(restored);
+    now = now.add(const Duration(milliseconds: 1));
+    expect(await store.load(), isEmpty);
+    expect(await const FlutterSecureStorage().read(key: booChatHistoryStorageKey), isNot(contains('Recent')));
+  });
   test('malformed history is reported rather than silently deleted', () async {
     FlutterSecureStorage.setMockInitialValues({
-      'cleango_boo_history_v1': 'invalid json',
+      booChatHistoryStorageKey: 'invalid json',
     });
     final store = ChatHistoryStore(tokens: SessionTokens());
     await expectLater(store.load(), throwsFormatException);

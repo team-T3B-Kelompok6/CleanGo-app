@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cleango_app/features/message/controllers/message_controller.dart';
 import 'package:cleango_app/features/message/data/customer_notification_api.dart';
 import 'package:cleango_app/features/message/data/message_data.dart';
@@ -11,6 +13,8 @@ class _FakeNotificationApi extends CustomerNotificationApi {
   final bool fail;
   int listCalls = 0;
   final List<String> readIds = [];
+  Completer<void>? pendingRead;
+  bool failRead = false;
 
   @override
   Future<List<Map<String, dynamic>>> fetchNotifications() async {
@@ -20,7 +24,14 @@ class _FakeNotificationApi extends CustomerNotificationApi {
   }
 
   @override
-  Future<void> markRead(String id) async => readIds.add(id);
+  Future<void> markRead(String id) async {
+    readIds.add(id);
+    if (failRead) throw StateError('offline');
+    await pendingRead?.future;
+    for (final row in rows) {
+      if ('${row['id']}' == id) row['isRead'] = true;
+    }
+  }
 }
 
 void main() {
@@ -122,16 +133,67 @@ void main() {
       expect(controller.unreadCount, 1);
     });
 
-    test('keeps the demo inbox when the backend is empty or fails', () async {
-      final empty = MessageController(notificationApi: _FakeNotificationApi());
-      await empty.loadFromApi();
-      expect(empty.visibleMessages.length, MessageData.notifications.length);
+    test(
+      'clears the demo inbox when the backend returns no notifications',
+      () async {
+        final empty = MessageController(
+          notificationApi: _FakeNotificationApi(),
+        );
+        await empty.loadFromApi();
+        expect(empty.visibleMessages, isEmpty);
+      },
+    );
 
+    test('keeps the demo inbox when loading fails', () async {
       final failing = MessageController(
         notificationApi: _FakeNotificationApi(fail: true),
       );
       await failing.loadFromApi();
       expect(failing.visibleMessages.length, MessageData.notifications.length);
+    });
+
+    test('failed read restores unread and can be retried', () async {
+      final api = _FakeNotificationApi(
+        rows: [
+          {'id': 7, 'isRead': false},
+        ],
+      )..failRead = true;
+      final controller = MessageController(notificationApi: api);
+      addTearDown(controller.dispose);
+      await controller.loadFromApi();
+      expect(await controller.markAsRead('7'), isFalse);
+      expect(controller.unreadCount, 1);
+      api.failRead = false;
+      expect(await controller.markAsRead('7'), isTrue);
+      await controller.loadFromApi();
+      expect(controller.unreadCount, 0);
+    });
+
+    test('refresh during read does not resurrect unread and other messages stay unread', () async {
+      final api = _FakeNotificationApi(
+        rows: [
+          {'id': 7, 'isRead': false},
+          {'id': 8, 'isRead': false},
+        ],
+      )..pendingRead = Completer<void>();
+      final controller = MessageController(notificationApi: api);
+      addTearDown(controller.dispose);
+      await controller.loadFromApi();
+      final pending = controller.markAsRead('7');
+      expect(controller.unreadCount, 1);
+      await controller.loadFromApi();
+      expect(controller.unreadCount, 1);
+      api.pendingRead!.complete();
+      expect(await pending, isTrue);
+      await controller.loadFromApi();
+      expect(controller.unreadCount, 1);
+      expect(api.readIds, ['7']);
+      expect(
+        controller.visibleMessages
+            .singleWhere((message) => message.id == '8')
+            .isUnread,
+        isTrue,
+      );
     });
 
     test('marks a notification read locally and on the backend', () async {

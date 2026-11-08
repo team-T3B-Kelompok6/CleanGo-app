@@ -16,6 +16,7 @@ import '../data/home_data.dart';
 import '../domain/models/popular_service_model.dart';
 import '../domain/models/service_category_model.dart';
 import '../../profile/controllers/profile_controller.dart';
+import '../../message/controllers/message_controller.dart';
 import '../../service/controllers/service_controller.dart';
 import '../controllers/home_controller.dart';
 import '../data/home_catalog.dart';
@@ -251,8 +252,21 @@ class _ServiceCategoriesSection extends StatelessWidget {
   }
 }
 
-class _HomeHeader extends StatelessWidget {
+class _HomeHeader extends StatefulWidget {
   const _HomeHeader();
+
+  @override
+  State<_HomeHeader> createState() => _HomeHeaderState();
+}
+
+class _HomeHeaderState extends State<_HomeHeader> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(context.read<MessageController>().loadFromApi());
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -343,17 +357,19 @@ class _HomeHeader extends StatelessWidget {
                         width: 15,
                         height: 19,
                       ),
-                      const Positioned(
-                        right: 8,
-                        top: 8,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.notification,
-                            shape: BoxShape.circle,
+                      if (context.watch<MessageController>().unreadCount > 0)
+                        const Positioned(
+                          key: ValueKey('notification-unread-badge'),
+                          right: 8,
+                          top: 8,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: AppColors.notification,
+                              shape: BoxShape.circle,
+                            ),
+                            child: SizedBox(width: 10, height: 10),
                           ),
-                          child: SizedBox(width: 10, height: 10),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -495,13 +511,26 @@ class _BannerImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (source.startsWith('http')) {
-      return Image.network(
-        source,
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Image.network(
+          source,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
       );
     }
-    return Image.asset(source, fit: BoxFit.contain);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Image.asset(
+        source,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      ),
+    );
   }
 }
 

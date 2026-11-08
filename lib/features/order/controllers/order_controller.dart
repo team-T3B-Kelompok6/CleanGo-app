@@ -272,21 +272,16 @@ class OrderController extends ChangeNotifier {
   }
 
   bool get canModifyScheduledOrder {
-    final schedule = _scheduledOrder.scheduledAt;
-    if (!_hasSelectedOrder || schedule == null) return false;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final serviceDay = DateTime(schedule.year, schedule.month, schedule.day);
-    final minimumChangeableDay = today.add(const Duration(days: 2));
-    return !serviceDay.isBefore(minimumChangeableDay) &&
-        _activeStage.index <= OrderStatusStage.ditugaskan.index;
+    if (!_hasSelectedOrder) return false;
+    if (_scheduledOrder.backendBookingId != null) {
+      return _scheduledOrder.canReschedule &&
+          _activeStage == OrderStatusStage.dikonfirmasi;
+    }
+    return _activeStage == OrderStatusStage.dikonfirmasi;
   }
 
   String get modificationDeadlineLabel {
-    final schedule = _scheduledOrder.scheduledAt;
-    if (schedule == null) return 'Perubahan tersedia maksimal H-1.';
-    final deadline = schedule.subtract(const Duration(days: 1));
-    return 'Bisa dibatalkan atau dijadwal ulang sebelum ${_formatDateTime(deadline)}.';
+    return 'Bisa dibatalkan atau diubah jadwalnya selama petugas belum ditugaskan.';
   }
 
   void setStage(OrderStatusStage stage) {
@@ -327,12 +322,29 @@ class OrderController extends ChangeNotifier {
     }
   }
 
-  bool rescheduleOrder(DateTime newSchedule) {
+  Future<bool> rescheduleOrder(DateTime newSchedule) async {
     if (!canModifyScheduledOrder ||
-        newSchedule.isBefore(DateTime.now().add(const Duration(days: 1)))) {
+        newSchedule.isBefore(DateTime.now().add(const Duration(minutes: 60)))) {
       return false;
     }
-    _scheduledOrder = _scheduledOrder.copyWith(
+    final selected = _selected;
+    final bookingId = selected.order.backendBookingId;
+    if (bookingId != null) {
+      final api = _bookingApi;
+      if (api == null) return false;
+      try {
+        await api.rescheduleBooking(
+          bookingId: bookingId,
+          date:
+              '${newSchedule.year}-${newSchedule.month.toString().padLeft(2, '0')}-${newSchedule.day.toString().padLeft(2, '0')}',
+          time:
+              '${newSchedule.hour.toString().padLeft(2, '0')}:${newSchedule.minute.toString().padLeft(2, '0')}',
+        );
+      } catch (_) {
+        return false;
+      }
+    }
+    selected.order = selected.order.copyWith(
       scheduledAt: newSchedule,
       arrivalEstimate: _activeStage == OrderStatusStage.dikonfirmasi
           ? _confirmedArrivalLabel(newSchedule)
@@ -342,8 +354,31 @@ class OrderController extends ChangeNotifier {
     return true;
   }
 
-  bool cancelScheduledOrder() {
-    if (!canModifyScheduledOrder) return false;
+  bool get canCancelScheduledOrder {
+    final bookingId = _scheduledOrder.backendBookingId;
+    if (bookingId != null) {
+      return _hasSelectedOrder &&
+          _scheduledOrder.canCancel &&
+          _activeStage == OrderStatusStage.dikonfirmasi;
+    }
+    return canModifyScheduledOrder;
+  }
+
+  Future<bool> cancelScheduledOrder() async {
+    if (!_hasSelectedOrder) return false;
+    final bookingId = _scheduledOrder.backendBookingId;
+    if (bookingId != null) {
+      if (!canCancelScheduledOrder) return false;
+      final api = _bookingApi;
+      if (api == null) return false;
+      try {
+        await api.cancelBooking(bookingId);
+      } catch (_) {
+        return false;
+      }
+    } else if (!canModifyScheduledOrder) {
+      return false;
+    }
     _history.insert(0, _toHistory(status: 'DIBATALKAN', canReview: false));
     _orders.remove(_scheduledOrder.orderNumber);
     notifyListeners();
@@ -476,6 +511,7 @@ class OrderController extends ChangeNotifier {
           address: _scheduledOrder.destinationAddress,
           note: _scheduledOrder.note,
           paymentMethod: _scheduledOrder.paymentMethod,
+          paymentStatus: _scheduledOrder.paymentState,
           servicePrice: _scheduledOrder.servicePrice,
           platformFee: _scheduledOrder.platformFee,
           discountAmount: _scheduledOrder.discountAmount,
@@ -497,25 +533,33 @@ class OrderController extends ChangeNotifier {
       final bookings = await api.fetchBookings();
       if (bookings.isEmpty) return;
 
-      final active = bookings.where((b) => !b.isFinished).toList();
-      final finished = bookings.where((b) => b.isFinished).toList();
+      final active = bookings
+          .where((b) => !b.isFinished && b.paymentStatus != 'expired')
+          .toList();
+      final finished = bookings
+          .where((b) => b.isFinished && b.paymentStatus != 'expired')
+          .toList();
+
+      _orders.clear();
+      for (final booking in active) {
+        final state = _ActiveOrderState(_fromBooking(booking));
+        _orders[state.order.orderNumber] = state;
+      }
 
       if (active.isNotEmpty) {
-        _orders.clear();
-        for (final booking in active) {
-          final state = _ActiveOrderState(_fromBooking(booking));
-          _orders[state.order.orderNumber] = state;
-        }
         _selected = _orders.values.last;
+      } else if (finished.isNotEmpty) {
+        _selected = _ActiveOrderState(_fromBooking(finished.first));
+      }
+
+      if (active.isNotEmpty || finished.isNotEmpty) {
         _stageUpdatedAt
           ..clear()
           ..[_activeStage] = DateTime.now();
         _resetTripTracking();
       }
 
-      if (finished.isNotEmpty) {
-        _history = finished.map(_historyFromBooking).toList(growable: false);
-      }
+      _history = finished.map(_historyFromBooking).toList();
       notifyListeners();
     } catch (_) {
       // offline / no session: keep the bundled demo orders
@@ -562,15 +606,25 @@ class OrderController extends ChangeNotifier {
     final stage = _stageFor(booking.status);
     return OrderData.scheduledOrder.copyWith(
       backendBookingId: booking.id,
+      holdUntil: booking.holdUntil,
+      canCancel: booking.canCancel,
+      canReschedule: booking.canReschedule,
       hasCleanerCoordinates: false,
       serviceName: booking.service,
       serviceDurationMinutes: booking.serviceDurationMinutes,
       workStartedAt: booking.startedAt,
       price: BookingController.formatRupiah(booking.totalAmount),
       cleanerName: booking.cleanerName,
+      cleanerRating: booking.cleanerRating,
       customerName: booking.recipientName,
       customerPhone: booking.recipientPhone,
       paymentStatus: _paymentLabel(booking.paymentStatus, booking.status),
+      paymentState: booking.paymentStatus ?? '',
+      paymentMethod: booking.paymentMethod.isEmpty
+          ? 'Belum dipilih'
+          : booking.paymentMethod.toUpperCase() == 'CASH'
+          ? 'Tunai'
+          : booking.paymentMethod.toUpperCase(),
       orderNumber: '#${booking.code}',
       stage: stage,
       progress: stage.progress,
@@ -611,6 +665,12 @@ class OrderController extends ChangeNotifier {
       canReview: booking.reviewEditable,
       hasReview: booking.hasReview,
       backendBookingId: booking.id,
+      paymentStatus: booking.paymentStatus,
+      paymentMethod: booking.paymentMethod.isEmpty
+          ? 'Belum dipilih'
+          : booking.paymentMethod.toLowerCase() == 'cash'
+          ? 'Tunai'
+          : booking.paymentMethod.toUpperCase(),
       rating: booking.reviewRating?.toDouble(),
       review: booking.hasReview
           ? OrderReviewModel(
@@ -710,6 +770,7 @@ class OrderController extends ChangeNotifier {
       address: _scheduledOrder.destinationAddress,
       note: _scheduledOrder.note,
       paymentMethod: _scheduledOrder.paymentMethod,
+      paymentStatus: _scheduledOrder.paymentState,
       servicePrice: _scheduledOrder.servicePrice,
       platformFee: _scheduledOrder.platformFee,
       discountAmount: _scheduledOrder.discountAmount,

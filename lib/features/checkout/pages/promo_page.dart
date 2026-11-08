@@ -12,18 +12,23 @@ class PromoPage extends StatefulWidget {
   const PromoPage({
     required this.servicePrice,
     this.initialPromoCode,
+    this.promoApi,
     super.key,
   });
 
   final int servicePrice;
   final String? initialPromoCode;
 
+  /// Null means local-only mode (bundled demo list, no network).
+  final CustomerPromoApi? promoApi;
+
   @override
   State<PromoPage> createState() => _PromoPageState();
 }
 
 class _PromoPageState extends State<PromoPage> {
-  final _selection = CheckoutController(promoApi: CustomerPromoApi());
+  late final CheckoutController _selection =
+      CheckoutController(promoApi: widget.promoApi);
 
   @override
   void initState() {
@@ -120,31 +125,49 @@ class _PromoPageState extends State<PromoPage> {
                     ),
                   ),
                   Expanded(
-                    child: ListView.separated(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
-                      itemCount: _selection.promos.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        final promo = _selection.promos[index];
-                        final selected =
-                            _selection.appliedPromo?.code == promo.code;
-                        return _PromoOptionCard(
-                          promo: promo,
-                          selected: selected,
-                          savings: BookingController.formatRupiah(
-                            promo.discountAmount(widget.servicePrice),
+                    child: _selection.promos.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Text(
+                                _selection.promoError != null
+                                    ? 'Gagal memuat promo: ${_selection.promoError}'
+                                    : 'Belum ada promo aktif saat ini.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.slate500,
+                                  fontFamily: AppTheme.fontFamily,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            physics: const BouncingScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
+                            itemCount: _selection.promos.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 14),
+                            itemBuilder: (context, index) {
+                              final promo = _selection.promos[index];
+                              final selected =
+                                  _selection.appliedPromo?.code == promo.code;
+                              return _PromoOptionCard(
+                                promo: promo,
+                                selected: selected,
+                                savings: BookingController.formatRupiah(
+                                  promo.discountAmount(widget.servicePrice),
+                                ),
+                                onTap: () => setState(() {
+                                  if (selected) {
+                                    _selection.clearPromo();
+                                  } else {
+                                    _selection.applyPromo(promo.code);
+                                  }
+                                }),
+                              );
+                            },
                           ),
-                          onTap: () => setState(() {
-                            if (selected) {
-                              _selection.clearPromo();
-                            } else {
-                              _selection.applyPromo(promo.code);
-                            }
-                          }),
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),

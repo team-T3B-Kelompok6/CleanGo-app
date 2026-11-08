@@ -9,6 +9,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../address/controllers/address_controller.dart';
 import '../../address/pages/address_list_page.dart';
+import '../../../core/storage/token_storage.dart';
+import '../../checkout/data/customer_promo_api.dart';
 import '../../checkout/pages/checkout_page.dart';
 import '../../service/domain/models/service_model.dart';
 import '../controllers/booking_controller.dart';
@@ -221,7 +223,9 @@ class _BookingPageState extends State<BookingPage> {
     }
 
     Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => const CheckoutPage()));
+        .push(MaterialPageRoute<void>(builder: (_) => CheckoutPage(
+  promoApi: CustomerPromoApi(tokenStorage: context.read<TokenStorage>()),
+)));
   }
 }
 

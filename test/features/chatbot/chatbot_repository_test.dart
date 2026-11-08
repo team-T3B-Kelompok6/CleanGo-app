@@ -99,7 +99,7 @@ void main() {
       ),
     );
     addTearDown(repository.close);
-    await repository.reply('berapa lama?', const [
+    await repository.reply('berapa lama?', [
       ChatMessage(content: 'Deep Cleaning', isUser: true),
       ChatMessage(content: 'Harga mengikuti katalog.', isUser: false),
       ChatMessage(

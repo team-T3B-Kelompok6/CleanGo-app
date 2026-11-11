@@ -40,15 +40,6 @@ abstract final class MessageData {
       iconType: MessageIconType.payment,
     ),
     MessageNotificationModel(
-      id: 'special-promo',
-      title: 'Promo Spesial!',
-      description: 'Diskon 35% untuk semua jenis layanan pertama dengan kode CLEANHEMAT.',
-      timeLabel: '1 hari lalu',
-      category: MessageCategory.promo,
-      iconType: MessageIconType.promo,
-      isUnread: true,
-    ),
-    MessageNotificationModel(
       id: 'rating-received',
       title: 'Rating Diterima',
       description:

@@ -10,19 +10,22 @@ abstract interface class ChatbotGateway {
 }
 
 class ChatbotRepository implements ChatbotGateway {
-  ChatbotRepository({ApiClient? client, TokenStorage? tokens})
+  ChatbotRepository({ApiClient? client, TokenStorage? tokens, DateTime Function()? now})
     : _client = client ?? ApiClient(),
-      _tokens = tokens ?? SecureTokenStorage();
+      _tokens = tokens ?? SecureTokenStorage(),
+      _now = now ?? DateTime.now;
 
   final ApiClient _client;
   final TokenStorage _tokens;
+  final DateTime Function() _now;
 
   @override
   Future<String> reply(String message, List<ChatMessage> history) async {
     final token = await _tokens.readAccessToken();
     // Local demo sessions are not server JWTs; public help remains available.
     final serverToken = token != null && token.split('.').length == 3;
-    final context = history.where((entry) => !entry.failed).toList();
+    final now = _now();
+    final context = history.where((entry) => !entry.failed && !entry.isExpired(now)).toList();
     final response = await _client.post(
       ApiConfig.customerChat,
       body: {

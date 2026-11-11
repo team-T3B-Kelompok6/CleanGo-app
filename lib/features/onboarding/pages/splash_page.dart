@@ -11,7 +11,8 @@ import '../../profile/controllers/profile_controller.dart';
 import 'onboarding_page.dart';
 
 class SplashPage extends StatefulWidget {
-  const SplashPage({super.key});
+  final bool visualOnly;
+  const SplashPage({super.key, this.visualOnly = false});
 
   @override
   State<SplashPage> createState() => _SplashPageState();
@@ -28,7 +29,9 @@ class _SplashPageState extends State<SplashPage>
       vsync: this,
       duration: const Duration(milliseconds: 1050),
     )..repeat();
-    _resolveInitialPage();
+    if (!widget.visualOnly) {
+      _resolveInitialPage();
+    }
   }
 
   Future<void> _resolveInitialPage() async {

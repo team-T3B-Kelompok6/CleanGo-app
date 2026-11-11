@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1059284671754",
+    "project_id": "cleango-starnezz",
+    "storage_bucket": "cleango-starnezz.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1059284671754:android:de0db558a53cfe1ca9aef3",
+        "android_client_info": {
+          "package_name": "com.example.cleango_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPi-lvhitGVNgH59t_vblHdI5HToOd028"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

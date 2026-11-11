@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/cleango_startup_dots">
+    <target android:name="dot_left">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:duration="300"
+                android:valueFrom="0.35"
+                android:valueTo="1"
+                android:repeatCount="infinite"
+                android:repeatMode="restart"
+                android:startOffset="0" />
+        </aapt:attr>
+    </target>
+    <target android:name="dot_middle">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:duration="300"
+                android:valueFrom="0.35"
+                android:valueTo="1"
+                android:repeatCount="infinite"
+                android:repeatMode="restart"
+                android:startOffset="300" />
+        </aapt:attr>
+    </target>
+    <target android:name="dot_right">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:duration="300"
+                android:valueFrom="0.35"
+                android:valueTo="1"
+                android:repeatCount="infinite"
+                android:repeatMode="restart"
+                android:startOffset="600" />
+        </aapt:attr>
+    </target>
+</animated-vector>

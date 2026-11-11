@@ -53,7 +53,12 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
         systemNavigationBarColor: AppColors.screenBackground,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
-      child: Scaffold(
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _goBack();
+        },
+        child: Scaffold(
         backgroundColor: AppColors.screenBackground,
         body: SafeArea(
           child: Align(
@@ -124,6 +129,7 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

@@ -27,6 +27,7 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
   bool _loading = true;
   bool _loadingMore = false;
   String? _error;
+  int _generation = 0;
 
   @override
   void initState() {
@@ -36,11 +37,13 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
   }
 
   Future<void> _load({required bool reset}) async {
-    if (!reset && (_loadingMore || !_hasMore)) return;
+    if (!reset && (_loading || _loadingMore || !_hasMore)) return;
+    final request = ++_generation;
     setState(() {
       if (reset) {
         _loading = true;
         _error = null;
+        _loadingMore = false;
       } else {
         _loadingMore = true;
       }
@@ -50,7 +53,7 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
         widget.service.id,
         page: reset ? 1 : _page + 1,
       );
-      if (!mounted) return;
+      if (!mounted || request != _generation) return;
       setState(() {
         if (reset) _reviews.clear();
         _reviews.addAll(result.reviews);
@@ -61,12 +64,12 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
         _hasMore = result.hasMore;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || request != _generation) return;
       setState(() {
         _error = 'Ulasan belum dapat dimuat. Periksa koneksi lalu coba lagi.';
       });
     } finally {
-      if (mounted) {
+      if (mounted && request == _generation) {
         setState(() {
           _loading = false;
           _loadingMore = false;
@@ -103,35 +106,65 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
 
   Widget _body() {
     if (_loading && _reviews.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return RefreshIndicator(
+        onRefresh: () => _load(reset: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: 48),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ],
+        ),
+      );
     }
     if (_error != null && _reviews.isEmpty) {
-      return Center(
-        child: Padding(
+      return RefreshIndicator(
+        onRefresh: () => _load(reset: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.slate500),
+          children: [
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.slate500),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton(
+                    onPressed: () => _load(reset: true),
+                    child: const Text('Coba Lagi'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () => _load(reset: true),
-                child: const Text('Coba Lagi'),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
     if (_reviews.isEmpty) {
-      return const Center(
-        child: Text(
-          'Belum ada ulasan untuk layanan ini.',
-          style: TextStyle(color: AppColors.slate500),
+      return RefreshIndicator(
+        onRefresh: () => _load(reset: true),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            Center(
+              child: Padding(
+                padding: EdgeInsets.only(top: 48),
+                child: Text(
+                  'Belum ada ulasan untuk layanan ini.',
+                  style: TextStyle(color: AppColors.slate500),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -139,6 +172,9 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
     return RefreshIndicator(
       onRefresh: () => _load(reset: true),
       child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
         itemCount: _reviews.length + 2,
         itemBuilder: (context, index) {
@@ -157,7 +193,9 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
             return Padding(
               padding: const EdgeInsets.only(top: 4),
               child: OutlinedButton(
-                onPressed: _loadingMore ? null : () => _load(reset: false),
+                onPressed: (_loading || _loadingMore)
+                    ? null
+                    : () => _load(reset: false),
                 child: _loadingMore
                     ? const SizedBox(
                         width: 18,

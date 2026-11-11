@@ -147,8 +147,8 @@ void main() {
   ) async {
     final store = FakeChatHistory()
       ..saved = [
-        const ChatMessage(content: 'Percakapan tersimpan', isUser: true),
-        const ChatMessage(content: 'Halo dari Boo', isUser: false),
+        ChatMessage(content: 'Percakapan tersimpan', isUser: true),
+        ChatMessage(content: 'Halo dari Boo', isUser: false),
       ];
     await tester.pumpWidget(
       MaterialApp(

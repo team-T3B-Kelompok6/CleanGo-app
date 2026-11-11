@@ -128,26 +128,29 @@ void main() {
       },
     );
 
-    test('rescheduling and cancelling one order preserves the others', () {
-      controller.completeScheduledOrder();
-      final firstId = addOrder('Pesanan pertama');
-      final secondId = addOrder('Pesanan kedua', days: 4);
-      final secondSchedule = controller.scheduledOrder.scheduledAt;
+    test(
+      'rescheduling and cancelling one order preserves the others',
+      () async {
+        controller.completeScheduledOrder();
+        final firstId = addOrder('Pesanan pertama');
+        final secondId = addOrder('Pesanan kedua', days: 4);
+        final secondSchedule = controller.scheduledOrder.scheduledAt;
 
-      controller.selectScheduledOrder(firstId);
-      final newSchedule = DateTime.now().add(const Duration(days: 7));
-      expect(controller.rescheduleOrder(newSchedule), isTrue);
-      expect(controller.scheduledOrder.scheduledAt, newSchedule);
-      expect(controller.cancelScheduledOrder(), isTrue);
-      expect(controller.hasScheduledOrder, isTrue);
-      expect(controller.scheduledOrders.single.orderNumber, secondId);
-      expect(controller.selectScheduledOrder(firstId), isFalse);
-      expect(controller.historyOrders.first.orderId, firstId);
-      expect(controller.historyOrders.first.status, 'DIBATALKAN');
-      expect(controller.historyOrders.first.canReview, isFalse);
-      expect(controller.selectScheduledOrder(secondId), isTrue);
-      expect(controller.scheduledOrder.scheduledAt, secondSchedule);
-    });
+        controller.selectScheduledOrder(firstId);
+        final newSchedule = DateTime.now().add(const Duration(days: 7));
+        expect(await controller.rescheduleOrder(newSchedule), isTrue);
+        expect(controller.scheduledOrder.scheduledAt, newSchedule);
+        expect(await controller.cancelScheduledOrder(), isTrue);
+        expect(controller.hasScheduledOrder, isTrue);
+        expect(controller.scheduledOrders.single.orderNumber, secondId);
+        expect(controller.selectScheduledOrder(firstId), isFalse);
+        expect(controller.historyOrders.first.orderId, firstId);
+        expect(controller.historyOrders.first.status, 'DIBATALKAN');
+        expect(controller.historyOrders.first.canReview, isFalse);
+        expect(controller.selectScheduledOrder(secondId), isTrue);
+        expect(controller.scheduledOrder.scheduledAt, secondSchedule);
+      },
+    );
 
     test(
       'completing and reviewing one order leaves the other active',

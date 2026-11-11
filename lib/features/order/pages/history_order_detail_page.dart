@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../shared/widgets/app_notice.dart';
+import '../../chatbot/pages/chatbot_page.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/remote_or_asset_image.dart';
@@ -21,7 +25,7 @@ class HistoryOrderDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileController>().profile;
-    final isCancelled = order.status == 'DIBATALKAN';
+    final isCancelled = order.isCancelled;
 
     return Scaffold(
       backgroundColor: AppColors.screenBackground,
@@ -43,7 +47,7 @@ class HistoryOrderDetailPage extends StatelessWidget {
                         _ServiceSummary(order: order),
                         const SizedBox(height: 14),
                         if (isCancelled) ...[
-                          const _CancelledNotice(),
+                          _CancelledNotice(order: order),
                           const SizedBox(height: 14),
                         ],
                         if (order.address.isNotEmpty) ...[
@@ -569,7 +573,26 @@ class _RoundIcon extends StatelessWidget {
 }
 
 class _CancelledNotice extends StatelessWidget {
-  const _CancelledNotice();
+  const _CancelledNotice({required this.order});
+
+  final OrderHistoryModel order;
+
+  Future<void> _contactSupport(BuildContext context) async {
+    final uri = Uri.https('wa.me', '/6282140636747', {
+      'text':
+          'Halo CS CleanGo, saya ingin mengajukan pengembalian dana untuk pesanan ${order.orderId} yang dibatalkan. Pembayaran menggunakan QRIS. Mohon bantuannya.',
+    });
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {}
+    if (context.mounted) {
+      AppNotice.show(
+        context,
+        'WhatsApp belum dapat dibuka. Hubungi CS di 082140636747.',
+        type: AppNoticeType.error,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -581,21 +604,59 @@ class _CancelledNotice extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFFFCDD5)),
       ),
-      child: const Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline_rounded, color: Color(0xFFBE123C)),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Pesanan ini telah dibatalkan.',
+          Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: Color(0xFFBE123C)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Pesanan ini telah dibatalkan.',
+                  style: const TextStyle(
+                    color: Color(0xFF9F1239),
+                    fontFamily: AppTheme.fontFamily,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (order.needsRefundContact) ...[
+            const SizedBox(height: 10),
+            const Text(
+              'Pengembalian dana tidak otomatis. Untuk mengajukan pengembalian dana, hubungi CS di 082140636747. Anda juga dapat bertanya kepada Boo untuk panduan; Boo tidak memproses atau menyetujui pengembalian dana.',
               style: TextStyle(
                 color: Color(0xFF9F1239),
                 fontFamily: AppTheme.fontFamily,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+                height: 1.4,
               ),
             ),
-          ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _contactSupport(context),
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: const Text('WhatsApp CS'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ChatbotPage(
+                        initialMessage: 'Bagaimana cara mengajukan pengembalian dana QRIS untuk pesanan CleanGo yang dibatalkan?',
+                      ),
+                    ),
+                  ),
+                  child: const Text('Tanya Boo'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

@@ -12,18 +12,28 @@ class PromoPage extends StatefulWidget {
   const PromoPage({
     required this.servicePrice,
     this.initialPromoCode,
+    this.promoApi,
+    this.serviceId,
     super.key,
   });
 
   final int servicePrice;
   final String? initialPromoCode;
 
+  /// Null means local-only mode (bundled demo list, no network).
+  final CustomerPromoApi? promoApi;
+
+  /// Backend service id of the service being checked out; scoped promos that
+  /// do not cover this service are hidden from the list.
+  final String? serviceId;
+
   @override
   State<PromoPage> createState() => _PromoPageState();
 }
 
 class _PromoPageState extends State<PromoPage> {
-  final _selection = CheckoutController(promoApi: CustomerPromoApi());
+  late final CheckoutController _selection =
+      CheckoutController(promoApi: widget.promoApi);
 
   @override
   void initState() {
@@ -35,7 +45,7 @@ class _PromoPageState extends State<PromoPage> {
   }
 
   Future<void> _bootstrap() async {
-    await _selection.loadPromos();
+    await _selection.loadPromos(serviceId: widget.serviceId);
     final code = widget.initialPromoCode ?? '';
     if (code.isNotEmpty) {
       // Re-validate against the freshly loaded list (handles server-only codes).
@@ -45,6 +55,13 @@ class _PromoPageState extends State<PromoPage> {
       );
     }
     if (mounted) setState(() {});
+  }
+
+  bool _appliesToService(PromoModel promo) {
+    if (promo.scope != 'services') return true;
+    final serviceId = widget.serviceId;
+    if (serviceId == null || serviceId.isEmpty) return true;
+    return promo.serviceIds.contains(serviceId);
   }
 
   @override
@@ -120,31 +137,56 @@ class _PromoPageState extends State<PromoPage> {
                     ),
                   ),
                   Expanded(
-                    child: ListView.separated(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
-                      itemCount: _selection.promos.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        final promo = _selection.promos[index];
-                        final selected =
-                            _selection.appliedPromo?.code == promo.code;
-                        return _PromoOptionCard(
-                          promo: promo,
-                          selected: selected,
-                          savings: BookingController.formatRupiah(
-                            promo.discountAmount(widget.servicePrice),
+                    child: (() {
+                      final applicable = _selection.promos
+                          .where(_appliesToService)
+                          .toList(growable: false);
+                      if (applicable.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Text(
+                              _selection.promoError != null
+                                  ? 'Gagal memuat promo: ${_selection.promoError}'
+                                  : _selection.promos.isEmpty
+                                      ? 'Belum ada promo aktif saat ini.'
+                                      : 'Belum ada promo untuk layanan ini.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppColors.slate500,
+                                fontFamily: AppTheme.fontFamily,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
-                          onTap: () => setState(() {
-                            if (selected) {
-                              _selection.clearPromo();
-                            } else {
-                              _selection.applyPromo(promo.code);
-                            }
-                          }),
                         );
-                      },
-                    ),
+                      }
+                      return ListView.separated(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
+                        itemCount: applicable.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 14),
+                        itemBuilder: (context, index) {
+                          final promo = applicable[index];
+                          final selected =
+                              _selection.appliedPromo?.code == promo.code;
+                          return _PromoOptionCard(
+                            promo: promo,
+                            selected: selected,
+                            savings: BookingController.formatRupiah(
+                              promo.discountAmount(widget.servicePrice),
+                            ),
+                            onTap: () => setState(() {
+                              if (selected) {
+                                _selection.clearPromo();
+                              } else {
+                                _selection.applyPromo(promo.code);
+                              }
+                            }),
+                          );
+                        },
+                      );
+                    })(),
                   ),
                 ],
               ),

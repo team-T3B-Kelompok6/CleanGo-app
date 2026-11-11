@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../booking/pages/booking_page.dart';
 import '../../service/data/service_data.dart';
 import '../controllers/order_controller.dart';
 import '../domain/models/order_model.dart';
+import '../widgets/hold_countdown_banner.dart';
 import '../widgets/order_tracking_map.dart';
 import 'orders_page.dart';
 import 'review_rating_page.dart';
@@ -90,6 +92,36 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _cancelDuringHold(
+    BuildContext context,
+    ScheduledOrderModel order,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppDialog(
+        title: 'Batalkan pesanan?',
+        message: 'Pesanan akan dibatalkan jika petugas belum ditugaskan.',
+        confirmLabel: 'Batalkan Pesanan',
+        cancelLabel: 'Kembali',
+        onConfirm: () => Navigator.pop(dialogContext, true),
+        isDestructive: true,
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final controller = context.read<OrderController>();
+    final ok = controller.selectScheduledOrder(order.orderNumber) &&
+        await controller.cancelScheduledOrder();
+    if (!context.mounted) return;
+    AppNotice.show(
+      context,
+      ok
+          ? 'Pesanan dibatalkan.'
+          : 'Pembatalan gagal karena sudah ditugaskan.',
+      type: ok ? AppNoticeType.success : AppNoticeType.error,
+    );
+    if (ok) _navigateBackToScheduled(context);
   }
 
   void _autoNavigateToRating(ScheduledOrderModel order) {
@@ -186,7 +218,30 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                           ),
                         ),
                         const SizedBox(height: 14),
-                        _buildEstimatedArrivalCard(orderController),
+                        if (order.canCancel &&
+                            order.holdUntil != null &&
+                            order.holdUntil!.isAfter(DateTime.now())) ...[
+                          HoldCountdownBanner(
+                            holdUntil: order.holdUntil!,
+                            onCancel: () => _cancelDuringHold(context, order),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                         if (orderController.canModifyScheduledOrder || orderController.canCancelScheduledOrder) ...[
+                           Row(children: [
+                             Expanded(child: OutlinedButton(
+                               onPressed: orderController.canModifyScheduledOrder ? () => showOrderReschedulePicker(context, orderController) : null,
+                               child: const Text('Ubah Jadwal'),
+                             )),
+                             const SizedBox(width: 8),
+                             Expanded(child: OutlinedButton(
+                               onPressed: orderController.canCancelScheduledOrder ? () => _cancelDuringHold(context, order) : null,
+                               child: const Text('Batalkan Pesanan'),
+                             )),
+                           ]),
+                           const SizedBox(height: 14),
+                         ],
+                         _buildEstimatedArrivalCard(orderController),
                         const SizedBox(height: 14),
                         currentStage == OrderStatusStage.dikonfirmasi
                             ? _buildWaitingCleanerCard()
@@ -611,7 +666,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                     ),
                     const SizedBox(width: 3),
                     Text(
-                      '${order.cleanerRating}',
+                       order.cleanerRating == null
+                           ? 'Belum ada penilaian'
+                           : order.cleanerRating!.toStringAsFixed(1),
                       style: const TextStyle(
                         color: Color(0xFF0F172A),
                         fontFamily: 'Inter',

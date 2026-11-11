@@ -2,7 +2,9 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/storage/token_storage.dart';
 
-/// Reads the home promo banners managed in the admin dashboard.
+/// Reads the home promo banners that now live on active promos
+/// (`promos.banner_url`). The backend endpoint stays `/api/customer/banners`
+/// so the mobile contract does not change.
 class CustomerBannerApi {
   CustomerBannerApi({ApiClient? client, TokenStorage? tokenStorage})
       : _client = client ?? ApiClient(),

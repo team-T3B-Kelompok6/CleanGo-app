@@ -20,8 +20,83 @@ import '../../profile/controllers/profile_controller.dart';
 import '../../service/controllers/service_controller.dart';
 import '../controllers/order_controller.dart';
 import '../domain/models/order_model.dart';
+import '../widgets/hold_countdown_banner.dart';
 import 'history_order_detail_page.dart';
 import 'review_rating_page.dart';
+
+Future<void> showOrderReschedulePicker(
+  BuildContext context,
+  OrderController controller,
+) async {
+  if (!controller.canModifyScheduledOrder) {
+    AppNotice.show(
+      context,
+      'Perubahan tidak tersedia setelah petugas ditugaskan.',
+      type: AppNoticeType.error,
+    );
+    return;
+  }
+  final orderNumber = controller.scheduledOrder.orderNumber;
+  final now = DateTime.now();
+  final firstDate = DateUtils.dateOnly(now);
+  final lastDate = firstDate.add(const Duration(days: 30));
+  final current = controller.scheduledOrder.scheduledAt ?? now;
+  final initial = current.isBefore(firstDate)
+      ? firstDate
+      : current.isAfter(lastDate)
+      ? lastDate
+      : current;
+  final date = await showDatePicker(
+    context: context,
+    initialDate: initial,
+    firstDate: firstDate,
+    lastDate: lastDate,
+    helpText: 'Pilih tanggal baru',
+  );
+  if (date == null || !context.mounted) return;
+  final time = await showModalBottomSheet<String>(
+    context: context,
+    builder: (context) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          const ListTile(title: Text('Pilih jam baru')),
+          for (var hour = 8; hour <= 16; hour++)
+            ListTile(
+              title: Text('${hour.toString().padLeft(2, '0')}:00'),
+              enabled: !DateTime(
+                date.year,
+                date.month,
+                date.day,
+                hour,
+              ).isBefore(DateTime.now().add(const Duration(minutes: 60))),
+              onTap: () => Navigator.pop(
+                context,
+                '${hour.toString().padLeft(2, '0')}:00',
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (time == null || !context.mounted) return;
+  final result =
+      controller.selectScheduledOrder(orderNumber) &&
+      await controller.rescheduleOrder(
+        DateTime(
+          date.year,
+          date.month,
+          date.day,
+          int.parse(time.split(':').first),
+        ),
+      );
+  if (!context.mounted) return;
+  AppNotice.show(
+    context,
+    result ? 'Jadwal pesanan berhasil diperbarui.' : 'Jadwal tidak tersedia atau petugas sudah ditugaskan. Muat ulang pesanan dan pilih jadwal lain.',
+    type: result ? AppNoticeType.success : AppNoticeType.error,
+  );
+}
 
 enum OrdersTab { scheduled, history }
 
@@ -318,77 +393,130 @@ class _ScheduledOrdersView extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<OrderController>();
     if (!controller.hasScheduledOrder) {
-      return ListView(
-        padding: EdgeInsets.fromLTRB(24, 54, 24, bottomSpacing),
-        children: const [
-          Icon(
-            Icons.event_available_rounded,
-            size: 68,
-            color: AppColors.primaryBorder,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Belum ada pesanan terjadwal',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.slate900,
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+      return RefreshIndicator(
+        onRefresh: () => context.read<OrderController>().loadFromApi(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(24, 54, 24, bottomSpacing),
+          children: const [
+            Icon(
+              Icons.event_available_rounded,
+              size: 68,
+              color: AppColors.primaryBorder,
             ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Pesanan baru dan layanan yang belum selesai akan tampil di sini.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.slate500,
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 14,
-              height: 1.5,
+            SizedBox(height: 16),
+            Text(
+              'Belum ada pesanan terjadwal',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.slate900,
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+            SizedBox(height: 8),
+            Text(
+              'Pesanan baru dan layanan yang belum selesai akan tampil di sini.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.slate500,
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
     final orders = controller.scheduledOrders;
-    return ListView.separated(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
-      itemCount: orders.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        final scheduledOrder = orders[index];
-        final displayAddress = scheduledOrder.destinationAddress.isNotEmpty
-            ? scheduledOrder.destinationAddress
-            : address;
-        return _ScheduledOrderCard(
-          key: ValueKey(scheduledOrder.orderNumber),
-          order: scheduledOrder,
-          address: displayAddress,
-          onTrackOrder: () {
-            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
-              onTrackOrder();
-            }
-          },
-          onReschedule: () {
-            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
-              _pickNewSchedule(context, controller);
-            }
-          },
-          onDetail: () {
-            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
-              _showScheduledDetail(
-                context,
-                controller,
-                scheduledOrder,
-                displayAddress,
-              );
-            }
-          },
-        );
-      },
+    ScheduledOrderModel? holdOrder;
+    for (final order in orders) {
+      if (order.canCancel &&
+          order.holdUntil != null &&
+          order.holdUntil!.isAfter(DateTime.now())) {
+        holdOrder = order;
+        break;
+      }
+    }
+    return RefreshIndicator(
+      onRefresh: () => context.read<OrderController>().loadFromApi(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
+        itemCount: orders.length + (holdOrder == null ? 0 : 1),
+        separatorBuilder: (_, _) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          if (holdOrder != null && index == 0) {
+            return HoldCountdownBanner(
+              holdUntil: holdOrder.holdUntil!,
+              onCancel: () =>
+                  _confirmHoldCancellation(context, controller, holdOrder!),
+            );
+          }
+          final scheduledOrder = orders[index - (holdOrder == null ? 0 : 1)];
+          final displayAddress = scheduledOrder.destinationAddress.isNotEmpty
+              ? scheduledOrder.destinationAddress
+              : address;
+          return _ScheduledOrderCard(
+            key: ValueKey(scheduledOrder.orderNumber),
+            order: scheduledOrder,
+            address: displayAddress,
+            onTrackOrder: () {
+              if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+                onTrackOrder();
+              }
+            },
+            onReschedule: () {
+              if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+                _pickNewSchedule(context, controller);
+              }
+            },
+            onDetail: () {
+              if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+                _showScheduledDetail(
+                  context,
+                  controller,
+                  scheduledOrder,
+                  displayAddress,
+                );
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _confirmHoldCancellation(
+    BuildContext context,
+    OrderController controller,
+    ScheduledOrderModel order,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AppDialog(
+        title: 'Batalkan pesanan?',
+        message: 'Pesanan dapat dibatalkan selama petugas belum ditugaskan.',
+        confirmLabel: 'Batalkan Pesanan',
+        cancelLabel: 'Kembali',
+        onConfirm: () => Navigator.pop(context, true),
+        isDestructive: true,
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final result =
+        controller.selectScheduledOrder(order.orderNumber) &&
+        await controller.cancelScheduledOrder();
+    if (!context.mounted) return;
+    AppNotice.show(
+      context,
+      result ? 'Pesanan berhasil dibatalkan.' : 'Pesanan tidak dapat dibatalkan. Muat ulang; petugas mungkin sudah ditugaskan.',
+      type: result ? AppNoticeType.success : AppNoticeType.error,
     );
   }
 
@@ -396,59 +524,7 @@ class _ScheduledOrdersView extends StatelessWidget {
     BuildContext context,
     OrderController controller,
   ) async {
-    if (!controller.canModifyScheduledOrder) {
-      AppNotice.show(
-        context,
-        'Jadwal tidak dapat diubah karena sudah melewati batas maksimal H-1.',
-        type: AppNoticeType.error,
-      );
-      return;
-    }
-
-    final orderNumber = controller.scheduledOrder.orderNumber;
-    final current =
-        controller.scheduledOrder.scheduledAt ??
-        DateTime.now().add(const Duration(days: 2));
-    final now = DateTime.now();
-    final firstDate = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).add(const Duration(days: 1));
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current.isBefore(firstDate) ? firstDate : current,
-      firstDate: firstDate,
-      lastDate: DateTime.now().add(const Duration(days: 180)),
-      helpText: 'Pilih jadwal baru',
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppColors.primaryAction,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked == null || !context.mounted) return;
-    final result =
-        controller.selectScheduledOrder(orderNumber) &&
-        controller.rescheduleOrder(
-          DateTime(
-            picked.year,
-            picked.month,
-            picked.day,
-            current.hour,
-            current.minute,
-          ),
-        );
-    AppNotice.show(
-      context,
-      result
-          ? 'Jadwal pesanan berhasil diperbarui.'
-          : 'Jadwal tidak dapat diubah karena sudah melewati batas H-1.',
-      type: result ? AppNoticeType.success : AppNoticeType.error,
-    );
+    await showOrderReschedulePicker(context, controller);
   }
 
   Future<void> _confirmCancellation(
@@ -462,7 +538,7 @@ class _ScheduledOrdersView extends StatelessWidget {
         title: 'Batalkan pesanan?',
         message:
             'Pesanan akan dipindahkan ke Riwayat. '
-            'Pembatalan hanya tersedia maksimal H-1.',
+            'Pembatalan tidak tersedia setelah cleaner ditugaskan.',
         confirmLabel: 'Batalkan Pesanan',
         onConfirm: () => Navigator.pop(context, true),
         cancelLabel: 'Kembali',
@@ -472,12 +548,13 @@ class _ScheduledOrdersView extends StatelessWidget {
     if (confirmed != true || !context.mounted) return;
     final result =
         controller.selectScheduledOrder(orderNumber) &&
-        controller.cancelScheduledOrder();
+        await controller.cancelScheduledOrder();
+    if (!context.mounted) return;
     AppNotice.show(
       context,
       result
           ? 'Pesanan dibatalkan dan dipindahkan ke Riwayat.'
-          : 'Pesanan tidak dapat dibatalkan karena sudah melewati batas H-1.',
+          : 'Pesanan tidak dapat dibatalkan karena cleaner sudah ditugaskan.',
       type: result ? AppNoticeType.success : AppNoticeType.error,
     );
   }
@@ -525,7 +602,7 @@ class _ScheduledOrdersView extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton(
-                onPressed: controller.canModifyScheduledOrder
+                onPressed: controller.canCancelScheduledOrder
                     ? () {
                         Navigator.pop(sheetContext);
                         _confirmCancellation(context, controller);
@@ -601,7 +678,7 @@ class _ScheduledOrdersView extends StatelessWidget {
               Text(
                 isSameDay
                     ? 'Pesanan hari ini tidak dapat dibatalkan atau diubah setelah diproses.'
-                    : 'Batas perubahan H-1 sudah lewat atau cleaner telah diberangkatkan.',
+                    : 'Jadwal dapat diubah sebelum cleaner ditugaskan.',
                 style: const TextStyle(
                   color: Color(0xFFB91C1C),
                   fontFamily: AppTheme.fontFamily,
@@ -850,7 +927,12 @@ class _ScheduledOrderCard extends StatelessWidget {
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: isScheduledBooking ? onReschedule : onTrackOrder,
+                  onPressed:
+                      (order.backendBookingId != null
+                          ? order.canReschedule
+                          : isScheduledBooking)
+                      ? onReschedule
+                      : onTrackOrder,
                   icon: Icon(
                     isScheduledBooking
                         ? Icons.edit_calendar_outlined
@@ -866,7 +948,11 @@ class _ScheduledOrderCard extends StatelessWidget {
                     ),
                   ),
                   label: Text(
-                    isScheduledBooking ? 'Ganti Jadwal' : 'Lacak Pesanan',
+                    (order.backendBookingId != null
+                            ? order.canReschedule
+                            : isScheduledBooking)
+                        ? 'Ganti Jadwal'
+                        : 'Lacak Pesanan',
                   ),
                 ),
               ),
@@ -974,14 +1060,19 @@ class _OrderHistoryView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final history = context.watch<OrderController>().historyOrders;
-    return ListView.separated(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
-      itemCount: history.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, index) {
-        return _HistoryOrderCard(order: history[index]);
-      },
+    return RefreshIndicator(
+      onRefresh: () => context.read<OrderController>().loadFromApi(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
+        itemCount: history.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 14),
+        itemBuilder: (context, index) {
+          return _HistoryOrderCard(order: history[index]);
+        },
+      ),
     );
   }
 }
@@ -993,7 +1084,7 @@ class _HistoryOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isCancelled = order.status == 'DIBATALKAN';
+    final isCancelled = order.isCancelled;
     final profileAvatar = context.watch<ProfileController>().avatarUrl;
     return _OrderSurface(
       padding: const EdgeInsets.all(14),

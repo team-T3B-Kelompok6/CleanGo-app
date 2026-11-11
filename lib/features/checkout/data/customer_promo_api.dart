@@ -17,10 +17,13 @@ class CustomerPromoApi {
     return token == null || token.isEmpty ? null : token;
   }
 
-  Future<List<PromoModel>> fetchPromos() async {
+  Future<List<PromoModel>> fetchPromos({String? serviceId}) async {
     final token = await _token();
     if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
-    final res = await _client.get(ApiConfig.customerPromos, token: token);
+    final path = serviceId != null && serviceId.isNotEmpty
+        ? '${ApiConfig.customerPromos}?serviceId=${Uri.encodeQueryComponent(serviceId)}'
+        : ApiConfig.customerPromos;
+    final res = await _client.get(path, token: token);
     final list = res['data'] as List<dynamic>? ?? const [];
     return list
         .whereType<Map<String, dynamic>>()

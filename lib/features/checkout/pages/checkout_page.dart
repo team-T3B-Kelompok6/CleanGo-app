@@ -74,6 +74,7 @@ class CheckoutPage extends StatefulWidget {
     this.onApplyPromo,
     this.onPaymentMethodTap,
     this.onPay,
+    this.promoApi,
     super.key,
   });
 
@@ -81,14 +82,17 @@ class CheckoutPage extends StatefulWidget {
   final VoidCallback? onPaymentMethodTap;
   final VoidCallback? onPay;
 
+  /// Null means local-only mode (bundled demo list, no network).
+  final CustomerPromoApi? promoApi;
+
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
 }
 
 class _CheckoutPageState extends State<CheckoutPage> {
   PaymentMethodType _selectedPaymentMethod = PaymentMethodType.qris;
-  final CheckoutController _checkoutController = CheckoutController(
-    promoApi: CustomerPromoApi(),
+  late final CheckoutController _checkoutController = CheckoutController(
+    promoApi: widget.promoApi,
   );
 
   Future<void> _openPromos() async {
@@ -97,6 +101,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
         builder: (_) => PromoPage(
           servicePrice: context.read<BookingController>().servicePriceValue,
           initialPromoCode: _checkoutController.appliedPromo?.code,
+          promoApi: widget.promoApi,
+          serviceId: context.read<BookingController>().service?.id,
         ),
       ),
     );

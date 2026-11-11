@@ -187,6 +187,29 @@ class CustomerBookingApi {
     );
   }
 
+  Future<void> cancelBooking(String bookingId) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    await _client.post(
+      '${ApiConfig.customerBookings}/$bookingId/cancel',
+      token: token,
+    );
+  }
+
+  Future<void> rescheduleBooking({
+    required String bookingId,
+    required String date,
+    required String time,
+  }) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    await _client.post(
+      '${ApiConfig.customerBookings}/$bookingId/reschedule',
+      body: {'date': date, 'time': time},
+      token: token,
+    );
+  }
+
   Future<CreatedBooking> create({
     required String serviceId,
     required String date,
@@ -264,12 +287,17 @@ class CustomerBookingSummary {
     required this.status,
     required this.notes,
     required this.address,
+    this.holdUntil,
+    this.canCancel = false,
+    this.canReschedule = false,
     this.addressLabel = '',
     this.recipientName = '',
     this.recipientPhone = '',
     this.landmark = '',
-    this.cleanerName = '',
+     this.cleanerName = '',
+    this.cleanerRating,
     this.paymentStatus,
+    this.paymentMethod = '',
     this.hasReview = false,
     this.reviewEditable = false,
     this.reviewRating,
@@ -293,12 +321,17 @@ class CustomerBookingSummary {
   final String status;
   final String notes;
   final String address;
+  final DateTime? holdUntil;
+  final bool canCancel;
+  final bool canReschedule;
   final String addressLabel;
   final String recipientName;
   final String recipientPhone;
   final String landmark;
   final String cleanerName;
+  final double? cleanerRating;
   final String? paymentStatus;
+  final String paymentMethod;
   final bool hasReview;
   final bool reviewEditable;
   final int? reviewRating;
@@ -330,12 +363,18 @@ class CustomerBookingSummary {
       status: json['status'] as String? ?? 'Menunggu Assign',
       notes: json['notes'] as String? ?? '',
       address: json['address'] as String? ?? '',
+      holdUntil: DateTime.tryParse(json['holdUntil'] as String? ?? '')
+          ?.toLocal(),
+      canCancel: json['canCancel'] == true,
+      canReschedule: json['canReschedule'] == true,
       addressLabel: json['addressLabel'] as String? ?? '',
       recipientName: json['recipientName'] as String? ?? '',
       recipientPhone: json['recipientPhone'] as String? ?? '',
       landmark: json['landmark'] as String? ?? '',
       cleanerName: json['cleanerName'] as String? ?? '',
+      cleanerRating: (json['cleanerRating'] as num?)?.toDouble(),
       paymentStatus: json['paymentStatus'] as String?,
+      paymentMethod: json['paymentMethod'] as String? ?? '',
       hasReview: json['hasReview'] == true,
       reviewEditable: json['reviewEditable'] == true,
       reviewRating: (json['reviewRating'] as num?)?.toInt(),

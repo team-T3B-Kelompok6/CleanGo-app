@@ -12,7 +12,9 @@ import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/pages/orders_page.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
 import 'package:cleango_app/features/profile/pages/profile_page.dart';
+import 'package:cleango_app/core/storage/token_storage.dart';
 import 'package:cleango_app/features/service/controllers/service_controller.dart';
+import 'package:cleango_app/features/service/domain/models/service_model.dart';
 import 'package:cleango_app/features/service/pages/service_detail_page.dart';
 import 'package:cleango_app/features/service/pages/service_list_page.dart';
 import 'package:cleango_app/features/service/widgets/service_card.dart';
@@ -22,11 +24,63 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+class _FakeTokenStorage implements TokenStorage {
+  final _tokens = <String, String>{};
+  final _expires = <String, DateTime>{};
+
+  @override
+  Future<void> writeAccessToken(String token) async => _tokens['access'] = token;
+
+  @override
+  Future<String?> readAccessToken() async => _tokens['access'];
+
+  @override
+  Future<void> writeRefreshToken(String token) async => _tokens['refresh'] = token;
+
+  @override
+  Future<String?> readRefreshToken() async => _tokens['refresh'];
+
+  @override
+  Future<void> writeExpiresAt(DateTime expiresAt) async => _expires['at'] = expiresAt;
+
+  @override
+  Future<DateTime?> readExpiresAt() async => _expires['at'];
+
+  @override
+  Future<void> clearSession() async {
+    _tokens.clear();
+    _expires.clear();
+  }
+}
+
 void main() {
   Widget buildHome() {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ServiceController()),
+        ChangeNotifierProvider(
+          create: (_) => ServiceController(
+            initialServices: [
+              const ServiceModel(
+                id: 'uji-layanan',
+                title: 'Layanan Uji',
+                description: 'Layanan sintetis untuk uji navigasi',
+                duration: '±1 jam',
+                price: 'Rp100.000',
+                category: 'Rumah',
+                imagePath: 'assets/images/service_detail_hero.jpeg',
+                detail: ServiceDetailModel(
+                  heroImagePath: 'assets/images/service_detail_hero.jpeg',
+                  description: 'Deskripsi layanan untuk uji navigasi.',
+                  rating: '5.0',
+                  reviewCount: '0 ulasan',
+                  satisfactionPercentage: 100,
+                  benefits: <String>['Manfaat uji navigasi'],
+                  reviews: <ServiceReviewModel>[],
+                ),
+              ),
+            ],
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => BookingController()),
         ChangeNotifierProvider(create: (_) => AddressController()),
         ChangeNotifierProvider(create: (_) => ProfileController()),
@@ -34,6 +88,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => HomeController()),
         ChangeNotifierProvider(create: (_) => OrderController()),
         ChangeNotifierProvider(create: (_) => MessageController()),
+        Provider<TokenStorage>(create: (_) => _FakeTokenStorage()),
       ],
       child: MaterialApp(
         theme: AppTheme.light,

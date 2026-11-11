@@ -65,28 +65,34 @@ abstract final class HomeCatalog {
     List<ServiceModel> services, {
     int limit = 5,
   }) {
-    return services
+    final ranked = services.indexed.toList()
+      ..sort((a, b) {
+        final selisih = b.$2.popularity.compareTo(a.$2.popularity);
+        if (selisih != 0) return selisih;
+        return a.$1.compareTo(b.$1);
+      });
+    return ranked
         .take(limit)
-        .map(
-          (service) => PopularServiceModel(
-            serviceId: service.id,
-            imagePath:
-                service.imagePath ??
-                service.iconPath ??
-                ServiceIconCatalog.fallback,
-            iconPath:
-                service.iconPath ??
-                ServiceIconCatalog.forCategory(service.category),
-            badge: 'Populer',
-            badgeStyle: PopularServiceBadgeStyle.primary,
-            rating: service.rating ?? '-',
-            reviewCount: '0',
-            title: service.title,
-            description: service.description,
-            duration: service.duration,
-            price: service.price,
-          ),
-        )
+        .map((entry) => _toPopularService(entry.$2))
         .toList(growable: false);
   }
+
+  static PopularServiceModel _toPopularService(ServiceModel service) =>
+      PopularServiceModel(
+        serviceId: service.id,
+        imagePath:
+            service.detail?.heroImagePath ?? service.imagePath ??
+            service.iconPath ??
+            ServiceIconCatalog.fallback,
+        iconPath:
+            service.iconPath ?? ServiceIconCatalog.forCategory(service.category),
+        badge: 'Populer',
+        badgeStyle: PopularServiceBadgeStyle.primary,
+        rating: service.rating ?? '-',
+        reviewCount: '${service.reviewCount}',
+        title: service.title,
+        description: service.description,
+        duration: service.duration,
+        price: service.price,
+      );
 }

@@ -67,36 +67,49 @@ class _ServiceListPageState extends State<ServiceListPage> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: SafeArea(
                   bottom: false,
-                  child: CustomScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: _ServiceListHeader(
-                          filters: serviceController.filterOptions,
-                          selectedFilter: serviceController.selectedFilter,
-                          searchQuery: serviceController.searchQuery,
-                          serviceCount: services.length,
-                          onFilterSelected: serviceController.selectFilter,
-                          onSearchChanged: serviceController.updateSearchQuery,
-                          onSortTap: _showSortOptions,
-                        ),
+                  child: RefreshIndicator(
+                    onRefresh: () =>
+                        context.read<ServiceController>().refreshServices(),
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
                       ),
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(16, 0, 16, bottomSpacing),
-                        sliver: SliverList.separated(
-                          itemCount: services.length,
-                          itemBuilder: (context, index) {
-                            final service = services[index];
-                            return ServiceCard(
-                              service: service,
-                              onTap: () => _openServiceDetail(context, service),
-                            );
-                          },
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 14),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: _ServiceListHeader(
+                            filters: serviceController.filterOptions,
+                            selectedFilter: serviceController.selectedFilter,
+                            searchQuery: serviceController.searchQuery,
+                            serviceCount: services.length,
+                            onFilterSelected: serviceController.selectFilter,
+                            onSearchChanged:
+                                serviceController.updateSearchQuery,
+                            onSortTap: _showSortOptions,
+                          ),
                         ),
-                      ),
-                    ],
+                        SliverPadding(
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            0,
+                            16,
+                            bottomSpacing,
+                          ),
+                          sliver: SliverList.separated(
+                            itemCount: services.length,
+                            itemBuilder: (context, index) {
+                              final service = services[index];
+                              return ServiceCard(
+                                service: service,
+                                onTap: () =>
+                                    _openServiceDetail(context, service),
+                              );
+                            },
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 14),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -116,10 +129,8 @@ class _ServiceListPageState extends State<ServiceListPage> {
           showOrderBadge: false,
           onDestinationSelected: (index) {
             if (index == 0) {
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                AppRoutes.home,
-                (route) => false,
-              );
+              Navigator.of(context)
+                  .pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
             } else if (index == 2) {
               Navigator.pushNamed(context, AppRoutes.orders);
             } else if (index == 3) {

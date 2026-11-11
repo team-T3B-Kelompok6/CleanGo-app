@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -6,12 +8,14 @@ import '../data/chat_history_store.dart';
 import '../models/chat_message.dart';
 
 class ChatbotController extends ChangeNotifier {
-  ChatbotController({ChatbotGateway? repository, ChatHistoryStore? history})
+  ChatbotController({ChatbotGateway? repository, ChatHistoryStore? history, DateTime Function()? now})
     : _repository = repository ?? ChatbotRepository(),
-      _history = history ?? ChatHistoryStore();
+      _history = history ?? ChatHistoryStore(),
+      _now = now ?? DateTime.now;
 
   final ChatbotGateway _repository;
   final ChatHistoryStore _history;
+  final DateTime Function() _now;
   Future<void>? _initialization;
   bool _historyReadable = true;
   bool _historyUnavailable = false;
@@ -19,6 +23,7 @@ class ChatbotController extends ChangeNotifier {
   bool _hasMessage = false;
   bool _isSending = false;
   bool _disposed = false;
+  Timer? _expiryTimer;
 
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get hasMessage => _hasMessage;
@@ -30,7 +35,10 @@ class ChatbotController extends ChangeNotifier {
   Future<void> _restoreHistory() async {
     try {
       final saved = await _history.load();
-      if (!_disposed) _messages.addAll(saved);
+      if (!_disposed) {
+        _messages.addAll(saved.where((message) => !message.isExpired(_now())));
+        _scheduleExpiry();
+      }
     } catch (_) {
       // Do not overwrite history that could not be read.
       _historyReadable = false;
@@ -49,6 +57,29 @@ class ChatbotController extends ChangeNotifier {
     }
   }
 
+  Future<void> expireHistory() async {
+    if (_disposed) return;
+    final now = _now();
+    final previousLength = _messages.length;
+    _messages.removeWhere((message) => message.isExpired(now));
+    _scheduleExpiry();
+    if (_messages.length != previousLength) {
+      await _saveHistory();
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  void _scheduleExpiry() {
+    _expiryTimer?.cancel();
+    if (_disposed || _messages.isEmpty) return;
+    final expiry = _messages.map((message) => message.createdAt.add(ChatMessage.retention))
+        .reduce((a, b) => a.isBefore(b) ? a : b);
+    final delay = expiry.difference(_now());
+    _expiryTimer = Timer(delay.isNegative ? Duration.zero : delay, () {
+      unawaited(expireHistory());
+    });
+  }
+
   void updateDraft(String value) {
     final hasMessage = value.trim().isNotEmpty;
     if (hasMessage == _hasMessage) return;
@@ -64,21 +95,24 @@ class ChatbotController extends ChangeNotifier {
     _isSending = true;
     await restoreHistory();
     if (_disposed) return false;
+    await expireHistory();
+    if (_disposed) return false;
     final history = List<ChatMessage>.of(_messages);
-    _messages.add(ChatMessage(content: message, isUser: true));
+    _messages.add(ChatMessage(content: message, isUser: true, createdAt: _now()));
     _hasMessage = false;
     notifyListeners();
     try {
       await _saveHistory();
       if (_disposed) return true;
       final answer = await _repository.reply(message, history);
-      _messages.add(ChatMessage(content: answer, isUser: false));
+      _messages.add(ChatMessage(content: answer, isUser: false, createdAt: _now()));
     } catch (error) {
       _messages.add(
         ChatMessage(
           content: error is ApiException ? error.message : 'Boo belum dapat terhubung. Periksa koneksi lalu kirim ulang pesan, atau buka Pusat Bantuan.',
           isUser: false,
           failed: true,
+          createdAt: _now(),
         ),
       );
     } finally {
@@ -87,6 +121,7 @@ class ChatbotController extends ChangeNotifier {
       }
       await _saveHistory();
       _isSending = false;
+      _scheduleExpiry();
       if (!_disposed) notifyListeners();
     }
     return true;
@@ -95,6 +130,7 @@ class ChatbotController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _expiryTimer?.cancel();
     _repository.close();
     super.dispose();
   }

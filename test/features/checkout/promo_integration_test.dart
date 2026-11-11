@@ -1,3 +1,4 @@
+import 'package:cleango_app/core/network/api_exception.dart';
 import 'package:cleango_app/features/checkout/controllers/checkout_controller.dart';
 import 'package:cleango_app/features/checkout/data/customer_promo_api.dart';
 import 'package:cleango_app/features/checkout/domain/models/promo_model.dart';
@@ -8,11 +9,15 @@ class _FakePromoApi extends CustomerPromoApi {
     this.promos = const [],
     this.validated,
     this.failValidate = false,
+    this.validationError,
+    this.fail = false,
   });
 
   final List<PromoModel> promos;
   final PromoModel? validated;
   final bool failValidate;
+  final ApiException? validationError;
+  final bool fail;
   int listCalls = 0;
   int validateCalls = 0;
   String? lastCode;
@@ -20,8 +25,9 @@ class _FakePromoApi extends CustomerPromoApi {
   String? lastServiceId;
 
   @override
-  Future<List<PromoModel>> fetchPromos() async {
+  Future<List<PromoModel>> fetchPromos({String? serviceId}) async {
     listCalls++;
+    if (fail) throw StateError('offline');
     return promos;
   }
 
@@ -35,6 +41,7 @@ class _FakePromoApi extends CustomerPromoApi {
     lastCode = code;
     lastAmount = amount;
     lastServiceId = serviceId;
+    if (validationError != null) throw validationError!;
     if (failValidate) throw StateError('offline');
     return validated ?? PromoModel(code: code, discountPercent: 10);
   }
@@ -147,12 +154,24 @@ void main() {
       expect(controller.promos.single.code, 'AWAL20');
     });
 
-    test('keeps the bundled list when loading fails', () async {
+    test('does not fallback to bundle when loading fails', () async {
+      final controller = CheckoutController(
+        promoApi: _FakePromoApi(fail: true),
+      );
+
+      await controller.loadPromos();
+
+      expect(controller.promos, isEmpty);
+    });
+
+    test('clears the bundled list when there are no active promos', () async {
       final controller = CheckoutController(promoApi: _FakePromoApi());
 
       await controller.loadPromos();
 
-      expect(controller.promos, CheckoutController.availablePromos);
+      expect(controller.promos, isEmpty);
+      controller.applyPromo('CLEANHEMAT');
+      expect(controller.isPromoApplied, isFalse);
     });
 
     test('applies a server-only code through validation', () async {
@@ -181,7 +200,7 @@ void main() {
       expect(controller.promoError, isNull);
     });
 
-    test('falls back to the bundled list when validation fails', () async {
+    test('reports an error when validation fails', () async {
       final controller = CheckoutController(
         promoApi: _FakePromoApi(failValidate: true),
       );
@@ -191,8 +210,8 @@ void main() {
         servicePrice: 150000,
       );
 
-      expect(controller.appliedPromo?.code, 'CLEANHEMAT');
-      expect(controller.discountAmount(150000), 52500);
+      expect(controller.appliedPromo, isNull);
+      expect(controller.promoError, isNotNull);
     });
 
     test('reports an error for an unknown code when offline', () async {
@@ -206,7 +225,7 @@ void main() {
       expect(controller.promoError, isNotNull);
     });
 
-    test('works without an api (local-only mode)', () async {
+        test('rejects a promo without a backend (local-only mode)', () async {
       final controller = CheckoutController();
 
       await controller.applyPromoRemote(
@@ -214,7 +233,8 @@ void main() {
         servicePrice: 150000,
       );
 
-      expect(controller.appliedPromo?.code, 'CLEANHEMAT');
+      expect(controller.appliedPromo, isNull);
+      expect(controller.promoError, 'Kode promo tidak valid.');
     });
   });
 }

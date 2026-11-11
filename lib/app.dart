@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/constants/app_routes.dart';
+import 'core/notifications/push_notifications.dart';
 import 'core/database/app_database.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/token_storage.dart';
@@ -60,6 +61,7 @@ class CleanGoApp extends StatefulWidget {
     this.initialBookingDraft,
     this.initialBookingService,
     this.initialBookingAddress,
+    this.pushNotifications,
     super.key,
   });
 
@@ -75,14 +77,37 @@ class CleanGoApp extends StatefulWidget {
   final CleaningAddress? initialBookingAddress;
   final AppPreferences preferences;
   final TokenStorage tokenStorage;
+  final PushNotifications? pushNotifications;
 
   @override
   State<CleanGoApp> createState() => _CleanGoAppState();
 }
 
 class _CleanGoAppState extends State<CleanGoApp> {
+  late final MessageController _messageController;
+  PushNotifications? _push;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageController = MessageController(
+      notificationApi: CustomerNotificationApi(tokenStorage: widget.tokenStorage),
+    );
+    _push = widget.pushNotifications;
+    if (_push != null) {
+      _push!.onInboxRefresh = () {
+        if (!mounted) return;
+        _messageController.loadFromApi();
+      };
+      unawaited(_push!.ensurePermission());
+      _push!.startTokenSync();
+    }
+  }
+
   @override
   void dispose() {
+    unawaited(_push?.dispose());
+    _messageController.dispose();
     unawaited(widget.database.close());
     super.dispose();
   }
@@ -92,8 +117,12 @@ class _CleanGoAppState extends State<CleanGoApp> {
     return MultiProvider(
       providers: [
         Provider<AppPreferences>.value(value: widget.preferences),
+        Provider<TokenStorage>.value(value: widget.tokenStorage),
         ChangeNotifierProvider(
-          create: (_) => AuthSessionController(widget.tokenStorage),
+          create: (_) => AuthSessionController(
+            widget.tokenStorage,
+            pushNotifications: _push,
+          ),
         ),
         ChangeNotifierProvider(
           create: (_) => ServiceController(
@@ -135,13 +164,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
             bookingApi: CustomerBookingApi(tokenStorage: widget.tokenStorage),
           ),
         ),
-        ChangeNotifierProvider(
-          create: (_) => MessageController(
-            notificationApi: CustomerNotificationApi(
-              tokenStorage: widget.tokenStorage,
-            ),
-          ),
-        ),
+        ChangeNotifierProvider<MessageController>.value(value: _messageController),
       ],
       child: MaterialApp(
         title: 'CleanGo',

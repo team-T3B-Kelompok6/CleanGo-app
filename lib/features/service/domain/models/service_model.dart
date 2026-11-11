@@ -13,6 +13,7 @@ class ServiceModel {
     this.detail,
     this.popularity = 0,
     this.releaseOrder = 0,
+    this.reviewCount = 0,
     this.durationMinutes,
   }) : assert(imagePath != null || iconPath != null);
 
@@ -29,6 +30,7 @@ class ServiceModel {
   final ServiceDetailModel? detail;
   final int popularity;
   final int releaseOrder;
+  final int reviewCount;
   final int? durationMinutes;
 }
 

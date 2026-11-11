@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
 import '../../service/widgets/service_icon.dart';
 import '../domain/models/popular_service_model.dart';
 
@@ -66,12 +67,19 @@ class PopularServiceCard extends StatelessWidget {
                                 colors: [Color(0xFFF0FDFA), Color(0xFFDDF7F2)],
                               ),
                             ),
-                            child: Center(
-                              child: ServiceIcon(
-                                path: service.iconPath,
-                                size: 56,
-                              ),
-                            ),
+                            child:
+                                service.imagePath.isNotEmpty &&
+                                    service.imagePath != service.iconPath &&
+                                    !service.imagePath.startsWith(
+                                      'assets/icons/',
+                                    )
+                                ? RemoteOrAssetImage(source: service.imagePath)
+                                : Center(
+                                    child: ServiceIcon(
+                                      path: service.iconPath,
+                                      size: 56,
+                                    ),
+                                  ),
                           ),
                         ),
                         Positioned(

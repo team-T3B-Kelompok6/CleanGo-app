@@ -12,7 +12,7 @@ class _FakeBookingApi extends CustomerBookingApi {
   _FakeBookingApi({this.bookings = const [], this.fail = false});
 
   final List<CustomerBookingSummary> bookings;
-  final bool fail;
+  bool fail;
   int calls = 0;
 
   @override
@@ -322,17 +322,47 @@ void main() {
       expect(controller.historyOrders.first.customerName, 'Timothy');
     });
 
-    test('keeps the demo orders when the backend returns nothing', () async {
+    test('respons kosong sukses membersihkan daftar aktif dan riwayat', () async {
       final controller = OrderController(bookingApi: _FakeBookingApi());
 
       await controller.loadFromApi();
 
-      expect(controller.scheduledOrders.length, 1);
-      expect(
-        controller.scheduledOrder.orderNumber,
-        OrderData.scheduledOrder.orderNumber,
+      expect(controller.scheduledOrders, isEmpty);
+      expect(controller.historyOrders, isEmpty);
+    });
+
+    test('daftar aktif dan riwayat awal kosong saat API terpasang', () async {
+      final controller = OrderController(bookingApi: _FakeBookingApi());
+
+      expect(controller.scheduledOrders, isEmpty);
+      expect(controller.historyOrders, isEmpty);
+    });
+
+    test('gagal awal tetap kosong', () async {
+      final controller = OrderController(
+        bookingApi: _FakeBookingApi(fail: true),
       );
-      expect(controller.historyOrders.length, OrderData.history.length);
+
+      await controller.loadFromApi();
+
+      expect(controller.scheduledOrders, isEmpty);
+      expect(controller.historyOrders, isEmpty);
+    });
+
+    test('data sukses dipertahankan saat reload gagal', () async {
+      final api = _FakeBookingApi(
+        bookings: [_booking(code: 'CG-1', status: 'Selesai')],
+      );
+      final controller = OrderController(bookingApi: api);
+
+      await controller.loadFromApi();
+      expect(controller.historyOrders, hasLength(1));
+
+      api.fail = true;
+      await controller.loadFromApi();
+
+      expect(controller.historyOrders, hasLength(1));
+      expect(controller.historyOrders.first.orderId, '#CG-1');
     });
 
     test('keeps the demo orders when the request fails', () async {

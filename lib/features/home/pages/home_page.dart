@@ -24,29 +24,56 @@ import '../../service/pages/service_detail_page.dart';
 import '../widgets/popular_service_card.dart';
 import '../widgets/service_category_item.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (context.mounted) context.read<HomeController>().loadFromApi();
+      if (!mounted) return;
+      context.read<HomeController>().loadFromApi();
     });
+  }
+
+  Future<void> _refresh() {
+    return Future.wait([
+      context.read<HomeController>().loadFromApi(),
+      context.read<ServiceController>().refreshServices(),
+    ]);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final homeController = context.watch<HomeController>();
     final services = context.watch<ServiceController>().allServices;
+    final hasRealApi = homeController.hasApi ||
+        services.any((service) => RegExp(r'^\d+$').hasMatch(service.id));
     final derivedCategories = HomeCatalog.categories(services);
     final derivedPopular = HomeCatalog.popularServices(services);
     // The backend ranks categories by bookings; fall back to the catalogue when
     // it is unavailable. At most 8 are shown.
     final rankedCategories = HomeCatalog.fromPopularCategories(
-      context.watch<HomeController>().popularCategories,
+      homeController.popularCategories,
       services,
     );
     final catalogCategories = rankedCategories.isNotEmpty
         ? rankedCategories
-        : (derivedCategories.isEmpty ? HomeData.categories : derivedCategories);
-    final catalogPopular = derivedPopular.isEmpty
-        ? HomeData.popularServices
-        : derivedPopular;
+        : (hasRealApi
+            ? derivedCategories
+            : (derivedCategories.isEmpty
+                ? HomeData.categories
+                : derivedCategories));
+    final catalogPopular = hasRealApi
+        ? derivedPopular
+        : (derivedPopular.isEmpty
+            ? HomeData.popularServices
+            : derivedPopular);
     final mediaQuery = MediaQuery.of(context);
     final double screenWidth = mediaQuery.size.width;
     final double cardWidth = math.min(256, math.max(224, screenWidth * 0.70));
@@ -75,31 +102,36 @@ class HomePage extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: SafeArea(
                   bottom: false,
-                  child: CustomScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    slivers: [
-                      const SliverToBoxAdapter(child: _HomeIntroSection()),
-                      SliverToBoxAdapter(
-                        child: _ServiceCategoriesSection(
-                          categories: catalogCategories,
-                          onViewAll: () => _openServices(context),
-                          onServiceSelected: (serviceId) =>
-                              _openServiceDetail(context, serviceId),
+                  child: RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      slivers: [
+                        const SliverToBoxAdapter(child: _HomeIntroSection()),
+                        SliverToBoxAdapter(
+                          child: _ServiceCategoriesSection(
+                            categories: catalogCategories,
+                            onViewAll: () => _openServices(context),
+                            onServiceSelected: (serviceId) =>
+                                _openServiceDetail(context, serviceId),
+                          ),
                         ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: _PopularServicesSection(
-                          services: catalogPopular,
-                          cardWidth: cardWidth,
-                          onViewAll: () => _openServices(context),
-                          onServiceSelected: (serviceId) =>
-                              _openServiceDetail(context, serviceId),
+                        SliverToBoxAdapter(
+                          child: _PopularServicesSection(
+                            services: catalogPopular,
+                            cardWidth: cardWidth,
+                            onViewAll: () => _openServices(context),
+                            onServiceSelected: (serviceId) =>
+                                _openServiceDetail(context, serviceId),
+                          ),
                         ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: SizedBox(height: bottomContentSpacing),
-                      ),
-                    ],
+                        SliverToBoxAdapter(
+                          child: SizedBox(height: bottomContentSpacing),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -460,6 +492,20 @@ class _PromoSectionState extends State<_PromoSection> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.bannerPaths.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        child: AspectRatio(
+          aspectRatio: 3,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       child: Column(

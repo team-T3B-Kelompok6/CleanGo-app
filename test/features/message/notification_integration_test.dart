@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:cleango_app/features/message/controllers/message_controller.dart';
 import 'package:cleango_app/features/message/data/customer_notification_api.dart';
-import 'package:cleango_app/features/message/data/message_data.dart';
 import 'package:cleango_app/features/message/domain/models/message_notification_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,7 +9,7 @@ class _FakeNotificationApi extends CustomerNotificationApi {
   _FakeNotificationApi({this.rows = const [], this.fail = false});
 
   final List<Map<String, dynamic>> rows;
-  final bool fail;
+  bool fail = false;
   int listCalls = 0;
   final List<String> readIds = [];
   Completer<void>? pendingRead;
@@ -144,12 +143,34 @@ void main() {
       },
     );
 
-    test('keeps the demo inbox when loading fails', () async {
+    test('stays empty when the API fails and no backend data was loaded', () async {
       final failing = MessageController(
         notificationApi: _FakeNotificationApi(fail: true),
       );
       await failing.loadFromApi();
-      expect(failing.visibleMessages.length, MessageData.notifications.length);
+      expect(failing.visibleMessages, isEmpty);
+    });
+
+    test('keeps previously loaded data when a later API call fails', () async {
+      final api = _FakeNotificationApi(
+        rows: [
+          {
+            'id': 1,
+            'type': 'order',
+            'title': 'Pesanan',
+            'message': 'Pesan',
+            'isRead': false,
+          },
+        ],
+      );
+      final controller = MessageController(notificationApi: api);
+      await controller.loadFromApi();
+      expect(controller.visibleMessages.length, 1);
+
+      api.fail = true;
+      await controller.loadFromApi();
+      expect(controller.visibleMessages.length, 1);
+      expect(controller.visibleMessages.single.title, 'Pesanan');
     });
 
     test('failed read restores unread and can be retried', () async {

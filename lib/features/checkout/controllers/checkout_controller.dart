@@ -17,11 +17,11 @@ class CheckoutController {
   List<PromoModel> get promos => List.unmodifiable(_promos);
 
   /// Loads the active promo list; keeps the bundled fallback on failure.
-  Future<void> loadPromos() async {
+  Future<void> loadPromos({String? serviceId}) async {
     final api = _promoApi;
     if (api == null) return;
     try {
-      final promos = await api.fetchPromos();
+      final promos = await api.fetchPromos(serviceId: serviceId);
       _promos = promos;
       _promoError = null;
     } catch (e) {

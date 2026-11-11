@@ -15,6 +15,14 @@ class ServiceRepository {
   final AppDatabase _database;
   final ServiceRemoteDataSource? remote;
 
+  static const Set<String> _legacySeedIds = {
+    'deep-cleaning',
+    'ac-care',
+    'sofa-mattress',
+    'office-cleaning',
+    'daily-cleaning',
+  };
+
   Stream<List<ServiceModel>> watchServices() {
     return _database.watchServiceCache().map(_decodeRows);
   }
@@ -52,13 +60,15 @@ class ServiceRepository {
   }
 
   List<ServiceModel> _decodeRows(List<ServiceCacheRow> rows) {
-    return rows
+    final services = rows
         .map(
           (row) => _fromJson(
             Map<String, Object?>.from(jsonDecode(row.payload) as Map),
           ),
         )
         .toList(growable: false);
+    if (remote == null) return services;
+    return services.where((service) => !_legacySeedIds.contains(service.id)).toList(growable: false);
   }
 
   Map<String, Object?> _toJson(ServiceModel service) => {
@@ -74,6 +84,7 @@ class ServiceRepository {
     'badge': service.badge,
     'rating': service.rating,
     'popularity': service.popularity,
+    'reviewCount': service.reviewCount,
     'releaseOrder': service.releaseOrder,
     'detail': service.detail == null ? null : _detailToJson(service.detail!),
   };
@@ -114,6 +125,7 @@ class ServiceRepository {
       badge: json['badge'] as String?,
       rating: json['rating'] as String?,
       popularity: json['popularity']! as int,
+      reviewCount: (json['reviewCount'] as int?) ?? 0,
       releaseOrder: json['releaseOrder']! as int,
       detail: detailJson == null
           ? null

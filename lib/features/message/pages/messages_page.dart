@@ -77,37 +77,60 @@ class _MessagesPageState extends State<MessagesPage> {
                               switchInCurve: Curves.easeOut,
                               switchOutCurve: Curves.easeIn,
                               child: visibleMessages.isEmpty
-                                  ? _EmptyMessages(tab: _controller.selectedTab)
-                                  : ListView.separated(
-                                      key: ValueKey(_controller.selectedTab),
-                                      padding: EdgeInsets.fromLTRB(
-                                        16,
-                                        16,
-                                        16,
-                                        bottomSpacing,
+                                  ? RefreshIndicator(
+                                      onRefresh: _controller.loadFromApi,
+                                      child: ListView(
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(
+                                              parent: BouncingScrollPhysics(),
+                                            ),
+                                        children: [
+                                          _EmptyMessages(
+                                            tab: _controller.selectedTab,
+                                          ),
+                                        ],
                                       ),
-                                      itemCount: visibleMessages.length,
-                                      separatorBuilder: (_, _) =>
-                                          const SizedBox(height: 12),
-                                      itemBuilder: (context, index) {
-                                        final message = visibleMessages[index];
-                                        return _MessageNotificationCard(
-                                          message: message,
-                                          onTap: () async {
-                                            final result = _controller
-                                                .markAsRead(message.id);
-                                            widget.onMessageTap?.call(message);
-                                            if (!await result &&
-                                                context.mounted) {
-                                              AppNotice.show(
-                                                context,
-                                                'Status baca belum tersimpan. Periksa koneksi lalu tekan pesan lagi.',
-                                                type: AppNoticeType.error,
+                                    )
+                                  : RefreshIndicator(
+                                      onRefresh: _controller.loadFromApi,
+                                      child: ListView.separated(
+                                        key: ValueKey(_controller.selectedTab),
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(
+                                              parent: BouncingScrollPhysics(),
+                                            ),
+                                        padding: EdgeInsets.fromLTRB(
+                                          16,
+                                          16,
+                                          16,
+                                          bottomSpacing,
+                                        ),
+                                        itemCount: visibleMessages.length,
+                                        separatorBuilder: (_, _) =>
+                                            const SizedBox(height: 12),
+                                        itemBuilder: (context, index) {
+                                          final message =
+                                              visibleMessages[index];
+                                          return _MessageNotificationCard(
+                                            message: message,
+                                            onTap: () async {
+                                              final result = _controller
+                                                  .markAsRead(message.id);
+                                              widget.onMessageTap?.call(
+                                                message,
                                               );
-                                            }
-                                          },
-                                        );
-                                      },
+                                              if (!await result &&
+                                                  context.mounted) {
+                                                AppNotice.show(
+                                                  context,
+                                                  'Status baca belum tersimpan. Periksa koneksi lalu tekan pesan lagi.',
+                                                  type: AppNoticeType.error,
+                                                );
+                                              }
+                                            },
+                                          );
+                                        },
+                                      ),
                                     ),
                             ),
                           ),

@@ -25,7 +25,7 @@ class _FakePromoApi extends CustomerPromoApi {
   String? lastServiceId;
 
   @override
-  Future<List<PromoModel>> fetchPromos() async {
+  Future<List<PromoModel>> fetchPromos({String? serviceId}) async {
     listCalls++;
     if (fail) throw StateError('offline');
     return promos;
@@ -225,7 +225,7 @@ void main() {
       expect(controller.promoError, isNotNull);
     });
 
-        test('works without an api (local-only mode)', () async {
+        test('rejects a promo without a backend (local-only mode)', () async {
       final controller = CheckoutController();
 
       await controller.applyPromoRemote(
@@ -233,7 +233,8 @@ void main() {
         servicePrice: 150000,
       );
 
-      expect(controller.appliedPromo?.code, 'CLEANHEMAT');
+      expect(controller.appliedPromo, isNull);
+      expect(controller.promoError, 'Kode promo tidak valid.');
     });
   });
 }

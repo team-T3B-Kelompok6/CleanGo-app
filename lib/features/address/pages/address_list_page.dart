@@ -44,140 +44,147 @@ class _AddressListPageState extends State<AddressListPage> {
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: BouncingScrollPhysics(),
-                ),
-                slivers: [
-                  // Header
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
-                      child: Row(
-                        children: [
-                          _CircularBackButton(
-                            onPressed: () => Navigator.of(context).maybePop(),
-                          ),
-                          const SizedBox(width: 14),
-                          const Text(
-                            'Alamat Pembersihan',
-                            style: TextStyle(
-                              fontFamily: AppTheme.fontFamily,
-                              color: AppColors.slate900,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.3,
+              child: RefreshIndicator(
+                onRefresh: () =>
+                    context.read<AddressController>().loadFromApi(),
+                child: CustomScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics(),
+                  ),
+                  slivers: [
+                    // Header
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                        child: Row(
+                          children: [
+                            _CircularBackButton(
+                              onPressed: () => Navigator.of(context).maybePop(),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Subjudul: "Daftar alamat tersimpan"
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        _sidePadding,
-                        4,
-                        _sidePadding,
-                        16,
-                      ),
-                      child: Text(
-                        'Daftar alamat tersimpan',
-                        style: TextStyle(
-                          fontFamily: AppTheme.fontFamily,
-                          color: Color(0xFF64748B),
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                            const SizedBox(width: 14),
+                            const Text(
+                              'Alamat Pembersihan',
+                              style: TextStyle(
+                                fontFamily: AppTheme.fontFamily,
+                                color: AppColors.slate900,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ),
 
-                  // Daftar Alamat / Empty State
-                  if (addresses.isEmpty)
-                    SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 72,
-                                height: 72,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFE8FAF7),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.location_off_outlined,
-                                  color: AppColors.primary,
-                                  size: 34,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Belum Ada Alamat Tersimpan',
-                                style: TextStyle(
-                                  fontFamily: AppTheme.fontFamily,
-                                  color: AppColors.slate900,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Tambahkan alamat pembersihan Anda untuk kemudahan pemesanan.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontFamily: AppTheme.fontFamily,
-                                  color: Color(0xFF64748B),
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
+                    // Subjudul: "Daftar alamat tersimpan"
+                    const SliverToBoxAdapter(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          _sidePadding,
+                          4,
+                          _sidePadding,
+                          16,
+                        ),
+                        child: Text(
+                          'Daftar alamat tersimpan',
+                          style: TextStyle(
+                            fontFamily: AppTheme.fontFamily,
+                            color: Color(0xFF64748B),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
-                    )
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        _sidePadding,
-                        0,
-                        _sidePadding,
-                        130, // Ruang untuk 2 tombol bottom bar
-                      ),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate((context, index) {
-                          final address = addresses[index];
-                          final isSelected = address.id == selectedId;
+                    ),
 
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 14),
-                            child: AddressCard(
-                              address: address,
-                              isSelected: isSelected,
-                              onTap: () {
-                                addressController.selectAddress(address.id);
-                              },
-                              onEdit: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        EditAddressPage(address: address),
+                    // Daftar Alamat / Empty State
+                    if (addresses.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 72,
+                                  height: 72,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFE8FAF7),
+                                    shape: BoxShape.circle,
                                   ),
-                                );
-                              },
+                                  child: const Icon(
+                                    Icons.location_off_outlined,
+                                    color: AppColors.primary,
+                                    size: 34,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Belum Ada Alamat Tersimpan',
+                                  style: TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    color: AppColors.slate900,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'Tambahkan alamat pembersihan Anda untuk kemudahan pemesanan.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontFamily: AppTheme.fontFamily,
+                                    color: Color(0xFF64748B),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
                             ),
-                          );
-                        }, childCount: addresses.length),
+                          ),
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(
+                          _sidePadding,
+                          0,
+                          _sidePadding,
+                          130, // Ruang untuk 2 tombol bottom bar
+                        ),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate((
+                            context,
+                            index,
+                          ) {
+                            final address = addresses[index];
+                            final isSelected = address.id == selectedId;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: AddressCard(
+                                address: address,
+                                isSelected: isSelected,
+                                onTap: () {
+                                  addressController.selectAddress(address.id);
+                                },
+                                onEdit: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          EditAddressPage(address: address),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          }, childCount: addresses.length),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

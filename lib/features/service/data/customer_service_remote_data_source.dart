@@ -47,9 +47,16 @@ class CustomerServiceRemoteDataSource implements ServiceRemoteDataSource {
       category: category,
       imagePath: resolveImageUrl(imageUrl),
       iconPath: ServiceIconCatalog.forCategory(categoryName),
-      popularity: 0,
+      rating: _formatRating(json['rating']),
+      popularity: (json['orderCount'] as num?)?.toInt() ?? 0,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       releaseOrder: (json['id'] as num?)?.toInt() ?? 0,
     );
+  }
+
+  static String? _formatRating(dynamic raw) {
+    if (raw is! num) return null;
+    return raw.toDouble().toStringAsFixed(1);
   }
 
   /// Bundled assets stay as-is; backend `/uploads/...` paths become absolute so
@@ -144,6 +151,7 @@ class CustomerServiceDetailApi {
           ? base.rating
           : averageRating.toStringAsFixed(1),
       popularity: base.popularity,
+      reviewCount: base.reviewCount,
       releaseOrder: base.releaseOrder,
       detail: ServiceDetailModel(
         heroImagePath: base.imagePath ?? base.iconPath!,

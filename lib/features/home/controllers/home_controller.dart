@@ -11,14 +11,19 @@ import '../domain/models/popular_category_model.dart';
 class HomeController extends ChangeNotifier {
   HomeController({CustomerBannerApi? bannerApi, CustomerCategoryApi? categoryApi})
       : _bannerApi = bannerApi,
-        _categoryApi = categoryApi;
+        _categoryApi = categoryApi,
+        _banners = bannerApi == null ? HomeData.promoBanners : const [];
 
   final CustomerBannerApi? _bannerApi;
   final CustomerCategoryApi? _categoryApi;
   List<PopularCategoryModel> _popularCategories = const [];
-  List<String> _banners = HomeData.promoBanners;
+  List<String> _banners;
   String? _error;
   bool _loading = false;
+
+  bool get hasBannerApi => _bannerApi != null;
+  bool get hasCategoryApi => _categoryApi != null;
+  bool get hasApi => _bannerApi != null || _categoryApi != null;
 
   List<String> get banners => List.unmodifiable(_banners);
 
@@ -38,11 +43,7 @@ class HomeController extends ChangeNotifier {
       if (_bannerApi != null) {
         try {
           final banners = await _bannerApi.fetchBanners();
-          if (banners.isNotEmpty) {
-            _banners = banners;
-          } else {
-            _banners = HomeData.promoBanners;
-          }
+          _banners = banners;
         } catch (error) {
           _error = error.toString();
         }

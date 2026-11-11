@@ -8,7 +8,7 @@ class _FakeBannerApi extends CustomerBannerApi {
   _FakeBannerApi({this.banners = const [], this.fail = false});
 
   final List<String> banners;
-  final bool fail;
+  bool fail;
   int calls = 0;
 
   @override
@@ -61,20 +61,34 @@ void main() {
       expect(controller.error, isNull);
     });
 
-    test('keeps the bundled banners when the backend returns none', () async {
+    test('uses empty list when the backend returns none', () async {
       final controller = HomeController(bannerApi: _FakeBannerApi());
 
       await controller.loadFromApi();
 
-      expect(controller.banners, HomeData.promoBanners);
+      expect(controller.banners, []);
     });
 
-    test('keeps the bundled banners and records the error on failure', () async {
+    test('gagal awal kembali list kosong dan mencatat error', () async {
       final controller = HomeController(bannerApi: _FakeBannerApi(fail: true));
 
       await controller.loadFromApi();
 
-      expect(controller.banners, HomeData.promoBanners);
+      expect(controller.banners, []);
+      expect(controller.error, isNotNull);
+    });
+
+    test('sukses kemudian gagal mempertahankan banner backend sebelumnya', () async {
+      final api = _FakeBannerApi(banners: ['http://x/a.png']);
+      final controller = HomeController(bannerApi: api);
+
+      await controller.loadFromApi();
+      expect(controller.banners, ['http://x/a.png']);
+      expect(controller.error, isNull);
+
+      api.fail = true;
+      await controller.loadFromApi();
+      expect(controller.banners, ['http://x/a.png']);
       expect(controller.error, isNotNull);
     });
 

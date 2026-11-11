@@ -13,7 +13,7 @@ import 'package:cleango_app/features/checkout/domain/models/promo_model.dart';
 
 class _LocalPromoApi extends CustomerPromoApi {
   @override
-  Future<List<PromoModel>> fetchPromos() async {
+  Future<List<PromoModel>> fetchPromos({String? serviceId}) async {
     return const [
       PromoModel(code: 'CLEANHEMAT', discountPercent: 35),
     ];
@@ -233,17 +233,22 @@ void main() {
               .copyWith(textScaler: const TextScaler.linear(1.3)),
           child: child!,
         ),
-        home: const PromoPage(servicePrice: 150000),
+        home: PromoPage(servicePrice: 150000, promoApi: _LocalPromoApi()),
       ),
     );
+    await tester.pumpAndSettle();
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsOneWidget);
     expect(find.byIcon(Icons.check_box_outline_blank_rounded), findsNothing);
     await tester.tap(promoOption);
-    await tester.pump();
+    await tester.pumpAndSettle();
 
+    expect(find.text('Gunakan Promo'), findsOneWidget);
     expect(find.byIcon(Icons.radio_button_checked_rounded), findsOneWidget);
     expect(find.byIcon(Icons.radio_button_unchecked_rounded), findsNothing);
-    expect(find.text('Gunakan Promo'), findsOneWidget);
+    await tester.tap(confirmPromo);
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 }

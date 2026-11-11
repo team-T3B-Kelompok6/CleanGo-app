@@ -1,14 +1,38 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/notifications/push_notifications.dart';
 import '../../../core/storage/token_storage.dart';
 
 class AuthSessionController extends ChangeNotifier {
-  AuthSessionController(this._tokenStorage);
+  AuthSessionController(this._tokenStorage, {this.pushNotifications});
 
   final TokenStorage _tokenStorage;
+  final PushNotifications? pushNotifications;
+
+  bool _started = false;
+
+  void start() {
+    if (_started) return;
+    _started = true;
+    unawaited(pushNotifications?.ensurePermission());
+    pushNotifications?.startTokenSync();
+    unawaited(_registerCurrentToken());
+  }
+
+  void stop() {
+    _started = false;
+    pushNotifications?.stopTokenSync();
+  }
+
+  Future<void> _registerCurrentToken() async {
+    final fcmToken = await pushNotifications?.transport.getToken();
+    if (fcmToken == null || fcmToken.isEmpty) return;
+    await pushNotifications?.registerDevice(fcmToken);
+  }
 
   Future<bool> hasSession() async {
     try {
@@ -41,6 +65,7 @@ class AuthSessionController extends ChangeNotifier {
     await _tokenStorage.writeExpiresAt(
       DateTime.now().toUtc().add(Duration(seconds: seconds)),
     );
+    await _linkFcmToken();
   }
 
   static const int _fallbackSeconds = 7 * 24 * 60 * 60;
@@ -70,6 +95,21 @@ class AuthSessionController extends ChangeNotifier {
     await _tokenStorage.writeAccessToken(accessToken);
     await _tokenStorage.writeRefreshToken(refreshToken);
     await _tokenStorage.writeExpiresAt(expiresAt);
+    await _linkFcmToken();
+  }
+
+  /// Menautkan token FCM ke backend hanya saat JWT ada dan sesi valid. Error
+  /// cloud/izin tidak menggagalkan sesi.
+  Future<void> _linkFcmToken() async {
+    try {
+      final valid = await hasSession();
+      if (!valid) return;
+      final fcmToken = await pushNotifications?.transport.getToken();
+      if (fcmToken == null || fcmToken.isEmpty) return;
+      await pushNotifications?.registerDevice(fcmToken);
+    } catch (_) {
+      // Gagal menyambungkan token FCM tidak membatalkan sesi.
+    }
   }
 
   Future<void> createLocalSession() async {
@@ -84,7 +124,29 @@ class AuthSessionController extends ChangeNotifier {
     );
   }
 
-  Future<void> signOut() {
-    return _tokenStorage.clearSession();
+  Future<void> signOut() async {
+    // Tangkap JWT dan token sebelum operasi hapus. Cloud/izin gagal tidak
+    // memblokir logout permanen.
+    String? jwt;
+    String? fcmToken;
+    try {
+      jwt = await _tokenStorage.readAccessToken();
+      fcmToken = await pushNotifications?.transport.getToken();
+    } catch (_) {}
+
+    pushNotifications?.stopTokenSync();
+    // Biarkan operasi serial yang sedang berjalan selesai.
+    await Future<void>.delayed(Duration.zero);
+
+    try {
+      if (fcmToken != null && fcmToken.isNotEmpty && jwt != null && jwt.isNotEmpty) {
+        await pushNotifications?.unregisterDevice(fcmToken).timeout(const Duration(seconds: 8));
+        await pushNotifications?.transport.deleteToken().timeout(const Duration(seconds: 8));
+      }
+    } catch (_) {
+      // Abaikan error cloud/izin saat logout.
+    }
+
+    await _tokenStorage.clearSession();
   }
 }

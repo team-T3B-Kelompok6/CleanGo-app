@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/camera_access.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/remote_or_asset_image.dart';
 import '../../booking/domain/models/review_photo_model.dart';
@@ -99,14 +101,61 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
         ),
       ),
     );
-    if (source == null) return;
+    if (!mounted || source == null) return;
 
-    final picked = await ImagePicker().pickImage(
-      source: source,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 82,
-    );
+    if (source == ImageSource.camera) {
+      final status = await ensureCameraPermission();
+      if (!mounted) return;
+      if (status == CameraPermissionStatus.permanentlyDenied) {
+        final openSettings = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Izin kamera'),
+            content: const Text(
+              'Akses kamera diblokir secara permanen. Buka pengaturan aplikasi untuk mengaktifkannya.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Buka pengaturan'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted) return;
+        if (openSettings == true) {
+          await openAppSettings();
+          if (!mounted) return;
+        }
+        return;
+      }
+      if (status == CameraPermissionStatus.denied) {
+        AppNotice.show(
+          context,
+          'Akses kamera ditolak. Anda tetap dapat memilih foto dari galeri.',
+          type: AppNoticeType.error,
+        );
+        return;
+      }
+    }
+
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 82,
+      );
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      _showCameraError(e.code);
+      return;
+    }
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
@@ -136,6 +185,18 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
       return;
     }
     setState(() {});
+  }
+
+  void _showCameraError(String code) {
+    AppNotice.show(
+      context,
+      switch (code) {
+        'camera_access_denied' => 'Akses kamera ditolak. Aktifkan di pengaturan aplikasi.',
+        'image_source_not_available' => 'Kamera tidak tersedia pada perangkat ini.',
+        _ => 'Gagal mengambil foto. Coba lagi.',
+      },
+      type: AppNoticeType.error,
+    );
   }
 
   String? _imageType(XFile file) {

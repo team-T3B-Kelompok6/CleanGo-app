@@ -21,8 +21,12 @@ class OrderController extends ChangeNotifier {
         scheduledAt: DateTime.now().add(const Duration(days: 3)),
       ),
     );
-    _orders[_scheduledOrder.orderNumber] = _selected;
-    _history = List<OrderHistoryModel>.from(OrderData.history);
+    if (_bookingApi == null) {
+      _orders[_scheduledOrder.orderNumber] = _selected;
+      _history = List<OrderHistoryModel>.from(OrderData.history);
+    } else {
+      _history = <OrderHistoryModel>[];
+    }
     _stageUpdatedAt[_activeStage] = DateTime.now();
     _resetTripTracking();
   }
@@ -525,13 +529,29 @@ class OrderController extends ChangeNotifier {
   }
 
   /// Loads the customer's bookings from the backend and replaces the demo data.
-  /// Keeps the bundled demo orders when the request fails or returns nothing.
+  /// Respons kosong membersihkan daftar aktif dan riwayat. Gagal saat muat awal
+  /// biarkan kosong; gagal setelah muat sukses mempertahankan data backend.
   Future<void> loadFromApi() async {
     final api = _bookingApi;
     if (api == null) return;
     try {
       final bookings = await api.fetchBookings();
-      if (bookings.isEmpty) return;
+
+      _orders.clear();
+      _history = <OrderHistoryModel>[];
+
+      if (bookings.isEmpty) {
+        _selected = _ActiveOrderState(
+          OrderData.scheduledOrder.copyWith(
+            scheduledAt: DateTime.now().add(const Duration(days: 3)),
+          ),
+        );
+        _stageUpdatedAt
+          ..clear()
+          ..[_activeStage] = DateTime.now();
+        notifyListeners();
+        return;
+      }
 
       final active = bookings
           .where((b) => !b.isFinished && b.paymentStatus != 'expired')
@@ -540,7 +560,6 @@ class OrderController extends ChangeNotifier {
           .where((b) => b.isFinished && b.paymentStatus != 'expired')
           .toList();
 
-      _orders.clear();
       for (final booking in active) {
         final state = _ActiveOrderState(_fromBooking(booking));
         _orders[state.order.orderNumber] = state;
@@ -562,7 +581,8 @@ class OrderController extends ChangeNotifier {
       _history = finished.map(_historyFromBooking).toList();
       notifyListeners();
     } catch (_) {
-      // offline / no session: keep the bundled demo orders
+      // gagal saat muat awal: biarkan kosong; gagal setelah muat sukses:
+      // data backend sebelumnya tetap ada.
     }
   }
 

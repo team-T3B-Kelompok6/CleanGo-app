@@ -12,7 +12,10 @@ class MessageController extends ChangeNotifier {
     CustomerNotificationApi? notificationApi,
   }) : _notificationApi = notificationApi,
        _messages = List<MessageNotificationModel>.from(
-         initialMessages ?? MessageData.notifications,
+         initialMessages ??
+             (notificationApi == null
+                 ? MessageData.notifications
+                 : <MessageNotificationModel>[]),
        );
 
   final CustomerNotificationApi? _notificationApi;

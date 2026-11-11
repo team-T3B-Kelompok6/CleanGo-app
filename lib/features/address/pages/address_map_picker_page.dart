@@ -32,19 +32,25 @@ class AddressMapPickerPage extends StatefulWidget {
 
 class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
   late LatLng _selectedPosition;
+  late final MapController _mapController;
   final ReverseGeocodingController _geocodingController =
       ReverseGeocodingController();
   bool _isResolvingAddress = false;
   String? _addressError;
+  bool _isFetchingLocation = false;
+  bool _isMapReady = false;
+  final MethodChannel _locationChannel = const MethodChannel('com.cleango.app/location');
 
   @override
   void initState() {
     super.initState();
     _selectedPosition = widget.initialPosition;
+    _mapController = MapController();
   }
 
   @override
   void dispose() {
+    _mapController.dispose();
     _geocodingController.dispose();
     super.dispose();
   }
@@ -74,6 +80,48 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
     }
   }
 
+  Future<void> _useMyLocation() async {
+    if (_isFetchingLocation) return;
+    setState(() {
+      _isFetchingLocation = true;
+      _addressError = null;
+    });
+    try {
+      final result = await _locationChannel.invokeMethod<Map<dynamic, dynamic>>('getCurrentLocation');
+      if (!mounted) return;
+      if (result != null && result.containsKey('latitude') && result.containsKey('longitude')) {
+        final lat = result['latitude'] as double;
+        final lng = result['longitude'] as double;
+        final position = LatLng(lat, lng);
+        setState(() {
+          _selectedPosition = position;
+          _addressError = null;
+        });
+        if (mounted && _isMapReady) {
+          _mapController.move(position, 16);
+        }
+      }
+    } on MissingPluginException {
+      if (!mounted) return;
+      setState(() {
+        _addressError = 'Fitur lokasi tidak tersedia. Silakan pilih titik secara manual.';
+      });
+    } on PlatformException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _addressError = switch (e.code) {
+          'permission_denied' => 'Izin lokasi ditolak. Aktifkan di pengaturan aplikasi.',
+          'location_unavailable' => 'Lokasi tidak aktif atau tidak dapat ditemukan.',
+          _ => 'Gagal mendapatkan lokasi. Silakan pilih titik secara manual.',
+        };
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingLocation = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -94,9 +142,11 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
                 child: Stack(
                   children: [
                     FlutterMap(
+                      mapController: _mapController,
                       options: MapOptions(
                         initialCenter: _selectedPosition,
                         initialZoom: 16,
+                        onMapReady: () => _isMapReady = true,
                         onTap: (_, position) {
                           setState(() {
                             _selectedPosition = position;
@@ -184,6 +234,34 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
                     fontFamily: AppTheme.fontFamily,
                     color: AppColors.slate500,
                     fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: OutlinedButton.icon(
+                    onPressed: _isFetchingLocation ? null : _useMyLocation,
+                    icon: _isFetchingLocation
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.my_location_outlined),
+                    label: Text(
+                      _isFetchingLocation
+                          ? 'Mencari lokasi Anda...'
+                          : 'Gunakan lokasi saya',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),

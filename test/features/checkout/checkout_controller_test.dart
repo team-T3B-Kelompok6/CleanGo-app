@@ -10,7 +10,7 @@ class _FakePromoApi extends CustomerPromoApi {
   _FakePromoApi({this.promos = const [], this.shouldFail = false});
 
   @override
-  Future<List<PromoModel>> fetchPromos() async {
+  Future<List<PromoModel>> fetchPromos({String? serviceId}) async {
     if (shouldFail) throw Exception('network error');
     return promos;
   }

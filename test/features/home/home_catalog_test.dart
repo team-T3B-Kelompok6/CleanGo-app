@@ -12,6 +12,7 @@ import 'package:cleango_app/features/message/controllers/message_controller.dart
 import 'package:cleango_app/features/message/domain/models/message_notification_model.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
 import 'package:cleango_app/features/service/controllers/service_controller.dart';
+import 'package:cleango_app/features/service/data/customer_service_remote_data_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ServiceModel _service(
@@ -20,6 +21,8 @@ ServiceModel _service(
   String? rating,
   String? image,
   ServiceDetailModel? detail,
+  int popularity = 0,
+  int reviewCount = 0,
 }) => ServiceModel(
   id: id,
   title: 'Layanan $id',
@@ -30,6 +33,8 @@ ServiceModel _service(
   iconPath: 'assets/icons/$category.svg',
   imagePath: image,
   rating: rating,
+  popularity: popularity,
+  reviewCount: reviewCount,
   detail: detail,
 );
 
@@ -234,6 +239,60 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets(
+      'pembukaan pertama Beranda menampilkan rating dan reviewCount asli tanpa detail',
+      (tester) async {
+        int detailCalls = 0;
+
+        final fakeDetailApi = _FakeDetailApi(() => detailCalls++);
+
+        final services = [
+          ServiceModel(
+            id: '7',
+            title: 'Basic Home Cleaning',
+            description: 'Pembersihan rutin',
+            duration: '2 jam',
+            price: 'Rp100.000',
+            category: 'Rumah',
+            rating: '4.5',
+            reviewCount: 8,
+            popularity: 100,
+            iconPath: 'assets/icons/service_rumah.png',
+          ),
+        ];
+
+        await tester.pumpWidget(
+          MultiProvider(
+            providers: [
+              ChangeNotifierProvider(create: (_) => HomeController()),
+              ChangeNotifierProvider(create: (_) => ProfileController()),
+              ChangeNotifierProvider(create: (_) => MessageController()),
+              ChangeNotifierProvider(
+                create: (_) => ServiceController(
+                  initialServices: services,
+                  detailApi: fakeDetailApi,
+                ),
+              ),
+            ],
+            child: MaterialApp(
+              home: const HomePage(),
+              routes: {'/messages': (_) => const Scaffold(body: Text('Inbox'))},
+            ),
+          ),
+        );
+
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 100));
+
+        expect(find.text('4.5'), findsOneWidget);
+        expect(find.text('8'), findsOneWidget);
+
+        expect(detailCalls, 0);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
     test('prefers the service image when present', () {
       final popular = HomeCatalog.popularServices([
         _service('1', 'AC', image: 'assets/images/ac.jpeg'),
@@ -241,5 +300,76 @@ void main() {
 
       expect(popular.single.imagePath, 'assets/images/ac.jpeg');
     });
+
+    test('mengurutkan salinan menurun menurut popularity sebelum take limit', () {
+      final services = [
+        _service('1', 'Rumah', popularity: 1),
+        _service('2', 'Rumah', popularity: 5),
+        _service('3', 'Rumah', popularity: 3),
+      ];
+      final popular = HomeCatalog.popularServices(services, limit: 2);
+
+      expect(popular.map((p) => p.serviceId), ['2', '3']);
+    });
+
+    test('mempertahankan urutan masukan saat popularity sama (stabil)', () {
+      final services = [
+        _service('a', 'Rumah', popularity: 4),
+        _service('b', 'Rumah', popularity: 4),
+        _service('c', 'Rumah', popularity: 9),
+      ];
+      final popular = HomeCatalog.popularServices(services);
+
+      expect(popular.map((p) => p.serviceId), ['c', 'a', 'b']);
+    });
+
+    test('tidak mengubah urutan daftar asli controller', () {
+      final services = [
+        _service('1', 'Rumah', popularity: 1),
+        _service('2', 'Rumah', popularity: 5),
+        _service('3', 'Rumah', popularity: 3),
+      ];
+      final awal = List.of(services.map((service) => service.id));
+
+      HomeCatalog.popularServices(services, limit: 3);
+
+      expect(services.map((service) => service.id), awal);
+    });
+
+    test('mengambil limit setelah diurutkan, bukan sebelum', () {
+      final services = List.generate(6, (i) {
+        return _service('$i', 'Rumah', popularity: i);
+      });
+      final popular = HomeCatalog.popularServices(services, limit: 3);
+
+      expect(popular.map((p) => p.serviceId), ['5', '4', '3']);
+    });
+
+    test('membawa reviewCount asli ke kartu', () {
+      final popular = HomeCatalog.popularServices([
+        _service('1', 'Rumah', reviewCount: 7),
+      ]);
+
+      expect(popular.single.reviewCount, '7');
+    });
+
+    test('menampilkan - saat rating belum tersedia', () {
+      final popular = HomeCatalog.popularServices([
+        _service('1', 'Rumah'),
+      ]);
+
+      expect(popular.single.rating, '-');
+    });
   });
+}
+
+class _FakeDetailApi extends CustomerServiceDetailApi {
+  _FakeDetailApi(this._counter) : super();
+  final int Function() _counter;
+
+  @override
+  Future<ServiceModel?> fetchDetail(String serviceId) async {
+    _counter();
+    return null;
+  }
 }

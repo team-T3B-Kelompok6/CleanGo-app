@@ -393,37 +393,41 @@ class _ScheduledOrdersView extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = context.watch<OrderController>();
     if (!controller.hasScheduledOrder) {
-      return ListView(
-        padding: EdgeInsets.fromLTRB(24, 54, 24, bottomSpacing),
-        children: const [
-          Icon(
-            Icons.event_available_rounded,
-            size: 68,
-            color: AppColors.primaryBorder,
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Belum ada pesanan terjadwal',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.slate900,
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+      return RefreshIndicator(
+        onRefresh: () => context.read<OrderController>().loadFromApi(),
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(24, 54, 24, bottomSpacing),
+          children: const [
+            Icon(
+              Icons.event_available_rounded,
+              size: 68,
+              color: AppColors.primaryBorder,
             ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Pesanan baru dan layanan yang belum selesai akan tampil di sini.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.slate500,
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 14,
-              height: 1.5,
+            SizedBox(height: 16),
+            Text(
+              'Belum ada pesanan terjadwal',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.slate900,
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+            SizedBox(height: 8),
+            Text(
+              'Pesanan baru dan layanan yang belum selesai akan tampil di sini.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.slate500,
+                fontFamily: AppTheme.fontFamily,
+                fontSize: 14,
+                height: 1.5,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -437,49 +441,54 @@ class _ScheduledOrdersView extends StatelessWidget {
         break;
       }
     }
-    return ListView.separated(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
-      itemCount: orders.length + (holdOrder == null ? 0 : 1),
-      separatorBuilder: (_, _) => const SizedBox(height: 16),
-      itemBuilder: (context, index) {
-        if (holdOrder != null && index == 0) {
-          return HoldCountdownBanner(
-            holdUntil: holdOrder.holdUntil!,
-            onCancel: () =>
-                _confirmHoldCancellation(context, controller, holdOrder!),
+    return RefreshIndicator(
+      onRefresh: () => context.read<OrderController>().loadFromApi(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
+        itemCount: orders.length + (holdOrder == null ? 0 : 1),
+        separatorBuilder: (_, _) => const SizedBox(height: 16),
+        itemBuilder: (context, index) {
+          if (holdOrder != null && index == 0) {
+            return HoldCountdownBanner(
+              holdUntil: holdOrder.holdUntil!,
+              onCancel: () =>
+                  _confirmHoldCancellation(context, controller, holdOrder!),
+            );
+          }
+          final scheduledOrder = orders[index - (holdOrder == null ? 0 : 1)];
+          final displayAddress = scheduledOrder.destinationAddress.isNotEmpty
+              ? scheduledOrder.destinationAddress
+              : address;
+          return _ScheduledOrderCard(
+            key: ValueKey(scheduledOrder.orderNumber),
+            order: scheduledOrder,
+            address: displayAddress,
+            onTrackOrder: () {
+              if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+                onTrackOrder();
+              }
+            },
+            onReschedule: () {
+              if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+                _pickNewSchedule(context, controller);
+              }
+            },
+            onDetail: () {
+              if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
+                _showScheduledDetail(
+                  context,
+                  controller,
+                  scheduledOrder,
+                  displayAddress,
+                );
+              }
+            },
           );
-        }
-        final scheduledOrder = orders[index - (holdOrder == null ? 0 : 1)];
-        final displayAddress = scheduledOrder.destinationAddress.isNotEmpty
-            ? scheduledOrder.destinationAddress
-            : address;
-        return _ScheduledOrderCard(
-          key: ValueKey(scheduledOrder.orderNumber),
-          order: scheduledOrder,
-          address: displayAddress,
-          onTrackOrder: () {
-            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
-              onTrackOrder();
-            }
-          },
-          onReschedule: () {
-            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
-              _pickNewSchedule(context, controller);
-            }
-          },
-          onDetail: () {
-            if (controller.selectScheduledOrder(scheduledOrder.orderNumber)) {
-              _showScheduledDetail(
-                context,
-                controller,
-                scheduledOrder,
-                displayAddress,
-              );
-            }
-          },
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -1051,14 +1060,19 @@ class _OrderHistoryView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final history = context.watch<OrderController>().historyOrders;
-    return ListView.separated(
-      physics: const BouncingScrollPhysics(),
-      padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
-      itemCount: history.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, index) {
-        return _HistoryOrderCard(order: history[index]);
-      },
+    return RefreshIndicator(
+      onRefresh: () => context.read<OrderController>().loadFromApi(),
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
+        itemCount: history.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 14),
+        itemBuilder: (context, index) {
+          return _HistoryOrderCard(order: history[index]);
+        },
+      ),
     );
   }
 }

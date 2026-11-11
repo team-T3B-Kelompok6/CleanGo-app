@@ -102,6 +102,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           servicePrice: context.read<BookingController>().servicePriceValue,
           initialPromoCode: _checkoutController.appliedPromo?.code,
           promoApi: widget.promoApi,
+          serviceId: context.read<BookingController>().service?.id,
         ),
       ),
     );

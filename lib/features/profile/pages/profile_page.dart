@@ -18,7 +18,7 @@ import '../controllers/profile_controller.dart';
 import 'change_password_page.dart';
 import 'personal_data_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({
     this.onPersonalDataTap,
     this.onSavedAddressesTap,
@@ -37,11 +37,22 @@ class ProfilePage extends StatelessWidget {
   final VoidCallback? onLogout;
 
   @override
-  Widget build(BuildContext context) {
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  @override
+  void initState() {
+    super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<ProfileController>().loadFromApi();
       context.read<AddressController>().loadFromApi();
     });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final contentSideInset = ((mediaQuery.size.width - 480) / 2 + 16).clamp(
       16.0,
@@ -68,103 +79,119 @@ class ProfilePage extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: SafeArea(
                   bottom: false,
-                  child: ListView(
-                    padding: EdgeInsets.fromLTRB(16, 18, 16, bottomSpacing),
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          'Profil & Pengaturan',
-                          style: TextStyle(
-                            color: AppColors.slate900,
-                            fontFamily: AppTheme.fontFamily,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            height: 1.3,
+                  child: RefreshIndicator(
+                    onRefresh: () {
+                      return Future.wait([
+                        context.read<ProfileController>().loadFromApi(),
+                        context.read<AddressController>().loadFromApi(),
+                      ]);
+                    },
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: BouncingScrollPhysics(),
+                      ),
+                      padding: EdgeInsets.fromLTRB(16, 18, 16, bottomSpacing),
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            'Profil & Pengaturan',
+                            style: TextStyle(
+                              color: AppColors.slate900,
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              height: 1.3,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      const _ProfileIdentityCard(),
-                      const SizedBox(height: 20),
-                      const _SectionLabel(label: 'PENGATURAN AKUN'),
-                      const SizedBox(height: 8),
-                      _ProfileMenuGroup(
-                        children: [
-                          _ProfileMenuTile(
-                            icon: Icons.person_outline_rounded,
-                            title: 'Data Diri',
-                            onTap:
-                                onPersonalDataTap ??
-                                () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const PersonalDataPage(),
-                                    ),
-                                  );
-                                },
-                          ),
-                          Consumer<AddressController>(
-                            builder: (context, addressController, _) {
-                              final count = addressController.addresses.length;
-                              return _ProfileMenuTile(
-                                icon: Icons.location_on_outlined,
-                                title: 'Alamat Tersimpan',
-                                subtitle: '$count Alamat aktif',
-                                onTap:
-                                    onSavedAddressesTap ??
-                                    () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute<void>(
-                                          builder: (_) => const AddressListPage(
-                                            isSelectionMode: false,
+                        const SizedBox(height: 14),
+                        const _ProfileIdentityCard(),
+                        const SizedBox(height: 20),
+                        const _SectionLabel(label: 'PENGATURAN AKUN'),
+                        const SizedBox(height: 8),
+                        _ProfileMenuGroup(
+                          children: [
+                            _ProfileMenuTile(
+                              icon: Icons.person_outline_rounded,
+                              title: 'Data Diri',
+                              onTap:
+                                  widget.onPersonalDataTap ??
+                                  () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const PersonalDataPage(),
+                                      ),
+                                    );
+                                  },
+                            ),
+                            Consumer<AddressController>(
+                              builder: (context, addressController, _) {
+                                final count =
+                                    addressController.addresses.length;
+                                return _ProfileMenuTile(
+                                  icon: Icons.location_on_outlined,
+                                  title: 'Alamat Tersimpan',
+                                  subtitle: '$count Alamat aktif',
+                                  onTap:
+                                      widget.onSavedAddressesTap ??
+                                      () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) =>
+                                                const AddressListPage(
+                                                  isSelectionMode: false,
+                                                ),
                                           ),
-                                        ),
-                                      );
-                                    },
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      const _SectionLabel(label: 'UMUM & DUKUNGAN'),
-                      const SizedBox(height: 8),
-                      _ProfileMenuGroup(
-                        children: [
-                          _ProfileMenuTile(
-                            icon: Icons.help_outline_rounded,
-                            title: 'Bantuan',
-                            subtitle: 'FAQ & Kontak Dukungan',
-                            onTap:
-                                onHelpTap ??
-                                () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => const HelpCenterPage(),
-                                    ),
-                                  );
-                                },
-                          ),
-                          _ProfileMenuTile(
-                            icon: Icons.lock_outline_rounded,
-                            title: 'Ubah Kata Sandi',
-                            onTap:
-                                onChangePasswordTap ??
-                                () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          const ChangePasswordPage(),
-                                    ),
-                                  );
-                                },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _LogoutButton(onTap: onLogout ?? () => _logout(context)),
-                    ],
+                                        );
+                                      },
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        const _SectionLabel(label: 'UMUM & DUKUNGAN'),
+                        const SizedBox(height: 8),
+                        _ProfileMenuGroup(
+                          children: [
+                            _ProfileMenuTile(
+                              icon: Icons.help_outline_rounded,
+                              title: 'Bantuan',
+                              subtitle: 'FAQ & Kontak Dukungan',
+                              onTap:
+                                  widget.onHelpTap ??
+                                  () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => const HelpCenterPage(),
+                                      ),
+                                    );
+                                  },
+                            ),
+                            _ProfileMenuTile(
+                              icon: Icons.lock_outline_rounded,
+                              title: 'Ubah Kata Sandi',
+                              onTap:
+                                  widget.onChangePasswordTap ??
+                                  () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            const ChangePasswordPage(),
+                                      ),
+                                    );
+                                  },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        _LogoutButton(
+                          onTap: widget.onLogout ?? () => _logout(context),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -135,5 +135,68 @@ void main() {
       expect(service.price, 'Rp0');
       expect(service.iconPath, 'assets/icons/services.svg');
     });
+
+    test('memetakan rating asli dengan satu desimal', () {
+      final service = CustomerServiceRemoteDataSource.toServiceModel({
+        'id': 7,
+        'name': 'Basic Home Cleaning',
+        'price': 100000,
+        'durationMinutes': 60,
+        'categoryName': 'Rumah',
+        'rating': 4.5,
+      });
+
+      expect(service.rating, '4.5');
+    });
+
+    test('rating yang hilang tetap null, bukan nol palsu', () {
+      final service = CustomerServiceRemoteDataSource.toServiceModel({
+        'id': 7,
+        'name': 'Basic Home Cleaning',
+        'price': 100000,
+        'durationMinutes': 60,
+        'categoryName': 'Rumah',
+      });
+
+      expect(service.rating, isNull);
+    });
+
+    test('popularity diambil dari orderCount booking selesai', () {
+      final service = CustomerServiceRemoteDataSource.toServiceModel({
+        'id': 7,
+        'name': 'Basic Home Cleaning',
+        'price': 100000,
+        'durationMinutes': 60,
+        'categoryName': 'Rumah',
+        'orderCount': 12,
+      });
+
+      expect(service.popularity, 12);
+    });
+
+    test('popularity nol saat orderCount tidak ada', () {
+      final service = CustomerServiceRemoteDataSource.toServiceModel({
+        'id': 7,
+        'name': 'Basic Home Cleaning',
+        'price': 100000,
+        'durationMinutes': 60,
+        'categoryName': 'Rumah',
+      });
+
+      expect(service.popularity, 0);
+    });
+
+    test('reviewCount diambil dari daftar pelanggan', () {
+      final service = CustomerServiceRemoteDataSource.toServiceModel({
+        'id': 7,
+        'name': 'Basic Home Cleaning',
+        'price': 100000,
+        'durationMinutes': 60,
+        'categoryName': 'Rumah',
+        'reviewCount': 8,
+      });
+
+      expect(service.reviewCount, 8);
+    });
   });
 }

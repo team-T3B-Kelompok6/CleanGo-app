@@ -38,7 +38,14 @@ class _BootstrapViewState extends State<_BootstrapView> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _app = _bootstrap());
+      if (mounted) _startBootstrap();
+    });
+  }
+
+  void _startBootstrap() {
+    final app = _bootstrap();
+    setState(() {
+      _app = app;
     });
   }
 
@@ -119,7 +126,8 @@ class _BootstrapViewState extends State<_BootstrapView> {
     return FutureBuilder<CleanGoApp>(
       future: _app,
       builder: (context, snapshot) {
-        if (_app == null || snapshot.connectionState == ConnectionState.waiting) {
+        if (_app == null ||
+            snapshot.connectionState == ConnectionState.waiting) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             home: const SplashPage(visualOnly: true),
@@ -132,7 +140,7 @@ class _BootstrapViewState extends State<_BootstrapView> {
             theme: AppTheme.light,
             home: _BootstrapError(
               snapshot.error?.toString() ?? 'Gagal memulai aplikasi.',
-              onRetry: () => setState(() => _app = _bootstrap()),
+              onRetry: _startBootstrap,
             ),
           );
         }
@@ -160,7 +168,11 @@ class _BootstrapError extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.redAccent,
+                  size: 48,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Gagal memulai aplikasi',
@@ -173,7 +185,10 @@ class _BootstrapError extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 20),
-                FilledButton(onPressed: onRetry, child: const Text('Coba lagi')),
+                FilledButton(
+                  onPressed: onRetry,
+                  child: const Text('Coba lagi'),
+                ),
               ],
             ),
           ),
@@ -195,10 +210,14 @@ Future<T> _guard<T>(Future<T> Function() task, T fallback) async {
 
 /// Inisialisasi Firebase sekali di Android, konfigurasi native default, dengan
 /// timeout guard. Gagal ditangani dengan diagnosa tanpa kunci/token.
-Future<PushNotifications?> _initializeFirebase(TokenStorage tokenStorage) async {
+Future<PushNotifications?> _initializeFirebase(
+  TokenStorage tokenStorage,
+) async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
   try {
-    await Firebase.initializeApp().timeout(const Duration(seconds: 8));
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp().timeout(const Duration(seconds: 8));
+    }
     final push = PushNotifications(
       transport: FcmTransport(),
       client: ApiClient(),
@@ -207,9 +226,8 @@ Future<PushNotifications?> _initializeFirebase(TokenStorage tokenStorage) async 
     );
     await push.initialize();
     return push;
-  } catch (error) {
-    // Tidak mencetak kunci atau token.
-    debugPrint('Firebase inisialisasi gagal: $error');
+  } catch (_) {
+    // Do not log Firebase errors that might include identifiers or tokens.
     return null;
   }
 }

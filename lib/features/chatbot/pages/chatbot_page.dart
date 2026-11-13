@@ -36,6 +36,8 @@ class _ChatbotPageState extends State<ChatbotPage> with WidgetsBindingObserver {
   );
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  late final Future<List<ChatSuggestion>> _suggestions = _chatbotController
+      .loadSuggestions();
 
   @override
   void initState() {
@@ -68,6 +70,12 @@ class _ChatbotPageState extends State<ChatbotPage> with WidgetsBindingObserver {
 
   void _handleMessageChanged(String value) {
     _chatbotController.updateDraft(value);
+  }
+
+  void _sendSuggestedQuestion(String question) {
+    _messageController.text = question;
+    _handleMessageChanged(question);
+    unawaited(_sendMessage());
   }
 
   Future<void> _sendMessage() async {
@@ -147,6 +155,36 @@ class _ChatbotPageState extends State<ChatbotPage> with WidgetsBindingObserver {
                           'Riwayat belum dapat disimpan atau dimuat di perangkat ini.',
                         ),
                       ),
+                    FutureBuilder<List<ChatSuggestion>>(
+                      future: _suggestions,
+                      builder: (context, snapshot) {
+                        final items =
+                            (snapshot.hasData && snapshot.data!.isNotEmpty)
+                            ? snapshot.data!
+                            : const [
+                                ChatSuggestion(
+                                  question: 'Apa saja layanan CleanGo?',
+                                  source: 'knowledge',
+                                ),
+                                ChatSuggestion(
+                                  question: 'Bagaimana cara booking?',
+                                  source: 'knowledge',
+                                ),
+                                ChatSuggestion(
+                                  question: 'Bagaimana cara pembayaran?',
+                                  source: 'knowledge',
+                                ),
+                                ChatSuggestion(
+                                  question: 'Cek status pesanan',
+                                  source: 'knowledge',
+                                ),
+                              ];
+                        return _HorizontalSuggestionChips(
+                          suggestions: items,
+                          onSelected: _sendSuggestedQuestion,
+                        );
+                      },
+                    ),
                     _ChatInput(
                       controller: _messageController,
                       hasMessage:
@@ -236,6 +274,37 @@ class _HeaderBackButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HorizontalSuggestionChips extends StatelessWidget {
+  const _HorizontalSuggestionChips({
+    required this.suggestions,
+    required this.onSelected,
+  });
+  final List<ChatSuggestion> suggestions;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 48,
+    child: ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      scrollDirection: Axis.horizontal,
+      itemCount: suggestions.length,
+      separatorBuilder: (_, _) => const SizedBox(width: 8),
+      itemBuilder: (context, index) {
+        final item = suggestions[index];
+        return ActionChip(
+          label: Text(
+            item.question,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          onPressed: () => onSelected(item.question),
+        );
+      },
+    ),
+  );
 }
 
 class _ChatbotWelcome extends StatelessWidget {

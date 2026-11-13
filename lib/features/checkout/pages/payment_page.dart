@@ -15,6 +15,7 @@ import '../controllers/payment_countdown_controller.dart';
 import '../controllers/payment_flow_controller.dart';
 import '../domain/models/payment_method_model.dart';
 import '../widgets/payment_method_icon.dart';
+import 'midtrans_checkout_page.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({
@@ -37,7 +38,7 @@ class PaymentPage extends StatefulWidget {
 }
 
 class _PaymentPageState extends State<PaymentPage> {
-  static const _paymentFlowController = PaymentFlowController();
+  final _paymentFlowController = PaymentFlowController();
 
   late final PaymentCountdownController _countdownController;
   bool _isSubmitting = false;
@@ -89,10 +90,28 @@ class _PaymentPageState extends State<PaymentPage> {
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
                       child: Column(
                         children: [
-                          _PaymentCountdownCard(
-                            controller: _countdownController,
-                            isCash: _isCash,
-                          ),
+                          if (_isCash)
+                            _PaymentCountdownCard(
+                              controller: _countdownController,
+                              isCash: true,
+                            )
+                          else
+                            _PaymentSurface(
+                              child: Text(
+                                _paymentFlowController.payment?.expiresAt ==
+                                        null
+                                    ? 'Pembayaran melalui checkout aman Midtrans. Status pembayaran diverifikasi oleh server.'
+                                    : 'Batas waktu pembayaran: ${_paymentFlowController.payment!.expiresAt}. Cek status untuk konfirmasi pembayaran.',
+                              ),
+                            ),
+                          if (!_isCash &&
+                              _paymentFlowController.bookingId != null)
+                            TextButton(
+                              onPressed: _isSubmitting
+                                  ? null
+                                  : () => _showPaymentInformation(context),
+                              child: const Text('Buka / Coba Lagi Pembayaran'),
+                            ),
                           const SizedBox(height: 14),
                           _TotalPaymentCard(
                             method: widget.method,
@@ -122,22 +141,31 @@ class _PaymentPageState extends State<PaymentPage> {
           builder: (context, _) => _PaymentActionBar(
             label: _isSubmitting
                 ? 'Memproses pesanan...'
-                : _countdownController.isExpired
+                : _isCash && _countdownController.isExpired
                 ? 'Waktu Pembayaran Berakhir'
                 : _isCash
                 ? 'Konfirmasi Pembayaran Tunai'
-                : 'Saya Sudah Membayar',
-            onPressed: _countdownController.isExpired || _isSubmitting
+                : _paymentFlowController.bookingId == null
+                ? 'Lanjutkan Pembayaran'
+                : 'Cek Status Pembayaran',
+            onPressed:
+                (_isCash && _countdownController.isExpired) || _isSubmitting
                 ? null
-                : () => _showPaymentInformation(context),
+                : () => _showPaymentInformation(
+                    context,
+                    checkStatus: _paymentFlowController.bookingId != null,
+                  ),
           ),
         ),
       ),
     );
   }
 
-  Future<void> _showPaymentInformation(BuildContext context) async {
-    if (_isSubmitting || _countdownController.isExpired) return;
+  Future<void> _showPaymentInformation(
+    BuildContext context, {
+    bool checkStatus = false,
+  }) async {
+    if (_isSubmitting || (_countdownController.isExpired && _isCash)) return;
     setState(() => _isSubmitting = true);
     try {
       final isSameDay = await _paymentFlowController.createOrder(
@@ -149,8 +177,37 @@ class _PaymentPageState extends State<PaymentPage> {
         servicePrice: widget.servicePrice,
         platformFee: widget.platformFee,
         discountAmount: widget.discountAmount,
+        checkStatus: checkStatus,
       );
       if (!context.mounted) return;
+      if (isSameDay == null) {
+        final payment = _paymentFlowController.payment;
+        AppNotice.show(context, switch (payment?.status) {
+          'failed' => 'Pembayaran gagal. Silakan coba lagi.',
+          'expired' => 'Sesi pembayaran berakhir. Silakan coba lagi.',
+          _ =>
+            checkStatus
+                ? 'Pembayaran masih menunggu di penyedia pembayaran. Jika memakai Sandbox, selesaikan simulasi pembayaran lalu cek lagi.'
+                : 'Checkout siap. Selesaikan pembayaran di halaman Midtrans.',
+        });
+        if (!checkStatus && !_isCash && payment?.checkoutUrl != null) {
+          final uri = PaymentFlowController.checkoutUri(payment!.checkoutUrl);
+          if (uri == null) {
+            throw StateError('Tautan pembayaran tidak valid. Hubungi admin.');
+          }
+          await Navigator.of(context).push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => MidtransCheckoutPage(checkoutUri: uri),
+            ),
+          );
+          if (!context.mounted) return;
+          setState(() => _isSubmitting = false);
+          await _showPaymentInformation(context, checkStatus: true);
+          return;
+        }
+        if (context.mounted) setState(() => _isSubmitting = false);
+        return;
+      }
 
       AppNotice.show(
         context,
@@ -158,14 +215,7 @@ class _PaymentPageState extends State<PaymentPage> {
             ? 'Pesanan dikonfirmasi. Siapkan pembayaran tunai ${widget.totalPayment}.'
             : 'Pembayaran berhasil. Pesanan Anda sudah dikonfirmasi.',
       );
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute<void>(
-          builder: (_) => isSameDay
-              ? const OrderStatusPage(openedAfterPayment: true)
-              : const OrdersPage(initialTab: OrdersTab.scheduled),
-        ),
-        (route) => route.isFirst,
-      );
+      _navigateToOrders(context, isSameDay);
     } catch (error) {
       if (!context.mounted) return;
       setState(() => _isSubmitting = false);
@@ -175,6 +225,17 @@ class _PaymentPageState extends State<PaymentPage> {
         _ => 'Pesanan belum berhasil diproses. Silakan coba lagi.',
       }, type: AppNoticeType.error);
     }
+  }
+
+  void _navigateToOrders(BuildContext context, bool isSameDay) {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(
+        builder: (_) => isSameDay
+            ? const OrderStatusPage(openedAfterPayment: true)
+            : const OrdersPage(initialTab: OrdersTab.scheduled),
+      ),
+      (route) => route.isFirst,
+    );
   }
 }
 
@@ -341,7 +402,6 @@ class _TotalPaymentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCash = method.type == PaymentMethodType.cash;
-    final isQris = method.type == PaymentMethodType.qris;
     return _PaymentSurface(
       child: Column(
         children: [
@@ -386,29 +446,8 @@ class _TotalPaymentCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          if (isQris)
-            Container(
-              width: 142,
-              height: 142,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.slate100),
-              ),
-              child: const Icon(
-                Icons.qr_code_2_rounded,
-                color: AppColors.slate900,
-                size: 118,
-              ),
-            ),
-          if (isQris) const SizedBox(height: 12),
           Text(
-            isCash
-                ? 'Bayarkan kepada cleaner setelah layanan selesai.'
-                : isQris
-                ? 'Pindai QRIS dengan aplikasi pembayaran atau mobile banking.'
-                : 'Buka aplikasi ${method.name} dan selesaikan pembayaran.',
+            isCash ? 'Bayarkan kepada cleaner setelah layanan selesai.' : 'Lanjutkan ke checkout Midtrans untuk melihat QRIS dan menyelesaikan pembayaran.',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.slate500,

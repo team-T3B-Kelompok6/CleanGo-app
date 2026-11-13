@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
-import '../../core/network/api_client.dart';
-import '../../core/network/api_config.dart';
-import '../../core/storage/token_storage.dart';
+import '../network/api_client.dart';
+import '../network/api_config.dart';
+import '../storage/token_storage.dart';
 
-/// Transport abstraksi FCM agar dapat ditiru dalam tes tanpa menyentuh Firebase.
 abstract class PushTransport {
   Future<String?> getToken();
-  StreamSubscription<String> listenTokenRefresh(void Function(String token) onNewToken);
+  StreamSubscription<String> listenTokenRefresh(
+    void Function(String token) onNewToken,
+  );
   Future<NotificationSettings> requestPermission();
   Future<NotificationSettings> getNotificationSettings();
   Stream<RemoteMessage> get onMessage;
@@ -23,51 +24,54 @@ abstract class PushTransport {
   void dispose();
 }
 
-/// Implementasi nyata Firebase Cloud Messaging.
+// ponytail: HTTP v1 backend sends legacy registration tokens, not installation
+// IDs. Migrate transport and server target together before using register().
 class FcmTransport implements PushTransport {
-  FcmTransport();
+  @override
+  // ignore: deprecated_member_use
+  Future<String?> getToken() => FirebaseMessaging.instance.getToken();
 
   @override
-  Future<String?> getToken() async => FirebaseMessaging.instance.getToken();
+  StreamSubscription<String> listenTokenRefresh(
+    void Function(String token) onNewToken,
+  ) =>
+      // ignore: deprecated_member_use
+      FirebaseMessaging.instance.onTokenRefresh.listen(
+        onNewToken,
+        onError: (Object _) {},
+      );
 
   @override
-  StreamSubscription<String> listenTokenRefresh(void Function(String token) onNewToken) =>
-      FirebaseMessaging.instance.onTokenRefresh.listen(onNewToken);
-
-  @override
-  Future<NotificationSettings> requestPermission() async =>
+  Future<NotificationSettings> requestPermission() =>
       FirebaseMessaging.instance.requestPermission();
 
   @override
-  Future<NotificationSettings> getNotificationSettings() async =>
+  Future<NotificationSettings> getNotificationSettings() =>
       FirebaseMessaging.instance.getNotificationSettings();
 
   @override
   Stream<RemoteMessage> get onMessage => FirebaseMessaging.onMessage;
 
   @override
-  Stream<RemoteMessage> get onMessageOpenedApp => FirebaseMessaging.onMessageOpenedApp;
+  Stream<RemoteMessage> get onMessageOpenedApp =>
+      FirebaseMessaging.onMessageOpenedApp;
 
   @override
-  Future<RemoteMessage?> getInitialMessage() async => FirebaseMessaging.instance.getInitialMessage();
+  Future<RemoteMessage?> getInitialMessage() =>
+      FirebaseMessaging.instance.getInitialMessage();
 
   @override
-  Future<void> deleteToken() async => FirebaseMessaging.instance.deleteToken();
+  // ignore: deprecated_member_use
+  Future<void> deleteToken() => FirebaseMessaging.instance.deleteToken();
 
   @override
   void dispose() {}
 }
 
-/// Handler latar belakang top-level: Firebase.initializeApp saja, tanpa UI
-/// atau tandai baca; OS menampilkan notifikasi payload.
+// Notification payloads are displayed by Android. No Firebase services or UI
+// used here; Firebase must not be initialized again.
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  try {
-    await Firebase.initializeApp();
-  } catch (_) {
-    // Diagnosa tanpa kunci atau token.
-  }
-}
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
 
 class PushNotifications {
   PushNotifications({
@@ -76,135 +80,240 @@ class PushNotifications {
     required this.httpClient,
     required this.tokenStorage,
     this.onInboxRefresh,
-  });
+    this.onForegroundMessage,
+    ValueChanged<RemoteMessage>? onNotificationTap,
+    // Public callback name retained for callers attaching after startup.
+    // ignore: prefer_initializing_formals
+  }) : _onNotificationTap = onNotificationTap;
 
   final PushTransport transport;
   final ApiClient client;
   final http.Client httpClient;
   final TokenStorage tokenStorage;
-
   VoidCallback? onInboxRefresh;
+  ValueChanged<RemoteMessage>? onForegroundMessage;
+  ValueChanged<RemoteMessage>? _onNotificationTap;
+  RemoteMessage? _pendingNotificationTap;
+  final Set<String> _seenMessages = {};
+  static const _channel = MethodChannel('com.cleango.app/push');
+
+  set onNotificationTap(ValueChanged<RemoteMessage>? callback) {
+    _onNotificationTap = callback;
+    final pending = _pendingNotificationTap;
+    if (callback != null && pending != null) {
+      _pendingNotificationTap = null;
+      callback(pending);
+    }
+  }
+
+  void _tap(RemoteMessage message) {
+    final callback = _onNotificationTap;
+    if (callback == null) {
+      _pendingNotificationTap = message;
+    } else {
+      callback(message);
+    }
+  }
 
   bool _disposed = false;
+  bool _initialized = false;
+  int _revision = 0;
+  String? _currentToken;
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<RemoteMessage>? _messageSubscription;
   StreamSubscription<RemoteMessage>? _openedSubscription;
   Future<void> _last = Future<void>.value();
-  int _revision = 0;
-  String? _registeredJwt;
 
-  Future<T> _serial<T>(Future<T> Function() run) async {
-    final entry = Completer<T>();
-    final previous = _last;
-    _last = entry.future;
-    previous.then(
-      (_) => run().then(entry.complete, onError: entry.completeError),
-      onError: (_) => run().then(entry.complete, onError: entry.completeError),
-    );
-    return entry.future;
+  Future<void> _serial(Future<void> Function() run) {
+    final pending = _last.then((_) => run());
+    // Optional push work must never surface an unhandled async error.
+    _last = pending.catchError((Object _) {});
+    return _last;
   }
 
-  /// Menyiapkan handler latar belakang dan listener pesan. Firebase harus
-  /// sudah diinisialisasi oleh pemanggil (main.dart) sebelum ini dipanggil.
+  /// Caller initializes Firebase once, on supported native platforms only.
   Future<void> initialize() async {
-    if (_disposed) return;
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-    _messageSubscription = transport.onMessage.listen((_) {
-      if (_disposed) return;
-      onInboxRefresh?.call();
-    });
-    _openedSubscription = transport.onMessageOpenedApp.listen((_) {
-      if (_disposed) return;
-      onInboxRefresh?.call();
-    });
-    unawaited(transport.getInitialMessage().then((_) {
-      if (_disposed) return;
-      onInboxRefresh?.call();
-    }));
+    if (_disposed || _initialized || kIsWeb) return;
+    _initialized = true;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'tap' && call.arguments is Map) {
+          await _handleMessage(RemoteMessage(data: Map<String, dynamic>.from(call.arguments as Map)), opened: true);
+        }
+      });
+      try {
+        final data = await _channel.invokeMapMethod<String, dynamic>('initialTap');
+        if (data != null) await _handleMessage(RemoteMessage(data: data), opened: true);
+      } catch (_) {}
+    }
+    if (transport is FcmTransport) {
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    }
+    _messageSubscription = transport.onMessage.listen((message) {
+      unawaited(_handleMessage(message, opened: false));
+    }, onError: (Object _) {});
+    _openedSubscription = transport.onMessageOpenedApp.listen((message) {
+      unawaited(_handleMessage(message, opened: true));
+    }, onError: (Object _) {});
+    try {
+      final message = await transport.getInitialMessage().timeout(
+        const Duration(seconds: 8),
+      );
+      if (message != null) await _handleMessage(message, opened: true);
+    } catch (_) {}
   }
 
-  /// Izin notifikasi Android 13 hanya ketika pengguna sudah punya sesi, bukan
-  /// saat startup tanpa login.
+  Future<void> _handleMessage(
+    RemoteMessage message, {
+    required bool opened,
+  }) async {
+    try {
+      final jwt = await tokenStorage.readAccessToken();
+      if (_disposed || jwt == null || jwt.isEmpty) return;
+      onInboxRefresh?.call();
+      if (opened) {
+        _tap(message);
+      } else {
+        final id = message.messageId ?? message.data['notificationId']?.toString();
+        if (id != null && id.isNotEmpty && !_seenMessages.add(id)) return;
+        if (_seenMessages.length > 200) _seenMessages.clear();
+        onForegroundMessage?.call(message);
+        if (!kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.android &&
+            message.notification != null) {
+          await _channel.invokeMethod<void>('show', {
+            'title': message.notification!.title ?? 'CleanGo',
+            'body': message.notification!.body ?? '',
+            'data': message.data,
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> ensurePermission() async {
-    if (_disposed) return;
-    final token = await tokenStorage.readAccessToken();
-    if (token == null || token.isEmpty) return;
+    if (_disposed || kIsWeb) return;
     try {
-      await transport.requestPermission();
-    } catch (_) {
-      // Izin ditolak/diabaikan tidak memblokir aplikasi.
-    }
+      final jwt = await tokenStorage.readAccessToken();
+      if (jwt == null || jwt.isEmpty) return;
+      await transport.requestPermission().timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
-  /// Sinkronkan token FCM ke backend setelah JWT tersedia.
+  /// Permission precedes token retrieval; unavailable Firebase never blocks auth.
+  Future<void> registerCurrentDevice() async {
+    final revision = _revision;
+    try {
+      if (_disposed || kIsWeb) return;
+      final jwt = await tokenStorage.readAccessToken();
+      if (jwt == null || jwt.isEmpty) return;
+      await ensurePermission();
+      final settings = await transport.getNotificationSettings().timeout(
+        const Duration(seconds: 8),
+      );
+      if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+          settings.authorizationStatus != AuthorizationStatus.provisional) {
+        return;
+      }
+      final token = await transport.getToken().timeout(
+        const Duration(seconds: 8),
+      );
+      if (token == null ||
+          token.isEmpty ||
+          revision != _revision ||
+          await tokenStorage.readAccessToken() != jwt) {
+        return;
+      }
+      await registerDevice(token);
+    } catch (_) {}
+  }
+
   Future<void> registerDevice(String token) async {
-    await _serial(() => _doRegister(token));
-  }
-
-  Future<void> _doRegister(String token) async {
-    if (_disposed) return;
-    final revision = ++_revision;
-    final jwt = await tokenStorage.readAccessToken();
-    if (jwt == null || jwt.isEmpty) return;
+    final revision = _revision;
     try {
-      await client.post(
-        '${ApiConfig.customerNotifications}/devices',
-        body: {'token': token, 'platform': 'android'},
-        token: jwt,
-      ).timeout(const Duration(seconds: 8));
-    } catch (_) {
-      // Cloud/izin gagal tidak menggagalkan sesi.
-      return;
-    }
-    if (_disposed || revision != _revision) return;
-    final now = await tokenStorage.readAccessToken();
-    if (now == null || now != jwt) return;
-    _registeredJwt = jwt;
+      if (_disposed || kIsWeb || token.isEmpty) return;
+      final jwt = await tokenStorage.readAccessToken();
+      if (jwt == null || jwt.isEmpty) return;
+      await _serial(() async {
+        if (_disposed ||
+            revision != _revision ||
+            await tokenStorage.readAccessToken() != jwt) {
+          return;
+        }
+        final settings = await transport.getNotificationSettings().timeout(
+          const Duration(seconds: 8),
+        );
+        if (settings.authorizationStatus != AuthorizationStatus.authorized &&
+            settings.authorizationStatus != AuthorizationStatus.provisional) {
+          return;
+        }
+        if (_disposed ||
+            revision != _revision ||
+            await tokenStorage.readAccessToken() != jwt) {
+          return;
+        }
+        _currentToken = token;
+        await client.post(
+          '${ApiConfig.customerNotifications}/devices',
+          body: {'token': token, 'platform': 'android'},
+          token: jwt,
+          timeout: const Duration(seconds: 8),
+        );
+      });
+    } catch (_) {}
   }
 
-  /// Hapus perangkat dari backend. DELETE dengan body {token}; tidak melepaskan
-  /// token yang baru pindah akun.
   Future<void> unregisterDevice(String token) async {
-    await _serial(() => _doUnregister(token));
-  }
-
-  Future<void> _doUnregister(String token) async {
-    if (_disposed) return;
-    final revision = ++_revision;
-    final jwt = await tokenStorage.readAccessToken();
-    if (jwt == null || jwt.isEmpty) return;
-    final uri = Uri.parse('${ApiConfig.baseUrl}${ApiConfig.customerNotifications}/devices');
     try {
-      final request = http.Request('DELETE', uri)
-        ..headers.addAll({
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $jwt',
-        })
-        ..body = jsonEncode({'token': token});
-      await httpClient.send(request).timeout(const Duration(seconds: 8));
-    } catch (_) {
-      return;
-    }
-    if (_disposed || revision != _revision) return;
-    final now = await tokenStorage.readAccessToken();
-    if (now == null || now != jwt) return;
-    if (_registeredJwt == jwt) _registeredJwt = null;
+      final jwt = await tokenStorage.readAccessToken();
+      if (_disposed || kIsWeb || jwt == null || jwt.isEmpty) return;
+      await _serial(() async {
+        final uri = Uri.parse(
+          '${ApiConfig.normalizeBaseUrl(ApiConfig.baseUrl)}${ApiConfig.customerNotifications}/devices',
+        );
+        final request = http.Request('DELETE', uri)
+          ..headers.addAll({
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $jwt',
+          })
+          ..body = jsonEncode({'token': token});
+        final response = await httpClient
+            .send(request)
+            .timeout(const Duration(seconds: 8));
+        await response.stream.drain<void>().timeout(const Duration(seconds: 8));
+        if (response.statusCode >= 200 &&
+            response.statusCode < 300 &&
+            _currentToken == token) {
+          _currentToken = null;
+        }
+      });
+    } catch (_) {}
   }
 
-  /// Mulai satu subscription sinkronisasi token saat refresh. Dapat dibatalkan
-  /// lewat [stopTokenSync] atau [dispose].
-  void startTokenSync() {
-    if (_disposed) return;
+  Future<void> unregisterCurrentDevice() async {
     stopTokenSync();
+    String? token = _currentToken;
+    try {
+      token ??= await transport.getToken().timeout(const Duration(seconds: 8));
+    } catch (_) {}
+    if (token != null && token.isNotEmpty) await unregisterDevice(token);
+    try {
+      // Also rotate locally when backend is offline, reducing stale delivery risk.
+      await transport.deleteToken().timeout(const Duration(seconds: 8));
+    } catch (_) {}
+  }
+
+  void startTokenSync() {
+    if (_disposed || kIsWeb || _tokenSubscription != null) return;
     _tokenSubscription = transport.listenTokenRefresh((token) {
-      if (_disposed) return;
       unawaited(registerDevice(token));
     });
   }
 
   void stopTokenSync() {
-    _tokenSubscription?.cancel();
+    _revision++;
+    unawaited(_tokenSubscription?.cancel());
     _tokenSubscription = null;
   }
 
@@ -213,8 +322,8 @@ class PushNotifications {
     stopTokenSync();
     await _messageSubscription?.cancel();
     await _openedSubscription?.cancel();
-    _messageSubscription = null;
-    _openedSubscription = null;
+    transport.dispose();
+    client.close();
     httpClient.close();
   }
 }

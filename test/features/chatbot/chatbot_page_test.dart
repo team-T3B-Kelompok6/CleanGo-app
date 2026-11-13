@@ -23,6 +23,10 @@ class PendingChat implements ChatbotGateway {
   }
 
   @override
+  Future<List<ChatSuggestion>> suggestions() async => const [
+    ChatSuggestion(question: 'Bagaimana cara booking?', source: 'knowledge'),
+  ];
+  @override
   void close() {}
 }
 
@@ -97,7 +101,7 @@ void main() {
       await tester.pumpWidget(page());
       await tester.pump();
       expect(repository.questions, ['Bagaimana cara booking?']);
-      expect(find.text('Bagaimana cara booking?'), findsOneWidget);
+      expect(find.text('Bagaimana cara booking?'), findsAtLeastNWidgets(1));
       expect(find.text('Boo sedang mengetik…'), findsOneWidget);
       expect(
         tester.widget<TextField>(find.byType(TextField)).controller!.text,
@@ -115,6 +119,26 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('sends a selected dynamic suggestion through chat', (
+    tester,
+  ) async {
+    final repository = PendingChat();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatbotPage(repository: repository, history: FakeChatHistory()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bagaimana cara booking?'));
+    await tester.pump();
+    expect(repository.questions, ['Bagaimana cara booking?']);
+    expect(find.text('Boo sedang mengetik…'), findsOneWidget);
+    repository.answer.complete('Ikuti langkah booking di aplikasi.');
+    await tester.pumpAndSettle();
+    expect(find.text('Ikuti langkah booking di aplikasi.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('shows the user message, waiting state and assistant reply', (
     tester,

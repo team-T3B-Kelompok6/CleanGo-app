@@ -18,20 +18,13 @@ class AuthSessionController extends ChangeNotifier {
   void start() {
     if (_started) return;
     _started = true;
-    unawaited(pushNotifications?.ensurePermission());
     pushNotifications?.startTokenSync();
-    unawaited(_registerCurrentToken());
+    unawaited(pushNotifications?.registerCurrentDevice());
   }
 
   void stop() {
     _started = false;
     pushNotifications?.stopTokenSync();
-  }
-
-  Future<void> _registerCurrentToken() async {
-    final fcmToken = await pushNotifications?.transport.getToken();
-    if (fcmToken == null || fcmToken.isEmpty) return;
-    await pushNotifications?.registerDevice(fcmToken);
   }
 
   Future<bool> hasSession() async {
@@ -44,7 +37,10 @@ class AuthSessionController extends ChangeNotifier {
           expiresAt != null &&
           expiresAt.isAfter(DateTime.now().toUtc());
       if (!isValid) {
+        stop();
         await _tokenStorage.clearSession();
+      } else {
+        start();
       }
       return isValid;
     } catch (_) {
@@ -61,7 +57,8 @@ class AuthSessionController extends ChangeNotifier {
   /// closed. Without a stored expiry [hasSession] would always be false.
   Future<void> createSession(String token, {int? expiresInSeconds}) async {
     await _tokenStorage.writeAccessToken(token);
-    final seconds = expiresInSeconds ?? _secondsUntilExpiry(token) ?? _fallbackSeconds;
+    final seconds =
+        expiresInSeconds ?? _secondsUntilExpiry(token) ?? _fallbackSeconds;
     await _tokenStorage.writeExpiresAt(
       DateTime.now().toUtc().add(Duration(seconds: seconds)),
     );
@@ -81,7 +78,8 @@ class AuthSessionController extends ChangeNotifier {
       final exp = payload['exp'];
       if (exp is! num) return null;
       // Keep a negative value so an already expired token is stored as expired.
-      return exp.toInt() - DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+      return exp.toInt() -
+          DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
     } catch (_) {
       return null;
     }
@@ -102,11 +100,8 @@ class AuthSessionController extends ChangeNotifier {
   /// cloud/izin tidak menggagalkan sesi.
   Future<void> _linkFcmToken() async {
     try {
-      final valid = await hasSession();
-      if (!valid) return;
-      final fcmToken = await pushNotifications?.transport.getToken();
-      if (fcmToken == null || fcmToken.isEmpty) return;
-      await pushNotifications?.registerDevice(fcmToken);
+      stop();
+      await hasSession();
     } catch (_) {
       // Gagal menyambungkan token FCM tidak membatalkan sesi.
     }
@@ -125,28 +120,12 @@ class AuthSessionController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    // Tangkap JWT dan token sebelum operasi hapus. Cloud/izin gagal tidak
-    // memblokir logout permanen.
-    String? jwt;
-    String? fcmToken;
+    stop();
     try {
-      jwt = await _tokenStorage.readAccessToken();
-      fcmToken = await pushNotifications?.transport.getToken();
-    } catch (_) {}
-
-    pushNotifications?.stopTokenSync();
-    // Biarkan operasi serial yang sedang berjalan selesai.
-    await Future<void>.delayed(Duration.zero);
-
-    try {
-      if (fcmToken != null && fcmToken.isNotEmpty && jwt != null && jwt.isNotEmpty) {
-        await pushNotifications?.unregisterDevice(fcmToken).timeout(const Duration(seconds: 8));
-        await pushNotifications?.transport.deleteToken().timeout(const Duration(seconds: 8));
-      }
-    } catch (_) {
-      // Abaikan error cloud/izin saat logout.
+      // Keep JWT available until ownership-scoped unregister finishes.
+      await pushNotifications?.unregisterCurrentDevice();
+    } finally {
+      await _tokenStorage.clearSession();
     }
-
-    await _tokenStorage.clearSession();
   }
 }

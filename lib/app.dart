@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:provider/provider.dart';
 
 import 'core/constants/app_routes.dart';
+import 'shared/widgets/app_notice.dart';
 import 'core/notifications/push_notifications.dart';
 import 'core/database/app_database.dart';
 import 'core/storage/app_preferences.dart';
@@ -83,15 +85,76 @@ class CleanGoApp extends StatefulWidget {
   State<CleanGoApp> createState() => _CleanGoAppState();
 }
 
+// Splash uses an unnamed home replacement; defer cold taps until it completes.
+class _NotificationRouteObserver extends NavigatorObserver {
+  _NotificationRouteObserver(this.onReady);
+  final ValueChanged<bool> onReady;
+  void _update(Route<dynamic>? route) {
+    final name = route?.settings.name;
+    onReady(route != null && name != Navigator.defaultRouteName &&
+        name != AppRoutes.splash && name != AppRoutes.login &&
+        name != AppRoutes.onboarding && name != AppRoutes.register);
+  }
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _update(route);
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _update(newRoute);
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _update(previousRoute);
+}
+
 class _CleanGoAppState extends State<CleanGoApp> {
   late final MessageController _messageController;
   PushNotifications? _push;
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  RemoteMessage? _pendingTap;
+  late final _routeObserver = _NotificationRouteObserver((ready) {
+    _notificationRouteReady = ready;
+    _openPendingTap();
+  });
+  bool _notificationRouteReady = false;
+
+  void _openPendingTap() {
+    if (!_notificationRouteReady || _pendingTap == null || !mounted) return;
+    final message = _pendingTap!;
+    _pendingTap = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_openNotification(message));
+    });
+  }
+
+  Future<void> _openNotification(RemoteMessage message) async {
+    final context = _navigatorKey.currentContext;
+    if (context == null) return;
+    if (!await context.read<AuthSessionController>().hasSession()) {
+      _pendingTap = message;
+      return;
+    }
+    if (!context.mounted) return;
+    final orders = context.read<OrderController>();
+    final bookingId = message.data['bookingId']?.toString();
+    if ((message.data['type'] == 'order' || message.data['type'] == 'payment') &&
+        bookingId != null && RegExp(r'^[1-9][0-9]*$').hasMatch(bookingId)) {
+      await orders.loadFromApi();
+      if (!mounted) return;
+      for (final order in orders.scheduledOrders) {
+        if (order.backendBookingId == bookingId) {
+          orders.selectScheduledOrder(order.orderNumber);
+          _navigatorKey.currentState?.pushNamed(AppRoutes.orderStatus);
+          return;
+        }
+      }
+    }
+    _navigatorKey.currentState?.pushNamed(AppRoutes.messages);
+  }
 
   @override
   void initState() {
     super.initState();
     _messageController = MessageController(
-      notificationApi: CustomerNotificationApi(tokenStorage: widget.tokenStorage),
+      notificationApi: CustomerNotificationApi(
+        tokenStorage: widget.tokenStorage,
+      ),
     );
     _push = widget.pushNotifications;
     if (_push != null) {
@@ -99,8 +162,17 @@ class _CleanGoAppState extends State<CleanGoApp> {
         if (!mounted) return;
         _messageController.loadFromApi();
       };
-      unawaited(_push!.ensurePermission());
-      _push!.startTokenSync();
+      _push!.onForegroundMessage = (message) {
+        final context = _navigatorKey.currentContext;
+        final body = message.notification?.body;
+        if (context != null && body != null && body.isNotEmpty) {
+          AppNotice.show(context, body, type: AppNoticeType.info);
+        }
+      };
+      _push!.onNotificationTap = (message) {
+        _pendingTap = message;
+        _openPendingTap();
+      };
     }
   }
 
@@ -128,7 +200,9 @@ class _CleanGoAppState extends State<CleanGoApp> {
           create: (_) => ServiceController(
             repository: widget.serviceRepository,
             preferences: widget.preferences,
-            detailApi: CustomerServiceDetailApi(tokenStorage: widget.tokenStorage),
+            detailApi: CustomerServiceDetailApi(
+              tokenStorage: widget.tokenStorage,
+            ),
             initialServices: widget.initialServices,
             initialFilter: widget.initialServiceFilter,
           ),
@@ -149,7 +223,9 @@ class _CleanGoAppState extends State<CleanGoApp> {
             tokenStorage: widget.tokenStorage,
           ),
         ),
-        ChangeNotifierProvider(create: (_) => ProfileController(tokenStorage: widget.tokenStorage)),
+        ChangeNotifierProvider(
+          create: (_) => ProfileController(tokenStorage: widget.tokenStorage),
+        ),
         ChangeNotifierProvider(
           create: (_) => SupportController(tokenStorage: widget.tokenStorage),
         ),
@@ -164,9 +240,13 @@ class _CleanGoAppState extends State<CleanGoApp> {
             bookingApi: CustomerBookingApi(tokenStorage: widget.tokenStorage),
           ),
         ),
-        ChangeNotifierProvider<MessageController>.value(value: _messageController),
+        ChangeNotifierProvider<MessageController>.value(
+          value: _messageController,
+        ),
       ],
       child: MaterialApp(
+        navigatorKey: _navigatorKey,
+        navigatorObservers: [_routeObserver],
         title: 'CleanGo',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,

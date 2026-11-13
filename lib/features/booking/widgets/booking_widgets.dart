@@ -154,14 +154,14 @@ class BookingTimeSelector extends StatelessWidget {
     required this.selectedTime,
     required this.onTimeSelected,
     this.isTimeAvailable,
-    this.onUnavailableTap,
+    this.slotReason,
   });
 
   final List<String> options;
   final String selectedTime;
   final ValueChanged<String> onTimeSelected;
   final bool Function(String)? isTimeAvailable;
-  final ValueChanged<String>? onUnavailableTap;
+  final String? Function(String)? slotReason;
 
   @override
   Widget build(BuildContext context) {
@@ -174,6 +174,7 @@ class BookingTimeSelector extends StatelessWidget {
               .map((time) {
                 final enabled = isTimeAvailable?.call(time) ?? true;
                 final isSelected = enabled && time == selectedTime;
+                final reason = slotReason?.call(time);
 
                 return SizedBox(
                   width: (constraints.maxWidth - 18) / 3,
@@ -181,7 +182,9 @@ class BookingTimeSelector extends StatelessWidget {
                     button: true,
                     enabled: enabled,
                     selected: isSelected,
-                    label: 'Pilih jam $time',
+                    excludeSemantics: true,
+                    label: enabled ? 'Pilih jam $time' : 'Jam $time tidak tersedia${reason == null ? '' : ', $reason'}',
+                    onTap: enabled ? () => onTimeSelected(time) : null,
                     child: Material(
                       color: !enabled
                           ? AppColors.slate100
@@ -189,37 +192,36 @@ class BookingTimeSelector extends StatelessWidget {
                           ? AppColors.primary
                           : Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
-                        onTap: enabled
-                            ? () => onTimeSelected(time)
-                            : (onUnavailableTap == null
-                                  ? null
-                                  : () => onUnavailableTap!(time)),
-                        borderRadius: BorderRadius.circular(12),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          height: 48,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: !enabled
-                                  ? AppColors.slate400
-                                  : isSelected
-                                  ? AppColors.primary
-                                  : AppColors.slate200,
+                      child: Opacity(
+                        opacity: !enabled ? 0.55 : 1.0,
+                        child: InkWell(
+                          onTap: enabled ? () => onTimeSelected(time) : null,
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            height: 48,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: !enabled
+                                    ? AppColors.slate200
+                                    : isSelected
+                                    ? AppColors.primary
+                                    : AppColors.slate200,
+                              ),
                             ),
-                          ),
-                          child: Text(
-                            time,
-                            style: TextStyle(
-                              color: !enabled
-                                  ? AppColors.slate400
-                                  : isSelected
-                                  ? Colors.white
-                                  : AppColors.slate600,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
+                            child: Text(
+                              time,
+                              style: TextStyle(
+                                color: !enabled
+                                    ? AppColors.slate400
+                                    : isSelected
+                                    ? Colors.white
+                                    : AppColors.slate600,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),

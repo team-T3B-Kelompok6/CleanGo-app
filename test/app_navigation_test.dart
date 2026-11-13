@@ -8,6 +8,8 @@ import 'package:cleango_app/features/checkout/pages/checkout_page.dart';
 import 'package:cleango_app/features/home/pages/home_page.dart';
 import 'package:cleango_app/features/message/pages/messages_page.dart';
 import 'package:cleango_app/features/message/controllers/message_controller.dart';
+import 'package:cleango_app/features/onboarding/pages/onboarding_page.dart';
+import 'package:cleango_app/features/onboarding/pages/splash_page.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/pages/orders_page.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
@@ -20,9 +22,13 @@ import 'package:cleango_app/features/service/pages/service_list_page.dart';
 import 'package:cleango_app/features/service/widgets/service_card.dart';
 import 'package:cleango_app/features/home/controllers/home_controller.dart';
 import 'package:cleango_app/features/support/controllers/support_controller.dart';
+import 'package:cleango_app/main.dart' as startup;
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 class _FakeTokenStorage implements TokenStorage {
   final _tokens = <String, String>{};
@@ -54,6 +60,36 @@ class _FakeTokenStorage implements TokenStorage {
 }
 
 void main() {
+  testWidgets('first launch advances from the startup splash to onboarding', (
+    tester,
+  ) async {
+    final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+    addTearDown(() {
+      SharedPreferencesAsyncPlatform.instance = previousPreferences;
+    });
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    FlutterSecureStorage.setMockInitialValues({});
+
+    await startup.main();
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
+    await tester.pump(const Duration(seconds: 9));
+    await tester.pump();
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is SplashPage && !widget.visualOnly,
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.byType(OnboardingPage), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   Widget buildHome() {
     return MultiProvider(
       providers: [

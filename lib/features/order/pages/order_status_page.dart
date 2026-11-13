@@ -36,10 +36,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   void initState() {
     super.initState();
     _sheetController.addListener(_syncMapControlsWithSheet);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<OrderController>().refreshEta();
-    });
-    unawaited(context.read<OrderController>().loadFromApi());
+    unawaited(_loadInitialTracking());
     _statusTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted ||
           WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
@@ -58,6 +55,12 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
         unawaited(controller.refreshEta());
       }
     });
+  }
+
+  Future<void> _loadInitialTracking() async {
+    final controller = context.read<OrderController>();
+    await controller.loadFromApi();
+    if (mounted) await controller.refreshEta();
   }
 
   void _syncMapControlsWithSheet() {
@@ -634,7 +637,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   width: 13,
                   height: 13,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981),
+                    color: order.hasFreshCleanerLocation(DateTime.now())
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFF94A3B8),
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
@@ -659,26 +664,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 15,
-                      color: Color(0xFFF59E0B),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                       order.cleanerRating == null
-                           ? 'Belum ada penilaian'
-                           : order.cleanerRating!.toStringAsFixed(1),
-                      style: const TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '· ${order.cleanerCompletedTasks}',
+                    if (order.cleanerCompletedBookings != null)
+                      Text(
+                        '${order.cleanerCompletedBookings} pesanan selesai',
                       style: const TextStyle(
                         color: Color(0xFF64748B),
                         fontFamily: 'Inter',

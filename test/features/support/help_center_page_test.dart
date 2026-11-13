@@ -176,7 +176,7 @@ void main() {
       tester.widget<ChatbotPage>(find.byType(ChatbotPage)).initialMessage,
       'Bagaimana cara booking?',
     );
-    expect(find.text('Bagaimana cara booking?'), findsOneWidget);
+    expect(find.text('Bagaimana cara booking?'), findsAtLeastNWidgets(1));
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();

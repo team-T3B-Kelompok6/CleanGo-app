@@ -67,11 +67,15 @@ class OrderController extends ChangeNotifier {
       _activeStage == OrderStatusStage.dalamPerjalanan;
   bool get canCalculateEta =>
       isTravelStage &&
-      _scheduledOrder.hasDestinationCoordinates &&
+      (_scheduledOrder.hasDestinationCoordinates ||
+          _scheduledOrder.backendBookingId != null) &&
       (_scheduledOrder.backendBookingId == null ||
           _activeStage == OrderStatusStage.dalamPerjalanan);
   bool get etaAvailable =>
-      canCalculateEta && _scheduledOrder.etaUpdatedAt != null;
+      canCalculateEta &&
+      _scheduledOrder.etaUpdatedAt != null &&
+      (_scheduledOrder.backendBookingId == null ||
+          _scheduledOrder.hasFreshCleanerLocation(DateTime.now()));
   DateTime? get estimatedWorkCompletedAt {
     if (_activeStage != OrderStatusStage.sedangDikerjakan) return null;
     final started = _scheduledOrder.workStartedAt;
@@ -96,7 +100,15 @@ class OrderController extends ChangeNotifier {
       return 'Titik tujuan belum tersedia';
     }
     if (!isTravelStage) return 'Cleaner sudah tiba di lokasi';
-    if (!etaAvailable) return 'Sedang menghitung rute cleaner…';
+    if (_scheduledOrder.backendBookingId != null &&
+        _scheduledOrder.hasCleanerCoordinates &&
+        !_scheduledOrder.hasFreshCleanerLocation(DateTime.now())) {
+      return 'Lokasi cleaner sudah usang';
+    }
+    if (!etaAvailable) {
+      if (!etaLoading && etaError != null) return 'ETA belum tersedia';
+      return 'Sedang menghitung rute cleaner…';
+    }
     return 'Cleaner tiba pukul ${_scheduledOrder.estimatedArrivalTime}';
   }
 
@@ -109,6 +121,12 @@ class OrderController extends ChangeNotifier {
       return DateTime.now().isAfter(completed)
           ? 'Perkiraan waktu terlewati. Menunggu konfirmasi selesai dari cleaner.'
           : 'Perkiraan dari waktu mulai dan durasi layanan. Selesai dikonfirmasi cleaner.';
+    }
+    if (isTravelStage &&
+        _scheduledOrder.backendBookingId != null &&
+        _scheduledOrder.hasCleanerCoordinates &&
+        !_scheduledOrder.hasFreshCleanerLocation(DateTime.now())) {
+      return 'Lokasi terakhir ditampilkan. Menunggu pembaruan GPS.';
     }
     if (etaError != null) return etaError!;
     if (_activeStage == OrderStatusStage.dikonfirmasi) {
@@ -196,7 +214,6 @@ class OrderController extends ChangeNotifier {
     selected.etaError = null;
     notifyListeners();
     try {
-      final now = DateTime.now();
       final tripRevision = selected.tripRevision;
       final bookingId = _scheduledOrder.backendBookingId;
       final estimate = bookingId != null
@@ -214,26 +231,8 @@ class OrderController extends ChangeNotifier {
           tripRevision != selected.tripRevision) {
         return;
       }
-      final arrival =
-          estimate.estimatedArrivalAt ??
-          now.add(Duration(seconds: estimate.etaSeconds));
-      _scheduledOrder = _scheduledOrder.copyWith(
-        cleanerLatitude: estimate.cleanerLatitude,
-        cleanerLongitude: estimate.cleanerLongitude,
-        hasCleanerCoordinates:
-            estimate.cleanerLatitude != null || bookingId == null,
-        distanceKm:
-            '${(estimate.distanceMeters / 1000).toStringAsFixed(1)} km lagi',
-        estimatedMinutes: '±${estimate.etaMinutes} menit',
-        estimatedArrivalTime:
-            '${arrival.hour.toString().padLeft(2, '0')}:${arrival.minute.toString().padLeft(2, '0')} WIB',
-        etaSource: 'Perhitungan rute OSRM',
-        etaUpdatedAt: estimate.updatedAt,
-        routePoints: estimate.path,
-        arrivalEstimate: 'Tiba ~${_formatClock(arrival)}',
-        travelDescription:
-            '${(estimate.distanceMeters / 1000).toStringAsFixed(1)} km lagi • ±${estimate.etaMinutes} menit',
-      );
+      _scheduledOrder = estimate.applyTo(_scheduledOrder);
+      selected.etaError = estimate.hasRoute ? null : estimate.routeMessage;
     } catch (error) {
       selected.etaError =
           error is ApiException && error.code == 'TRACKING_NOT_READY'
@@ -546,6 +545,14 @@ class OrderController extends ChangeNotifier {
       final nextOrders = <String, _ActiveOrderState>{};
       _ActiveOrderState? selected;
       for (final booking in bookings) {
+        final method = booking.paymentMethod.toLowerCase();
+        final unverifiedPayment =
+            booking.paymentStatus != 'paid' &&
+            (method.isNotEmpty || booking.paymentStatus != null);
+        if (booking.status == 'Menunggu Pembayaran' ||
+            (!booking.isFinished && method != 'cash' && unverifiedPayment)) {
+          continue;
+        }
         final incoming = _fromBooking(booking);
         final state =
             _orders[incoming.orderNumber] ?? _ActiveOrderState(incoming);
@@ -561,6 +568,7 @@ class OrderController extends ChangeNotifier {
             previous.destinationLongitude == incoming.destinationLongitude;
         state.order = sameTrip
             ? incoming.copyWith(
+                locationUpdatedAt: previous.locationUpdatedAt,
                 cleanerLatitude: previous.cleanerLatitude,
                 cleanerLongitude: previous.cleanerLongitude,
                 hasCleanerCoordinates: previous.hasCleanerCoordinates,
@@ -659,7 +667,7 @@ class OrderController extends ChangeNotifier {
       workStartedAt: booking.startedAt,
       price: BookingController.formatRupiah(booking.totalAmount),
       cleanerName: booking.cleanerName,
-      cleanerRating: booking.cleanerRating,
+      cleanerCompletedBookings: booking.cleanerCompletedBookings,
       customerName: booking.recipientName,
       customerPhone: booking.recipientPhone,
       paymentStatus: _paymentLabel(booking.paymentStatus, booking.status),

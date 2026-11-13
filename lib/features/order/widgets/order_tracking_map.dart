@@ -27,9 +27,70 @@ class OrderTrackingMap extends StatefulWidget {
   State<OrderTrackingMap> createState() => _OrderTrackingMapState();
 }
 
-class _OrderTrackingMapState extends State<OrderTrackingMap>
-    with SingleTickerProviderStateMixin {
+class _OrderTrackingMapState extends State<OrderTrackingMap> {
   late final MapController _mapController;
+  bool _mapReady = false;
+  bool _syncedDestination = false;
+  bool _syncedCleaner = false;
+  bool _userPanned = false;
+  Timer? _locationExpiryTimer;
+
+  bool get _hasDestination =>
+      widget.order.hasDestinationCoordinates &&
+      RoutePoint.isValid(
+        widget.order.destinationLatitude,
+        widget.order.destinationLongitude,
+      );
+
+  bool get _hasCleaner =>
+      widget.order.hasCleanerCoordinates &&
+      RoutePoint.isValid(
+        widget.order.cleanerLatitude,
+        widget.order.cleanerLongitude,
+      );
+
+  bool get _isLocationStale =>
+      widget.order.backendBookingId != null &&
+      _hasCleaner &&
+      !widget.order.hasFreshCleanerLocation(DateTime.now());
+
+  LatLng? get _centerPoint {
+    if (_isTravelActive) {
+      return LatLng(
+        (_currentCleanerPosition.latitude + _destinationPoint.latitude) / 2,
+        (_currentCleanerPosition.longitude + _destinationPoint.longitude) / 2,
+      );
+    }
+    if (_isTravelStage && _hasCleaner) return _currentCleanerPosition;
+    if (_hasDestination) return _destinationPoint;
+    return null;
+  }
+
+  void _scheduleInitialSync() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_mapReady || _centerPoint == null) return;
+      final hasCleaner = _isTravelStage && _hasCleaner;
+      if ((_hasDestination && !_syncedDestination) ||
+          (hasCleaner && !_syncedCleaner)) {
+        if (!_userPanned) _recenterMap();
+        _syncedDestination = _hasDestination;
+        _syncedCleaner = hasCleaner;
+      }
+    });
+  }
+
+  void _scheduleLocationExpiry() {
+    _locationExpiryTimer?.cancel();
+    final timestamp = widget.order.locationUpdatedAt;
+    if (widget.order.backendBookingId == null || timestamp == null) return;
+    final remaining = timestamp
+        .add(const Duration(minutes: 5))
+        .difference(DateTime.now());
+    if (remaining <= Duration.zero) return;
+    _locationExpiryTimer = Timer(remaining, () {
+      if (mounted) setState(() {});
+    });
+  }
 
   LatLng get _destinationPoint => LatLng(
     widget.order.destinationLatitude,
@@ -40,10 +101,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
       widget.order.stage == OrderStatusStage.ditugaskan ||
       widget.order.stage == OrderStatusStage.dalamPerjalanan;
 
-  bool get _isTravelActive =>
-      _isTravelStage &&
-      widget.order.hasDestinationCoordinates &&
-      widget.order.hasCleanerCoordinates;
+  bool get _isTravelActive => _isTravelStage && _hasDestination && _hasCleaner;
 
   List<LatLng> get _remainingRoutePoints {
     final points = widget.order.routePoints
@@ -70,11 +128,26 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
       widget.order.cleanerLatitude,
       widget.order.cleanerLongitude,
     );
+    _syncedDestination = _hasDestination;
+    _syncedCleaner = _isTravelStage && _hasCleaner;
+    _scheduleLocationExpiry();
   }
 
   @override
   void didUpdateWidget(covariant OrderTrackingMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.order.orderNumber != widget.order.orderNumber) {
+      _userPanned = false;
+      _syncedDestination = false;
+      _syncedCleaner = false;
+      _simulationTimer?.cancel();
+      _isSimulating = false;
+      _currentCleanerPosition = LatLng(
+        widget.order.cleanerLatitude,
+        widget.order.cleanerLongitude,
+      );
+    }
+    _scheduleLocationExpiry();
     if (!_isSimulating &&
         (oldWidget.order.cleanerLatitude != widget.order.cleanerLatitude ||
             oldWidget.order.cleanerLongitude !=
@@ -84,6 +157,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
         widget.order.cleanerLongitude,
       );
     }
+    _scheduleInitialSync();
     if (!_isTravelActive && _isSimulating) {
       _simulationTimer?.cancel();
       _isSimulating = false;
@@ -92,6 +166,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
 
   @override
   void dispose() {
+    _locationExpiryTimer?.cancel();
     _simulationTimer?.cancel();
     _mapController.dispose();
     super.dispose();
@@ -158,32 +233,33 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
   }
 
   void _recenterMap() {
-    _mapController.move(
-      _isTravelActive
-          ? LatLng(
-              (_currentCleanerPosition.latitude + _destinationPoint.latitude) /
-                  2,
-              (_currentCleanerPosition.longitude +
-                      _destinationPoint.longitude) /
-                  2,
-            )
-          : (_isTravelStage && widget.order.hasCleanerCoordinates) ||
-                !widget.order.hasDestinationCoordinates
-          ? _currentCleanerPosition
-          : _destinationPoint,
-      14.3,
-    );
+    final center = _centerPoint;
+    if (!_mapReady || center == null) return;
+    if (_isTravelActive) {
+      _mapController.fitCamera(
+        CameraFit.coordinates(
+          coordinates: [_currentCleanerPosition, _destinationPoint],
+          padding: const EdgeInsets.all(52),
+          maxZoom: 14.3,
+        ),
+      );
+    } else {
+      _mapController.move(center, 14.3);
+    }
   }
 
   String get _remainingDistanceLabel {
-    if (!widget.order.hasDestinationCoordinates) {
+    if (!_hasDestination) {
       return 'Titik tujuan belum tersedia';
     }
     if (widget.order.stage == OrderStatusStage.dikonfirmasi) {
       return 'Menunggu cleaner berangkat';
     }
-    if (_isTravelStage && !widget.order.hasCleanerCoordinates) {
+    if (_isTravelStage && !_hasCleaner) {
       return 'Menunggu lokasi cleaner';
+    }
+    if (_isTravelStage && _isLocationStale) {
+      return 'Lokasi terakhir · menunggu GPS';
     }
     if (!_isTravelActive) return 'Cleaner sudah tiba';
     return widget.order.distanceKm;
@@ -191,16 +267,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
 
   @override
   Widget build(BuildContext context) {
-    final centerPoint = _isTravelActive
-        ? LatLng(
-            (_currentCleanerPosition.latitude + _destinationPoint.latitude) / 2,
-            (_currentCleanerPosition.longitude + _destinationPoint.longitude) /
-                2,
-          )
-        : (_isTravelStage && widget.order.hasCleanerCoordinates) ||
-              !widget.order.hasDestinationCoordinates
-        ? _currentCleanerPosition
-        : _destinationPoint;
+    final centerPoint = _centerPoint;
 
     return Container(
       height: widget.height,
@@ -222,65 +289,87 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
         child: Stack(
           children: [
             // Peta Nyata OSM menggunakan flutter_map
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: centerPoint,
-                initialZoom: 14.2,
-                minZoom: 11.5,
-                maxZoom: 17.5,
-                interactionOptions: const InteractionOptions(
-                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            if (centerPoint == null)
+              const Center(child: Text('Menunggu koordinat lokasi'))
+            else
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  onPositionChanged: (_, hasGesture) {
+                    if (hasGesture) _userPanned = true;
+                  },
+                  initialCenter: centerPoint,
+                  initialZoom: 14.2,
+                  initialCameraFit: _isTravelActive
+                      ? CameraFit.coordinates(
+                          coordinates: [
+                            _currentCleanerPosition,
+                            _destinationPoint,
+                          ],
+                          padding: const EdgeInsets.all(52),
+                          maxZoom: 14.3,
+                        )
+                      : null,
+                  maxZoom: 17.5,
+                  onMapReady: () {
+                    _mapReady = true;
+                    _scheduleInitialSync();
+                  },
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                  ),
                 ),
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.cleango_app',
-                ),
-                if (_isTravelActive &&
-                    _displayRoutePoints.length >= 2 &&
-                    (widget.order.routePoints.length >= 2 || _isSimulating))
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: _displayRoutePoints,
-                        strokeWidth: 7.0,
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
-                      Polyline(
-                        points: _displayRoutePoints,
-                        strokeWidth: 4.5,
-                        color: const Color(0xFF00685F),
-                      ),
+                children: [
+                  TileLayer(
+                    urlTemplate:
+                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.cleango_app',
+                  ),
+                  if (_isTravelActive &&
+                      _displayRoutePoints.length >= 2 &&
+                      (widget.order.routePoints.length >= 2 || _isSimulating))
+                    PolylineLayer(
+                      polylines: [
+                        Polyline(
+                          points: _displayRoutePoints,
+                          strokeWidth: 7.0,
+                          color: Colors.white.withValues(alpha: 0.85),
+                        ),
+                        Polyline(
+                          points: _displayRoutePoints,
+                          strokeWidth: 4.5,
+                          color: _isLocationStale
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF00685F),
+                        ),
+                      ],
+                    ),
+                  MarkerLayer(
+                    markers: [
+                      // 1. Marker Tujuan (Rumah Anda)
+                      if (_hasDestination)
+                        Marker(
+                          point: _destinationPoint,
+                          width: 110,
+                          height: 80,
+                          child: _buildDestinationMarker(),
+                        ),
+                      if (_isTravelStage && _hasCleaner)
+                        Marker(
+                          point: _currentCleanerPosition,
+                          width: 120,
+                          height: 72,
+                          child: _buildCleanerMarker(),
+                        ),
                     ],
                   ),
-                MarkerLayer(
-                  markers: [
-                    // 1. Marker Tujuan (Rumah Anda)
-                    if (widget.order.hasDestinationCoordinates)
-                      Marker(
-                        point: _destinationPoint,
-                        width: 110,
-                        height: 70,
-                        child: _buildDestinationMarker(),
-                      ),
-                    if (_isTravelStage && widget.order.hasCleanerCoordinates)
-                      Marker(
-                        point: _currentCleanerPosition,
-                        width: 120,
-                        height: 72,
-                        child: _buildCleanerMarker(),
-                      ),
-                  ],
-                ),
-                const RichAttributionWidget(
-                  attributions: [
-                    TextSourceAttribution('OpenStreetMap contributors'),
-                  ],
-                ),
-              ],
-            ),
+                  const RichAttributionWidget(
+                    attributions: [
+                      TextSourceAttribution('OpenStreetMap contributors'),
+                    ],
+                  ),
+                ],
+              ),
 
             // Kontrol simulasi di kiri bawah area peta.
             Positioned(
@@ -315,7 +404,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 9,
-                  vertical: 4.5,
+                  vertical: 3.5,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.92),
@@ -345,7 +434,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          !widget.order.hasDestinationCoordinates
+                          !_hasDestination
                               ? 'Alamat belum memiliki titik'
                               : _isTravelActive
                               ? '${widget.order.originLocation} ➔ Tujuan'
@@ -359,11 +448,13 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
                         ),
                         Text(
                           _remainingDistanceLabel,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 9.5,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF00685F),
+                            color: _isLocationStale
+                                ? const Color(0xFF64748B)
+                                : const Color(0xFF00685F),
                           ),
                         ),
                       ],
@@ -387,7 +478,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: const Color(0xFF008378),
+            color: _isLocationStale
+                ? const Color(0xFF64748B)
+                : const Color(0xFF008378),
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white, width: 2.2),
             boxShadow: const [
@@ -409,11 +502,16 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
         const SizedBox(height: 2),
         // Label Pill Cleaner
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF2DD4BF), width: 1.2),
+            border: Border.all(
+              color: _isLocationStale
+                  ? const Color(0xFF94A3B8)
+                  : const Color(0xFF2DD4BF),
+              width: 1.2,
+            ),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x18000000),
@@ -423,11 +521,15 @@ class _OrderTrackingMapState extends State<OrderTrackingMap>
             ],
           ),
           child: Text(
-            widget.order.cleanerName.split(' ').first.isNotEmpty
+            _isLocationStale
+                ? 'Lokasi terakhir'
+                : widget.order.cleanerName.split(' ').first.isNotEmpty
                 ? '${widget.order.cleanerName.split(' ').first} (Cleaner)'
-                : 'Siti (Cleaner)',
-            style: const TextStyle(
-              color: Color(0xFF0F766E),
+                : 'Cleaner',
+            style: TextStyle(
+              color: _isLocationStale
+                  ? const Color(0xFF64748B)
+                  : const Color(0xFF0F766E),
               fontFamily: 'Inter',
               fontSize: 10,
               fontWeight: FontWeight.w700,

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cleango_app/features/booking/data/customer_booking_api.dart';
 import 'package:cleango_app/features/address/controllers/address_controller.dart';
 import 'package:cleango_app/features/address/domain/models/address_model.dart';
 import 'package:cleango_app/features/booking/controllers/booking_controller.dart';
@@ -20,9 +23,12 @@ void main() {
     late BookingController booking;
     late AddressController addresses;
     late OrderController orders;
-    const controller = PaymentFlowController();
+    late PaymentFlowController controller;
+    late _BookingApi api;
 
-    setUp(() {
+    setUp(() async {
+      controller = PaymentFlowController();
+      api = _BookingApi();
       const uji = AddressModel(
         id: 'uji-1',
         title: 'Rumah Uji',
@@ -34,8 +40,11 @@ void main() {
         latitude: -7.95,
         longitude: 112.61,
       );
-      booking = BookingController()..startBooking(ServiceData.services.first);
+      booking = BookingController(bookingApi: api)
+        ..startBooking(ServiceData.services.first);
       booking.selectDate(DateTime(2030, 1, 3));
+      await booking.loadAvailability();
+      booking.selectTime('10:00');
       booking.updateAddress(uji.toCleaningAddress(), addressId: uji.id);
       addresses = AddressController(initialAddresses: const [uji]);
       orders = OrderController();
@@ -45,6 +54,47 @@ void main() {
       booking.dispose();
       addresses.dispose();
       orders.dispose();
+    });
+
+    test('pending payment retry reuses booking and confirms only server-paid order', () async {
+      api.status = 'pending';
+      orders.completeScheduledOrder();
+      final method = paymentMethodByType(PaymentMethodType.qris);
+      final first = await controller.createOrder(
+        booking: booking,
+        addresses: addresses,
+        orders: orders,
+        method: method,
+        totalPayment: 'Rp155.000',
+        servicePrice: 150000,
+        platformFee: 5000,
+        discountAmount: 0,
+        now: DateTime(2030, 1, 2),
+      );
+      expect(first, isNull);
+      expect(orders.hasScheduledOrder, isFalse);
+      expect(api.createdCount, 1);
+      expect(api.paidCalls, 1);
+      expect(controller.bookingId, '42');
+
+      api.status = 'paid';
+      final paid = await controller.createOrder(
+        booking: booking,
+        addresses: addresses,
+        orders: orders,
+        method: method,
+        totalPayment: 'Rp155.000',
+        servicePrice: 150000,
+        platformFee: 5000,
+        discountAmount: 0,
+        checkStatus: true,
+        now: DateTime(2030, 1, 2),
+      );
+      expect(paid, isFalse);
+      expect(api.createdCount, 1);
+      expect(api.paidCalls, 1);
+      expect(api.fetchCalls, 1);
+      expect(orders.hasScheduledOrder, isTrue);
     });
 
     test(
@@ -64,8 +114,11 @@ void main() {
           now: DateTime(2030, 1, 2),
         );
         final firstId = orders.scheduledOrder.orderNumber;
+        controller = PaymentFlowController();
+        booking.selectDate(DateTime(2030, 1, 4));
+        await booking.loadAvailability();
         booking
-          ..selectDate(DateTime(2030, 1, 4))
+          ..selectTime('10:00')
           ..updateNote('Catatan pesanan kedua');
         await controller.createOrder(
           booking: booking,
@@ -127,9 +180,9 @@ void main() {
     });
 
     test('marks a booking on the current date as same-day', () async {
-      booking
-        ..selectDate(DateTime(2030, 1, 2))
-        ..selectTime('08:00');
+      booking.selectDate(DateTime(2030, 1, 2));
+      await booking.loadAvailability();
+      booking.selectTime('08:00');
 
       final isSameDay = await controller.createOrder(
         booking: booking,
@@ -281,4 +334,73 @@ void main() {
       },
     );
   });
+}
+
+class _BookingApi extends CustomerBookingApi {
+  int createdCount = 0;
+  int paidCalls = 0;
+  int fetchCalls = 0;
+  String status = 'paid';
+  bool timeoutPayment = false;
+
+  @override
+  Future<List<BookingSlotInfo>> availability({
+    required String date,
+    String? serviceId,
+  }) async => [
+    for (final time in BookingController.availableTimes)
+      BookingSlotInfo(time: time, available: true),
+  ];
+
+  @override
+  Future<CreatedBooking> create({
+    required String serviceId,
+    required String date,
+    required String time,
+    String? addressId,
+    String notes = '',
+  }) async {
+    createdCount++;
+    return const CreatedBooking(
+      id: '42',
+      code: 'CG-42',
+      status: 'Menunggu Assign',
+      totalAmount: 155000,
+    );
+  }
+
+  @override
+  Future<BookingPayment> pay({
+    required String bookingId,
+    required String method,
+  }) async {
+    paidCalls++;
+    if (timeoutPayment) throw TimeoutException('timed out');
+    return _payment();
+  }
+
+  @override
+  Future<CreatedBooking> fetchBooking(String bookingId) async {
+    fetchCalls++;
+    return CreatedBooking(
+      id: bookingId,
+      code: 'CG-42',
+      status: 'Menunggu Assign',
+      totalAmount: 155000,
+      paymentStatus: status,
+    );
+  }
+
+  BookingPayment _payment() => BookingPayment(
+    booking: CreatedBooking(
+      id: '42',
+      code: 'CG-42',
+      status: 'Menunggu Assign',
+      totalAmount: 155000,
+      paymentStatus: status,
+    ),
+    status: status,
+    checkoutUrl: 'https://checkout.xendit.co/42',
+    expiresAt: null,
+  );
 }

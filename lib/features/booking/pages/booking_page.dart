@@ -43,8 +43,19 @@ class _BookingPageState extends State<BookingPage> {
     super.initState();
     final bookingController = context.read<BookingController>();
     _noteController = TextEditingController(text: bookingController.note);
+    _startBooking();
+  }
+
+  @override
+  void didUpdateWidget(covariant BookingPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.service.id != widget.service.id) _startBooking();
+  }
+
+  void _startBooking() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      final bookingController = context.read<BookingController>();
       bookingController.startBooking(widget.service);
       if (bookingController.addressId == null) {
         final address = context.read<AddressController>().selectedAddress;
@@ -122,8 +133,8 @@ class _BookingPageState extends State<BookingPage> {
                         selector: (_, controller) =>
                             (controller.selectedDate, controller.selectedTime),
                         builder: (context, selection, _) {
-                          final bookingController =
-                              context.watch<BookingController>();
+                          final bookingController = context
+                              .watch<BookingController>();
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -133,14 +144,7 @@ class _BookingPageState extends State<BookingPage> {
                                 isTimeAvailable:
                                     bookingController.isTimeAvailable,
                                 onTimeSelected: bookingController.selectTime,
-                                onUnavailableTap: (time) {
-                                  AppNotice.show(
-                                    context,
-                                    bookingController.slotReason(time) ??
-                                        'Jam ini tidak tersedia. Pilih jam lain.',
-                                    type: AppNoticeType.error,
-                                  );
-                                },
+                                slotReason: bookingController.slotReason,
                               ),
                               if (bookingController.availabilityLoading) ...[
                                 const SizedBox(height: 10),
@@ -155,11 +159,15 @@ class _BookingPageState extends State<BookingPage> {
                                   null) ...[
                                 const SizedBox(height: 10),
                                 const Text(
-                                  'Jadwal terbaru belum dapat dimuat. Menampilkan jadwal umum.',
+                                  'Jadwal terbaru belum dapat dimuat.',
                                   style: TextStyle(
                                     color: AppColors.slate500,
                                     fontSize: 12,
                                   ),
+                                ),
+                                TextButton(
+                                  onPressed: bookingController.loadAvailability,
+                                  child: const Text('Coba lagi'),
                                 ),
                               ],
                             ],
@@ -210,7 +218,7 @@ class _BookingPageState extends State<BookingPage> {
     );
   }
 
-  void _handleContinue() {
+  Future<void> _handleContinue() async {
     final booking = context.read<BookingController>();
     final error = booking.addressError ?? booking.validateSchedule();
     if (error != null) {
@@ -222,10 +230,16 @@ class _BookingPageState extends State<BookingPage> {
       return;
     }
 
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => CheckoutPage(
-  promoApi: CustomerPromoApi(tokenStorage: context.read<TokenStorage>()),
-)));
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CheckoutPage(
+          promoApi: CustomerPromoApi(
+            tokenStorage: context.read<TokenStorage>(),
+          ),
+        ),
+      ),
+    );
+    if (mounted) await booking.loadAvailability();
   }
 }
 

@@ -24,6 +24,7 @@ class _FakeBookingApi extends CustomerBookingApi {
 }
 
 class _OwnedTracking extends EtaRepository {
+  DateTime? locationUpdatedAt = DateTime.now();
   int calls = 0;
   Future<EtaEstimate>? pendingResult;
   @override
@@ -38,6 +39,7 @@ class _OwnedTracking extends EtaRepository {
       source: 'osrm',
       modelVersion: null,
       updatedAt: DateTime.now(),
+      locationUpdatedAt: locationUpdatedAt,
       path: const [],
       cleanerLatitude: -7.97,
       cleanerLongitude: 112.61,
@@ -65,8 +67,13 @@ CustomerBookingSummary _booking({
   int? reviewRating,
   String reviewComment = '',
   String cleanerName = '',
+  int? cleanerCompletedBookings,
   String recipientName = '',
   String recipientPhone = '',
+  String? paymentStatus,
+  String paymentMethod = '',
+  double? latitude = -7.98,
+  double? longitude = 112.63,
 }) => CustomerBookingSummary(
   id: code,
   code: code,
@@ -80,15 +87,18 @@ CustomerBookingSummary _booking({
   status: status,
   notes: 'catatan',
   address: 'Jl. Uji No. 1, Malang',
-  latitude: -7.98,
-  longitude: 112.63,
+  latitude: latitude,
+  longitude: longitude,
   reviewEditable: reviewEditable,
   hasReview: hasReview,
   reviewRating: reviewRating,
   reviewComment: reviewComment,
   cleanerName: cleanerName,
+  cleanerCompletedBookings: cleanerCompletedBookings,
   recipientName: recipientName,
   recipientPhone: recipientPhone,
+  paymentStatus: paymentStatus,
+  paymentMethod: paymentMethod,
 );
 
 void main() {
@@ -109,12 +119,14 @@ void main() {
         'status': 'Menunggu Assign',
         'notes': 'bawa vacuum',
         'address': 'Jl. A, Malang',
+        'cleanerCompletedBookings': 5,
         'latitude': -7.98,
         'longitude': 112.63,
       });
 
       expect(booking.id, '77');
       expect(booking.code, 'CG-TEST');
+      expect(booking.cleanerCompletedBookings, 5);
       expect(booking.totalAmount, 135000);
       expect(booking.serviceDurationMinutes, 120);
       expect(
@@ -162,6 +174,175 @@ void main() {
 
   group('OrderController.loadFromApi', () {
     test(
+      'hides failed or unverified QRIS but keeps cash and paid QRIS',
+      () async {
+        final controller = OrderController(
+          bookingApi: _FakeBookingApi(
+            bookings: [
+              for (final status in <String?>['failed', 'pending', null])
+                _booking(
+                  code: 'unpaid-$status',
+                  status: 'Menunggu Assign',
+                  paymentMethod: 'qris',
+                  paymentStatus: status,
+                ),
+              _booking(
+                code: 'checkout-not-started',
+                status: 'Menunggu Pembayaran',
+              ),
+              _booking(
+                code: 'cash',
+                status: 'Menunggu Assign',
+                paymentMethod: 'cash',
+                paymentStatus: 'pending',
+              ),
+              _booking(
+                code: 'paid',
+                status: 'Menunggu Assign',
+                paymentMethod: 'qris',
+                paymentStatus: 'paid',
+              ),
+            ],
+          ),
+        );
+        await controller.loadFromApi();
+        expect(
+          controller.scheduledOrders.map((order) => order.orderNumber),
+          unorderedEquals(['#cash', '#paid']),
+        );
+        controller.dispose();
+      },
+    );
+    test(
+      'hides pending non-cash orders without changing status or history',
+      () async {
+        final controller = OrderController(
+          bookingApi: _FakeBookingApi(
+            bookings: [
+              _booking(
+                code: 'pending-qris',
+                status: 'Menunggu Assign',
+                paymentStatus: 'pending',
+                paymentMethod: 'qris',
+              ),
+              _booking(
+                code: 'pending-other',
+                status: 'Menunggu Assign',
+                paymentStatus: 'pending',
+                paymentMethod: 'gopay',
+              ),
+              _booking(
+                code: 'pending-unknown',
+                status: 'Menunggu Assign',
+                paymentStatus: 'pending',
+              ),
+              _booking(
+                code: 'pending-cash',
+                status: 'Menunggu Assign',
+                paymentStatus: 'pending',
+                paymentMethod: 'cash',
+              ),
+              _booking(
+                code: 'pending-uppercase-cash',
+                status: 'Menunggu Assign',
+                paymentStatus: 'pending',
+                paymentMethod: 'CASH',
+              ),
+              _booking(
+                code: 'paid-qris',
+                status: 'Menuju Lokasi',
+                paymentStatus: 'paid',
+                paymentMethod: 'qris',
+              ),
+              _booking(
+                code: 'expired-qris',
+                status: 'Menunggu Assign',
+                paymentStatus: 'expired',
+                paymentMethod: 'qris',
+              ),
+              _booking(
+                code: 'cancelled-pending',
+                status: 'Batal',
+                paymentStatus: 'pending',
+                paymentMethod: 'qris',
+              ),
+            ],
+          ),
+        );
+        addTearDown(controller.dispose);
+
+        await controller.loadFromApi();
+
+        final orders = controller.scheduledOrders;
+        expect(
+          orders.map((order) => order.orderNumber),
+          unorderedEquals([
+            '#pending-cash',
+            '#pending-uppercase-cash',
+            '#paid-qris',
+          ]),
+        );
+        final cash = orders.firstWhere(
+          (order) => order.orderNumber == '#pending-cash',
+        );
+        expect(cash.stage, OrderStatusStage.dikonfirmasi);
+        expect(cash.status, 'PESANAN DIKONFIRMASI');
+        expect(cash.paymentStatus, 'Menunggu pembayaran');
+        final paid = orders.firstWhere(
+          (order) => order.orderNumber == '#paid-qris',
+        );
+        expect(paid.stage, OrderStatusStage.dalamPerjalanan);
+        expect(paid.status, 'CLEANER MENUJU LOKASI');
+        expect(paid.paymentStatus, 'Lunas');
+        expect(controller.historyOrders.single.orderId, '#cancelled-pending');
+        expect(controller.historyOrders.single.status, 'BATAL');
+      },
+    );
+
+    test(
+      'polling removes unpaid selection and restores it after payment',
+      () async {
+        final bookings = [
+          _booking(
+            code: 'qris',
+            status: 'Menunggu Assign',
+            paymentStatus: 'paid',
+            paymentMethod: 'qris',
+          ),
+        ];
+        final controller = OrderController(
+          bookingApi: _FakeBookingApi(bookings: bookings),
+        );
+        addTearDown(controller.dispose);
+        await controller.loadFromApi();
+        expect(controller.selectScheduledOrder('#qris'), isTrue);
+
+        bookings[0] = _booking(
+          code: 'qris',
+          status: 'Menunggu Assign',
+          paymentStatus: 'pending',
+          paymentMethod: 'qris',
+        );
+        await controller.loadFromApi();
+        expect(controller.scheduledOrders, isEmpty);
+        expect(controller.hasScheduledOrder, isFalse);
+        expect(controller.selectScheduledOrder('#qris'), isFalse);
+        expect(controller.historyOrders, isEmpty);
+
+        bookings[0] = _booking(
+          code: 'qris',
+          status: 'Menunggu Assign',
+          paymentStatus: 'paid',
+          paymentMethod: 'qris',
+        );
+        await controller.loadFromApi();
+        expect(controller.hasScheduledOrder, isTrue);
+        expect(controller.scheduledOrders.single.orderNumber, '#qris');
+        expect(controller.scheduledOrder.orderNumber, '#qris');
+      },
+    );
+
+    test(
       'status polling keeps the selected order and its last GPS estimate',
       () async {
         final api = _FakeBookingApi(
@@ -188,6 +369,76 @@ void main() {
     );
 
     test(
+      'partial tracking keeps GPS and clears previous route and ETA',
+      () async {
+        final tracking = _OwnedTracking();
+        final controller = OrderController(
+          bookingApi: _FakeBookingApi(
+            bookings: [_booking(code: '9', status: 'Menuju Lokasi')],
+          ),
+          etaRepository: tracking,
+        );
+        addTearDown(controller.dispose);
+        await controller.loadFromApi();
+        await controller.refreshEta();
+        expect(controller.etaAvailable, isTrue);
+        tracking.pendingResult = Future.value(
+          EtaEstimate(
+            distanceMeters: 0,
+            baselineEtaSeconds: 0,
+            etaSeconds: 0,
+            etaMinutes: 0,
+            source: '',
+            modelVersion: null,
+            updatedAt: DateTime.now(),
+            locationUpdatedAt: DateTime.now(),
+            path: const [],
+            cleanerLatitude: -7.96,
+            cleanerLongitude: 112.62,
+            routeStatus: 'unavailable',
+            routeMessage: 'Rute belum tersedia',
+          ),
+        );
+        await controller.refreshEta();
+        expect(controller.scheduledOrder.hasCleanerCoordinates, isTrue);
+        expect(controller.scheduledOrder.cleanerLatitude, -7.96);
+        expect(controller.scheduledOrder.routePoints, isEmpty);
+        expect(controller.scheduledOrder.etaUpdatedAt, isNull);
+        expect(controller.etaAvailable, isFalse);
+        expect(controller.etaLoading, isFalse);
+        expect(controller.etaHeadline, 'ETA belum tersedia');
+        expect(controller.etaError, 'Rute belum tersedia');
+      },
+    );
+
+    test('route recalculation cannot make old GPS live', () async {
+      final tracking = _OwnedTracking()
+        ..locationUpdatedAt = DateTime.now().subtract(
+          const Duration(minutes: 6),
+        );
+      final controller = OrderController(
+        bookingApi: _FakeBookingApi(
+          bookings: [_booking(code: '9', status: 'Menuju Lokasi')],
+        ),
+        etaRepository: tracking,
+      );
+      addTearDown(controller.dispose);
+      await controller.loadFromApi();
+      await controller.refreshEta();
+      expect(controller.scheduledOrder.hasCleanerCoordinates, isTrue);
+      expect(controller.etaAvailable, isFalse);
+      expect(controller.etaHeadline, 'Lokasi cleaner sudah usang');
+      expect(controller.etaMinutesLabel, 'Belum tersedia');
+      final gpsTime = controller.scheduledOrder.locationUpdatedAt;
+      await controller.loadFromApi();
+      expect(controller.scheduledOrder.locationUpdatedAt, gpsTime);
+      expect(controller.etaAvailable, isFalse);
+      tracking.locationUpdatedAt = DateTime.now();
+      await controller.refreshEta();
+      expect(controller.etaAvailable, isTrue);
+    });
+
+    test(
       'an ETA response remains valid when status polling keeps the same trip',
       () async {
         final pending = Completer<EtaEstimate>();
@@ -212,6 +463,7 @@ void main() {
             source: 'osrm',
             modelVersion: null,
             updatedAt: DateTime.now(),
+            locationUpdatedAt: DateTime.now(),
             path: const [],
             cleanerLatitude: -7.97,
             cleanerLongitude: 112.61,
@@ -236,6 +488,33 @@ void main() {
       expect(controller.currentStage, OrderStatusStage.selesai);
       expect(controller.historyOrders.single.orderId, '#9');
     });
+    test(
+      'owned booking tracking fetches GPS even without destination coordinates',
+      () async {
+        final tracking = _OwnedTracking();
+        final controller = OrderController(
+          bookingApi: _FakeBookingApi(
+            bookings: [
+              _booking(
+                code: '9',
+                status: 'Menuju Lokasi',
+                latitude: null,
+                longitude: null,
+              ),
+            ],
+          ),
+          etaRepository: tracking,
+        );
+        addTearDown(controller.dispose);
+        await controller.loadFromApi();
+        expect(controller.scheduledOrder.hasDestinationCoordinates, isFalse);
+        await controller.refreshEta();
+        expect(tracking.calls, 1);
+        expect(controller.scheduledOrder.hasCleanerCoordinates, isTrue);
+        expect(controller.scheduledOrder.cleanerLatitude, -7.97);
+      },
+    );
+
     test('owned bookings wait for departure and use saved GPS instead of demo positions', () async {
       final tracking = _OwnedTracking();
       final api = _FakeBookingApi(
@@ -304,6 +583,7 @@ void main() {
             status: 'Selesai',
             reviewEditable: true,
             cleanerName: 'Budi Santoso',
+            cleanerCompletedBookings: 2,
             recipientName: 'Timothy',
             recipientPhone: '082140636747',
           ),
@@ -319,17 +599,21 @@ void main() {
       expect(controller.historyOrders.first.canReview, isTrue);
       expect(controller.historyOrders.first.hasReview, isFalse);
       expect(controller.historyOrders.first.cleanerName, 'Budi Santoso');
+      expect(controller.scheduledOrder.cleanerCompletedBookings, 2);
       expect(controller.historyOrders.first.customerName, 'Timothy');
     });
 
-    test('respons kosong sukses membersihkan daftar aktif dan riwayat', () async {
-      final controller = OrderController(bookingApi: _FakeBookingApi());
+    test(
+      'respons kosong sukses membersihkan daftar aktif dan riwayat',
+      () async {
+        final controller = OrderController(bookingApi: _FakeBookingApi());
 
-      await controller.loadFromApi();
+        await controller.loadFromApi();
 
-      expect(controller.scheduledOrders, isEmpty);
-      expect(controller.historyOrders, isEmpty);
-    });
+        expect(controller.scheduledOrders, isEmpty);
+        expect(controller.historyOrders, isEmpty);
+      },
+    );
 
     test('daftar aktif dan riwayat awal kosong saat API terpasang', () async {
       final controller = OrderController(bookingApi: _FakeBookingApi());

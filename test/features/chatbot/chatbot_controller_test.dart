@@ -21,6 +21,9 @@ class FakeChatbot implements ChatbotGateway {
   }
 
   @override
+  Future<List<ChatSuggestion>> suggestions() async => const [];
+
+  @override
   void close() => closed = true;
 }
 
@@ -140,9 +143,7 @@ void main() {
     'storage failure does not prevent chatting or overwrite unread history',
     () async {
       final store = FakeChatHistory()..failLoad = true;
-      store.saved = [
-        ChatMessage(content: 'Jangan tertimpa', isUser: true),
-      ];
+      store.saved = [ChatMessage(content: 'Jangan tertimpa', isUser: true)];
       final controller = ChatbotController(
         repository: FakeChatbot(),
         history: store,

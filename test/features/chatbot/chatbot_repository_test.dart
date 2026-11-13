@@ -165,6 +165,39 @@ void main() {
       );
     });
   }
+  test('fetches dynamic suggestions and ignores invalid items', () async {
+    final repository = ChatbotRepository(
+      tokens: FakeTokens('header.payload.signature'),
+      client: ApiClient(
+        baseUrl: 'http://localhost:3001',
+        client: MockClient((request) async {
+          expect(request.method, 'GET');
+          expect(request.url.path, '/api/customer/chat/suggestions');
+          expect(
+            request.headers['authorization'],
+            'Bearer header.payload.signature',
+          );
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {'question': 'Apa itu CleanGo?', 'source': 'knowledge'},
+                {'question': 'Bagaimana pembayaran?', 'source': 'faq'},
+                {'invalid': 123},
+              ],
+            }),
+            200,
+          );
+        }),
+      ),
+    );
+    addTearDown(repository.close);
+    final items = await repository.suggestions();
+    expect(items.map((item) => item.question), [
+      'Apa itu CleanGo?',
+      'Bagaimana pembayaran?',
+    ]);
+  });
+
   test('rejects malformed chatbot responses', () async {
     final repository = ChatbotRepository(
       tokens: FakeTokens(null),

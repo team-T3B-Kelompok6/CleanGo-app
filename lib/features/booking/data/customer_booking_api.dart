@@ -21,19 +21,48 @@ class CreatedBooking {
     required this.code,
     required this.status,
     required this.totalAmount,
+    this.paymentStatus,
   });
 
   final String id;
   final String code;
   final String status;
   final int totalAmount;
+  final String? paymentStatus;
 
   static CreatedBooking fromJson(Map<String, dynamic> json) => CreatedBooking(
     id: '${json['id'] ?? ''}',
     code: json['code'] as String? ?? '',
     status: json['status'] as String? ?? '',
     totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
+    paymentStatus: json['paymentStatus'] as String?,
   );
+}
+
+class BookingPayment {
+  const BookingPayment({
+    required this.booking,
+    required this.status,
+    required this.checkoutUrl,
+    required this.expiresAt,
+  });
+
+  final CreatedBooking booking;
+  final String status;
+  final String? checkoutUrl;
+  final DateTime? expiresAt;
+
+  static BookingPayment fromJson(Map<String, dynamic> json) {
+    final data = json['data'] as Map<String, dynamic>? ?? const {};
+    final payment = json['payment'] as Map<String, dynamic>? ?? const {};
+    return BookingPayment(
+      booking: CreatedBooking.fromJson(data),
+      status: payment['status'] as String? ?? 'pending',
+      checkoutUrl: payment['checkoutUrl'] as String?,
+      expiresAt: DateTime.tryParse(payment['expiresAt'] as String? ?? '')
+          ?.toLocal(),
+    );
+  }
 }
 
 /// Booking availability and creation against the CleanGo backend.
@@ -91,8 +120,7 @@ class CustomerBookingApi {
         .toList(growable: false);
   }
 
-  /// Dummy payment (trial only): marks the booking as paid without a gateway.
-  Future<CreatedBooking> pay({
+  Future<BookingPayment> pay({
     required String bookingId,
     required String method,
   }) async {
@@ -101,6 +129,16 @@ class CustomerBookingApi {
     final res = await _client.post(
       '${ApiConfig.customerBookings}/$bookingId/pay',
       body: {'method': method},
+      token: token,
+    );
+    return BookingPayment.fromJson(res);
+  }
+
+  Future<CreatedBooking> fetchBooking(String bookingId) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    final res = await _client.get(
+      '${ApiConfig.customerBookings}/$bookingId',
       token: token,
     );
     final data = res['data'] as Map<String, dynamic>? ?? const {};
@@ -294,8 +332,8 @@ class CustomerBookingSummary {
     this.recipientName = '',
     this.recipientPhone = '',
     this.landmark = '',
-     this.cleanerName = '',
-    this.cleanerRating,
+    this.cleanerName = '',
+    this.cleanerCompletedBookings,
     this.paymentStatus,
     this.paymentMethod = '',
     this.hasReview = false,
@@ -329,7 +367,7 @@ class CustomerBookingSummary {
   final String recipientPhone;
   final String landmark;
   final String cleanerName;
-  final double? cleanerRating;
+  final int? cleanerCompletedBookings;
   final String? paymentStatus;
   final String paymentMethod;
   final bool hasReview;
@@ -372,7 +410,7 @@ class CustomerBookingSummary {
       recipientPhone: json['recipientPhone'] as String? ?? '',
       landmark: json['landmark'] as String? ?? '',
       cleanerName: json['cleanerName'] as String? ?? '',
-      cleanerRating: (json['cleanerRating'] as num?)?.toDouble(),
+      cleanerCompletedBookings: (json['cleanerCompletedBookings'] as num?)?.toInt(),
       paymentStatus: json['paymentStatus'] as String?,
       paymentMethod: json['paymentMethod'] as String? ?? '',
       hasReview: json['hasReview'] == true,

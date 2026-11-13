@@ -62,6 +62,9 @@ class BookingController extends ChangeNotifier {
   List<String> _apiSlots = const [];
   String? _availabilityError;
   bool _availabilityLoading = false;
+  bool _availabilityLoaded = false;
+  int _availabilityRequest = 0;
+  bool _disposed = false;
   ServiceModel? _service;
   DateTime _selectedDate;
   String _selectedTime;
@@ -76,9 +79,8 @@ class BookingController extends ChangeNotifier {
   String? get addressId => _addressId;
   String get note => _note;
 
-  /// Slots offered for the selected date: server slots when loaded, otherwise
-  /// the local default schedule.
-  List<String> get slots => _apiSlots.isEmpty ? availableTimes : _apiSlots;
+  /// Local defaults are usable only without a configured booking API.
+  List<String> get slots => _bookingApi == null ? availableTimes : _apiSlots;
 
   /// Every slot the backend reported for the selected date, including the ones
   /// that are closed, so the UI can show why a time cannot be picked.
@@ -91,7 +93,7 @@ class BookingController extends ChangeNotifier {
   List<BookingSlotInfo> get slotInfo => List.unmodifiable(_slotInfo);
   String? get availabilityError => _availabilityError;
   bool get availabilityLoading => _availabilityLoading;
-  bool get hasServerAvailability => _apiSlots.isNotEmpty;
+  bool get hasServerAvailability => _availabilityLoaded;
 
   String? slotReason(String time) {
     for (final slot in _slotInfo) {
@@ -108,30 +110,32 @@ class BookingController extends ChangeNotifier {
   /// Loads the availability board for the selected date and service.
   Future<void> loadAvailability() async {
     final api = _bookingApi;
-    if (api == null) return;
+    if (api == null || _disposed) return;
+    final request = ++_availabilityRequest;
+    final date = isoDate(_selectedDate);
+    final serviceId = _service?.id;
     _availabilityLoading = true;
     _availabilityError = null;
     notifyListeners();
     try {
-      final info = await api.availability(
-        date: isoDate(_selectedDate),
-        serviceId: _service?.id,
-      );
+      final info = await api.availability(date: date, serviceId: serviceId);
+      if (_disposed || request != _availabilityRequest || date != isoDate(_selectedDate) || serviceId != _service?.id) return;
       _slotInfo = info;
-      _apiSlots = info
-          .where((slot) => slot.available)
-          .map((slot) => slot.time)
-          .toList(growable: false);
-      if (_apiSlots.isNotEmpty && !_apiSlots.contains(_selectedTime)) {
-        _selectedTime = _apiSlots.first;
-      }
+      _apiSlots = info.where((slot) => slot.available).map((slot) => slot.time).toList(growable: false);
+      _availabilityLoaded = true;
+      if (!_apiSlots.contains(_selectedTime)) _selectedTime = _apiSlots.firstOrNull ?? '';
     } catch (error) {
+      if (_disposed || request != _availabilityRequest) return;
       _availabilityError = error.toString();
       _slotInfo = const [];
       _apiSlots = const [];
+      _availabilityLoaded = false;
+      _selectedTime = '';
     } finally {
-      _availabilityLoading = false;
-      notifyListeners();
+      if (!_disposed && request == _availabilityRequest) {
+        _availabilityLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -144,6 +148,8 @@ class BookingController extends ChangeNotifier {
     if (service == null) {
       throw StateError('Pilih layanan terlebih dahulu.');
     }
+    final scheduleError = validateSchedule();
+    if (scheduleError != null) throw StateError(scheduleError);
     return api.create(
       serviceId: service.id,
       date: isoDate(_selectedDate),
@@ -151,6 +157,18 @@ class BookingController extends ChangeNotifier {
       addressId: _addressId,
       notes: _note,
     );
+  }
+
+  Future<BookingPayment> payBooking(String bookingId, String method) {
+    final api = _bookingApi;
+    if (api == null) throw StateError('Pembayaran memerlukan koneksi server.');
+    return api.pay(bookingId: bookingId, method: method);
+  }
+
+  Future<CreatedBooking> fetchBooking(String bookingId) {
+    final api = _bookingApi;
+    if (api == null) throw StateError('Pembayaran memerlukan koneksi server.');
+    return api.fetchBooking(bookingId);
   }
 
   int get servicePriceValue => _parsePrice(_service?.price ?? '');
@@ -191,6 +209,9 @@ class BookingController extends ChangeNotifier {
   String get formattedSelectedTime => '$_selectedTime WIB';
 
   bool isTimeAvailable(String time, {DateTime? now}) {
+    if (_bookingApi != null) {
+      return !_availabilityLoading && _availabilityLoaded && _apiSlots.contains(time);
+    }
     if (!slots.contains(time)) return false;
     final hour = int.parse(time.substring(0, 2));
     final scheduled = DateTime(
@@ -212,6 +233,9 @@ class BookingController extends ChangeNotifier {
       hasAddress ? null : 'Tambahkan alamat terlebih dahulu.';
 
   String? validateSchedule({DateTime? now}) {
+    if (_bookingApi != null) {
+      return isTimeAvailable(_selectedTime) ? null : 'Pilih tanggal dan jam mulai yang masih tersedia.';
+    }
     final current = now ?? DateTime.now();
     if (_selectedDate.isBefore(DateUtils.dateOnly(current))) {
       return 'Tanggal booking sudah lewat. Pilih tanggal lain.';
@@ -246,12 +270,16 @@ class BookingController extends ChangeNotifier {
         notifyListeners();
         _persistDraft();
       }
+      if (_bookingApi != null) unawaited(loadAvailability());
       return;
     }
 
     _service = service;
     _selectedDate = initialDate;
-    _selectedTime = '12:00';
+    _selectedTime = '';
+    _slotInfo = const [];
+    _apiSlots = const [];
+    _availabilityLoaded = false;
     _ensureTimeSelection();
     _address = emptyAddress;
     _addressId = null;
@@ -268,6 +296,10 @@ class BookingController extends ChangeNotifier {
     }
 
     _selectedDate = DateUtils.dateOnly(date);
+    _selectedTime = '';
+    _slotInfo = const [];
+    _apiSlots = const [];
+    _availabilityLoaded = false;
     _ensureTimeSelection();
     if (_bookingApi != null) unawaited(loadAvailability());
     notifyListeners();
@@ -329,6 +361,12 @@ class BookingController extends ChangeNotifier {
             debugPrint('Gagal menyimpan draft booking: $error\n$stackTrace');
           }),
     );
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   static int _parsePrice(String price) {

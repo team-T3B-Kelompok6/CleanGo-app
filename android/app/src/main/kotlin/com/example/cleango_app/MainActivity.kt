@@ -43,10 +43,18 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        PushNotificationChannel.handleIntent(intent, deliver = false)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        PushNotificationChannel.handleIntent(intent)
     }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        PushNotificationChannel.register(this, flutterEngine)
         locationChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.cleango.app/location")
         locationChannel.setMethodCallHandler { call, result ->
             if (call.method == "getCurrentLocation") {

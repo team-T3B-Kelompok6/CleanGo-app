@@ -103,14 +103,17 @@ void main() {
       expect(controller.selectedTime, isNot('12:00'));
     });
 
-    test('falls back to the local schedule when availability fails', () async {
+    test('blocks selection when server availability fails', () async {
       final api = _FakeBookingApi(failAvailability: true);
       final controller = BookingController(bookingApi: api, initialService: _service);
 
       await controller.loadAvailability();
 
       expect(controller.hasServerAvailability, isFalse);
-      expect(controller.slots, BookingController.availableTimes);
+      expect(controller.slots, isEmpty);
+      expect(controller.selectedTime, isEmpty);
+      expect(controller.isTimeAvailable('12:00'), isFalse);
+      expect(controller.validateSchedule(), isNotNull);
       expect(controller.availabilityError, isNotNull);
     });
 

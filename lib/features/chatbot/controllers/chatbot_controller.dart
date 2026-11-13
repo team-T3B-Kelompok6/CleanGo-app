@@ -8,10 +8,13 @@ import '../data/chat_history_store.dart';
 import '../models/chat_message.dart';
 
 class ChatbotController extends ChangeNotifier {
-  ChatbotController({ChatbotGateway? repository, ChatHistoryStore? history, DateTime Function()? now})
-    : _repository = repository ?? ChatbotRepository(),
-      _history = history ?? ChatHistoryStore(),
-      _now = now ?? DateTime.now;
+  ChatbotController({
+    ChatbotGateway? repository,
+    ChatHistoryStore? history,
+    DateTime Function()? now,
+  }) : _repository = repository ?? ChatbotRepository(),
+       _history = history ?? ChatHistoryStore(),
+       _now = now ?? DateTime.now;
 
   final ChatbotGateway _repository;
   final ChatHistoryStore _history;
@@ -29,6 +32,7 @@ class ChatbotController extends ChangeNotifier {
   bool get hasMessage => _hasMessage;
   bool get isSending => _isSending;
   bool get historyUnavailable => _historyUnavailable;
+  Future<List<ChatSuggestion>> loadSuggestions() => _repository.suggestions();
 
   Future<void> restoreHistory() => _initialization ??= _restoreHistory();
 
@@ -72,7 +76,8 @@ class ChatbotController extends ChangeNotifier {
   void _scheduleExpiry() {
     _expiryTimer?.cancel();
     if (_disposed || _messages.isEmpty) return;
-    final expiry = _messages.map((message) => message.createdAt.add(ChatMessage.retention))
+    final expiry = _messages
+        .map((message) => message.createdAt.add(ChatMessage.retention))
         .reduce((a, b) => a.isBefore(b) ? a : b);
     final delay = expiry.difference(_now());
     _expiryTimer = Timer(delay.isNegative ? Duration.zero : delay, () {
@@ -98,14 +103,18 @@ class ChatbotController extends ChangeNotifier {
     await expireHistory();
     if (_disposed) return false;
     final history = List<ChatMessage>.of(_messages);
-    _messages.add(ChatMessage(content: message, isUser: true, createdAt: _now()));
+    _messages.add(
+      ChatMessage(content: message, isUser: true, createdAt: _now()),
+    );
     _hasMessage = false;
     notifyListeners();
     try {
       await _saveHistory();
       if (_disposed) return true;
       final answer = await _repository.reply(message, history);
-      _messages.add(ChatMessage(content: answer, isUser: false, createdAt: _now()));
+      _messages.add(
+        ChatMessage(content: answer, isUser: false, createdAt: _now()),
+      );
     } catch (error) {
       _messages.add(
         ChatMessage(

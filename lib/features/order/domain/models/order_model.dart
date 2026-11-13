@@ -13,6 +13,14 @@ class RoutePoint {
 
   final double latitude;
   final double longitude;
+
+  static bool isValid(double? lat, double? lng) {
+    if (lat == null || lng == null) return false;
+    if (lat.isNaN || lng.isNaN) return false;
+    if (lat < -90.0 || lat > 90.0) return false;
+    if (lng < -180.0 || lng > 180.0) return false;
+    return true;
+  }
 }
 
 extension OrderStatusStageExtension on OrderStatusStage {
@@ -91,8 +99,8 @@ class ScheduledOrderModel {
     this.paymentState,
     this.stage = OrderStatusStage.dikonfirmasi,
     this.cleanerName = '',
-    this.cleanerRating,
-    this.cleanerCompletedTasks = '340+ tugas selesai',
+    this.cleanerCompletedBookings,
+    this.cleanerCompletedTasks = '',
     this.cleanerAvatarPath = 'assets/images/cleaner_siti.jpeg',
     this.cleanerPhone = '',
     this.destinationAddress = '',
@@ -113,6 +121,7 @@ class ScheduledOrderModel {
     this.hasCleanerCoordinates = true,
     this.etaSource = 'Lokasi cleaner belum dibagikan',
     this.etaUpdatedAt,
+    this.locationUpdatedAt,
     this.routePoints = const [],
     this.scheduledAt,
     this.note = '',
@@ -138,7 +147,7 @@ class ScheduledOrderModel {
   final String? paymentState;
   final OrderStatusStage stage;
   final String cleanerName;
-  final double? cleanerRating;
+  final int? cleanerCompletedBookings;
   final String cleanerCompletedTasks;
   final String cleanerAvatarPath;
   final String cleanerPhone;
@@ -160,6 +169,20 @@ class ScheduledOrderModel {
   final bool hasCleanerCoordinates;
   final String etaSource;
   final DateTime? etaUpdatedAt;
+  final DateTime? locationUpdatedAt;
+
+  bool hasFreshCleanerLocation(DateTime now) {
+    if (!hasCleanerCoordinates ||
+        !RoutePoint.isValid(cleanerLatitude, cleanerLongitude)) {
+      return false;
+    }
+    if (backendBookingId == null) return true;
+    final timestamp = locationUpdatedAt;
+    if (timestamp == null) return false;
+    final age = now.difference(timestamp);
+    return !age.isNegative && age < const Duration(minutes: 5);
+  }
+
   final List<RoutePoint> routePoints;
   final DateTime? scheduledAt;
   final String note;
@@ -185,7 +208,7 @@ class ScheduledOrderModel {
     String? paymentState,
     OrderStatusStage? stage,
     String? cleanerName,
-    double? cleanerRating,
+    int? cleanerCompletedBookings,
     String? cleanerCompletedTasks,
     String? cleanerAvatarPath,
     String? cleanerPhone,
@@ -207,6 +230,8 @@ class ScheduledOrderModel {
     bool? hasCleanerCoordinates,
     String? etaSource,
     DateTime? etaUpdatedAt,
+    DateTime? locationUpdatedAt,
+    bool clearLocationUpdatedAt = false,
     List<RoutePoint>? routePoints,
     bool clearEtaUpdatedAt = false,
     DateTime? scheduledAt,
@@ -236,7 +261,8 @@ class ScheduledOrderModel {
       paymentState: paymentState ?? this.paymentState,
       stage: stage ?? this.stage,
       cleanerName: cleanerName ?? this.cleanerName,
-      cleanerRating: cleanerRating ?? this.cleanerRating,
+      cleanerCompletedBookings:
+          cleanerCompletedBookings ?? this.cleanerCompletedBookings,
       cleanerCompletedTasks:
           cleanerCompletedTasks ?? this.cleanerCompletedTasks,
       cleanerAvatarPath: cleanerAvatarPath ?? this.cleanerAvatarPath,
@@ -261,6 +287,9 @@ class ScheduledOrderModel {
       hasCleanerCoordinates:
           hasCleanerCoordinates ?? this.hasCleanerCoordinates,
       etaSource: etaSource ?? this.etaSource,
+      locationUpdatedAt: clearLocationUpdatedAt
+          ? null
+          : locationUpdatedAt ?? this.locationUpdatedAt,
       etaUpdatedAt: clearEtaUpdatedAt
           ? null
           : etaUpdatedAt ?? this.etaUpdatedAt,

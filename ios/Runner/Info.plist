@@ -27,9 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>CleanGo menggunakan kamera untuk foto profil dan foto hasil pengerjaan.</string>
+	<string>CleanGo menggunakan kamera untuk foto profil, foto hasil pengerjaan, dan analisis foto oleh Boo setelah konfirmasi Anda.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>CleanGo memilih foto profil dan foto hasil pengerjaan dari galeri.</string>
+	<string>CleanGo memilih foto profil, foto hasil pengerjaan, dan foto untuk analisis Boo dari galeri setelah konfirmasi Anda.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -14,10 +14,16 @@ class FakeChatbot implements ChatbotGateway {
   bool closed = false;
   bool fail = false;
   @override
-  Future<String> reply(String message, List<ChatMessage> history) async {
+  Future<ChatReply> reply(
+    String message,
+    List<ChatMessage> history, {
+    List<String>? faqIds,
+  }) async {
     lastHistory = List.of(history);
     if (fail) throw Exception('offline');
-    return pending == null ? 'Halo, saya Boo.' : pending!.future;
+    return ChatReply(
+      answer: pending == null ? 'Halo, saya Boo.' : await pending!.future,
+    );
   }
 
   @override
@@ -27,7 +33,76 @@ class FakeChatbot implements ChatbotGateway {
   void close() => closed = true;
 }
 
+class MenuChatbot extends FakeChatbot {
+  final calls = <List<String>?>[];
+  @override
+  Future<ChatReply> reply(
+    String message,
+    List<ChatMessage> history, {
+    List<String>? faqIds,
+  }) async {
+    calls.add(faqIds);
+    if (message == 'FAQ') {
+      return const ChatReply(
+        answer: '1. Pertanyaan',
+        faqChoices: [FaqChoice(id: '7', question: 'Pertanyaan')],
+        faqNextPage: 2,
+      );
+    }
+    if (message == '9') return const ChatReply(answer: 'Pilih nomor 1');
+    return const ChatReply(answer: 'Jawaban resmi');
+  }
+}
+
 void main() {
+  test(
+    'FAQ menu IDs belong only to active menu turn, not history/new session',
+    () async {
+      final repository = MenuChatbot();
+      final history = FakeChatHistory();
+      final controller = ChatbotController(
+        repository: repository,
+        history: history,
+      );
+      await controller.sendMessage('FAQ');
+      expect(controller.faqNextPage, 2);
+      await controller.sendMessage('9');
+      await controller.sendMessage('1');
+      expect(repository.calls, [
+        null,
+        ['7'],
+        ['7'],
+      ]);
+      await controller.sendMessage('2');
+      expect(repository.calls.last, isNull);
+      await controller.sendMessage('FAQ');
+      await controller.sendMessage('Apa itu CleanGo?');
+      await controller.sendMessage('1');
+      expect(repository.calls.last, isNull);
+      controller.dispose();
+      final restored = ChatbotController(
+        repository: repository,
+        history: history,
+      );
+      addTearDown(restored.dispose);
+      await restored.sendMessage('1');
+      expect(repository.calls.last, isNull);
+    },
+  );
+  test('FAQ menu expires before numeric selection', () async {
+    var now = DateTime.utc(2026);
+    final repository = MenuChatbot();
+    final controller = ChatbotController(
+      repository: repository,
+      history: FakeChatHistory(),
+      now: () => now,
+    );
+    addTearDown(controller.dispose);
+    await controller.sendMessage('FAQ');
+    now = now.add(const Duration(minutes: 16));
+    await controller.sendMessage('1');
+    expect(repository.calls.last, isNull);
+  });
   group('ChatbotController', () {
     late ChatbotController controller;
     late FakeChatbot repository;

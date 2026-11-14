@@ -12,6 +12,7 @@ import '../controllers/chatbot_controller.dart';
 import '../models/chat_message.dart';
 import '../data/chatbot_repository.dart';
 import '../data/chat_history_store.dart';
+import 'chat_image_page.dart';
 
 class ChatbotPage extends StatefulWidget {
   const ChatbotPage({
@@ -148,6 +149,18 @@ class _ChatbotPageState extends State<ChatbotPage> with WidgetsBindingObserver {
                               isSending: _chatbotController.isSending,
                             ),
                     ),
+                    if (_chatbotController.faqNextPage != null)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: _chatbotController.isSending
+                              ? null
+                              : () => _sendSuggestedQuestion(
+                                  'FAQ halaman ${_chatbotController.faqNextPage}',
+                                ),
+                          child: const Text('FAQ lainnya'),
+                        ),
+                      ),
                     if (_chatbotController.historyUnavailable)
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
@@ -162,6 +175,10 @@ class _ChatbotPageState extends State<ChatbotPage> with WidgetsBindingObserver {
                             (snapshot.hasData && snapshot.data!.isNotEmpty)
                             ? snapshot.data!
                             : const [
+                                ChatSuggestion(
+                                  question: 'FAQ',
+                                  source: 'faq-menu',
+                                ),
                                 ChatSuggestion(
                                   question: 'Apa saja layanan CleanGo?',
                                   source: 'knowledge',
@@ -192,6 +209,11 @@ class _ChatbotPageState extends State<ChatbotPage> with WidgetsBindingObserver {
                           !_chatbotController.isSending,
                       onChanged: _handleMessageChanged,
                       onSend: _sendMessage,
+                      onImage: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ChatImagePage(),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -439,12 +461,14 @@ class _ChatInput extends StatelessWidget {
     required this.hasMessage,
     required this.onChanged,
     required this.onSend,
+    required this.onImage,
   });
 
   final TextEditingController controller;
   final bool hasMessage;
   final ValueChanged<String> onChanged;
   final VoidCallback onSend;
+  final VoidCallback onImage;
 
   @override
   Widget build(BuildContext context) {
@@ -467,6 +491,11 @@ class _ChatInput extends StatelessWidget {
         ),
         child: Row(
           children: [
+            IconButton(
+              tooltip: 'Analisis foto dengan Boo',
+              onPressed: onImage,
+              icon: const Icon(Icons.image_outlined),
+            ),
             Expanded(
               child: TextField(
                 controller: controller,

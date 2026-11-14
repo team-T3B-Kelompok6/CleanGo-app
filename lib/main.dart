@@ -11,6 +11,7 @@ import 'core/notifications/push_notifications.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/token_storage.dart';
 import 'core/theme/app_theme.dart';
+import 'features/chatbot/data/chat_image_cache.dart';
 import 'features/address/data/address_repository.dart';
 import 'features/address/domain/models/address_model.dart';
 import 'features/booking/data/booking_draft_repository.dart';
@@ -69,6 +70,7 @@ class _BootstrapViewState extends State<_BootstrapView> {
 
     // I/O independen aman dijalankan bersamaan; setiap tugas punya fallback agar
     // satu kegagalan tidak menyedot seluruh startup.
+    await discardLostChatPhotos();
     final pushFuture = firebaseTask();
     final addressFuture = _guard(
       addressRepository.readAddresses,

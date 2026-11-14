@@ -27,6 +27,18 @@ class ChatbotController extends ChangeNotifier {
   bool _isSending = false;
   bool _disposed = false;
   Timer? _expiryTimer;
+  List<FaqChoice> _faqChoices = const [];
+  int? _faqNextPage;
+  DateTime? _faqExpiresAt;
+
+  bool get _hasFaqMenu => _faqExpiresAt?.isAfter(_now()) ?? false;
+  int? get faqNextPage => _hasFaqMenu ? _faqNextPage : null;
+
+  void _clearFaqMenu() {
+    _faqChoices = const [];
+    _faqNextPage = null;
+    _faqExpiresAt = null;
+  }
 
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get hasMessage => _hasMessage;
@@ -102,6 +114,17 @@ class ChatbotController extends ChangeNotifier {
     if (_disposed) return false;
     await expireHistory();
     if (_disposed) return false;
+    final numeric = RegExp(r'^-?\d+(?:\.\d+)?$').hasMatch(message);
+    final faqIds = numeric && _hasFaqMenu
+        ? _faqChoices.map((choice) => choice.id).toList()
+        : null;
+    final selected = int.tryParse(message);
+    final validSelection =
+        faqIds != null &&
+        selected != null &&
+        selected > 0 &&
+        selected <= faqIds.length;
+    if (faqIds == null || validSelection) _clearFaqMenu();
     final history = List<ChatMessage>.of(_messages);
     _messages.add(
       ChatMessage(content: message, isUser: true, createdAt: _now()),
@@ -111,11 +134,19 @@ class ChatbotController extends ChangeNotifier {
     try {
       await _saveHistory();
       if (_disposed) return true;
-      final answer = await _repository.reply(message, history);
+      final result = await _repository.reply(message, history, faqIds: faqIds);
+      if (result.faqChoices.isNotEmpty) {
+        _faqChoices = result.faqChoices;
+        _faqNextPage = result.faqNextPage;
+        _faqExpiresAt = _now().add(const Duration(minutes: 15));
+      } else if (faqIds == null || validSelection) {
+        _clearFaqMenu();
+      }
       _messages.add(
-        ChatMessage(content: answer, isUser: false, createdAt: _now()),
+        ChatMessage(content: result.answer, isUser: false, createdAt: _now()),
       );
     } catch (error) {
+      _clearFaqMenu();
       _messages.add(
         ChatMessage(
           content: error is ApiException ? error.message : 'Boo belum dapat terhubung. Periksa koneksi lalu kirim ulang pesan, atau buka Pusat Bantuan.',

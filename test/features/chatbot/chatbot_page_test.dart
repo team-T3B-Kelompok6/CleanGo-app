@@ -17,9 +17,13 @@ class PendingChat implements ChatbotGateway {
   final answer = Completer<String>();
   final questions = <String>[];
   @override
-  Future<String> reply(String message, List<ChatMessage> history) {
+  Future<ChatReply> reply(
+    String message,
+    List<ChatMessage> history, {
+    List<String>? faqIds,
+  }) async {
     questions.add(message);
-    return answer.future;
+    return ChatReply(answer: await answer.future);
   }
 
   @override
@@ -38,6 +42,86 @@ class GuestTokens implements TokenStorage {
 }
 
 void main() {
+  testWidgets(
+    'FAQ chip opens menu, numeric input sends displayed IDs, next page replaces menu',
+    (tester) async {
+      final calls = <Map<String, dynamic>>[];
+      final repository = ChatbotRepository(
+        tokens: GuestTokens(),
+        client: ApiClient(
+          client: MockClient((request) async {
+            if (request.method == 'GET') {
+              return http.Response(
+                '{"data":[{"question":"FAQ","source":"faq-menu"}]}',
+                200,
+              );
+            }
+            final body = jsonDecode(request.body) as Map<String, dynamic>;
+            calls.add(body);
+            final menu = body['message'] == 'FAQ';
+            return http.Response(
+              jsonEncode({
+                'data': menu
+                    ? {
+                        'answer': '1. Pertanyaan resmi',
+                        'faqChoices': [
+                          {'id': '42', 'question': 'Pertanyaan resmi'},
+                        ],
+                        'faqNextPage': 2,
+                      }
+                    : {'answer': 'Jawaban resmi'},
+              }),
+              200,
+            );
+          }),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ChatbotPage(repository: repository, history: FakeChatHistory()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ActionChip, 'FAQ'));
+      await tester.pumpAndSettle();
+      expect(find.text('1. Pertanyaan resmi'), findsOneWidget);
+      expect(find.text('FAQ lainnya'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), '1');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await tester.pumpAndSettle();
+      expect(calls.last['message'], '1');
+      expect(calls.last['faqIds'], ['42']);
+      expect(find.text('Jawaban resmi'), findsOneWidget);
+      expect(find.text('FAQ lainnya'), findsNothing);
+      await tester.tap(find.widgetWithText(ActionChip, 'FAQ'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('FAQ lainnya'));
+      await tester.pumpAndSettle();
+      expect(calls.last['message'], 'FAQ halaman 2');
+      expect(calls.last.containsKey('faqIds'), isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  testWidgets('opens ephemeral Boo photo flow without writing chat history', (
+    tester,
+  ) async {
+    final store = FakeChatHistory();
+    final repository = PendingChat();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChatbotPage(repository: repository, history: store),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Analisis foto dengan Boo'));
+    await tester.pumpAndSettle();
+    expect(find.text('Analisis foto'), findsOneWidget);
+    expect(find.text('Kamera'), findsOneWidget);
+    expect(find.text('Galeri'), findsOneWidget);
+    expect(repository.questions, isEmpty);
+    expect(store.saved, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
     'renders and saves an actual repository response without rewriting it',
     (tester) async {
@@ -150,7 +234,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.image_outlined), findsNothing);
+    expect(find.byTooltip('Analisis foto dengan Boo'), findsOneWidget);
     expect(find.byIcon(Icons.mic_none_rounded), findsNothing);
     await tester.enterText(find.byType(TextField), 'Harga layanan?');
     await tester.testTextInput.receiveAction(TextInputAction.send);

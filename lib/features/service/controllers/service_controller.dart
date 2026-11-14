@@ -35,12 +35,13 @@ class ServiceController extends ChangeNotifier {
   /// Filter chips built from the services currently loaded from the API, so a
   /// category added in the admin dashboard shows up here automatically.
   List<String> get filterOptions {
-    final categories = _allServices
-        .map((service) => service.category.trim())
-        .where((category) => category.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
+    final categories =
+        _allServices
+            .map((service) => service.category.trim())
+            .where((category) => category.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
     if (categories.isEmpty) return filters;
     return [filters.first, ...categories];
   }
@@ -102,11 +103,20 @@ class ServiceController extends ChangeNotifier {
 
   /// Re-reads the catalogue from the backend (new photos, prices, categories)
   /// without restarting the app.
-  Future<void> refreshServices() async {
+  Future<bool> refreshServices() async {
     try {
-      await _repository?.refresh();
+      final repo = _repository;
+      if (repo == null) return false;
+      if (!await repo.refresh()) return false;
+      final services = await repo.readServices();
+      _loadedDetails.clear();
+      _allServices = List<ServiceModel>.from(services);
+      _selectedService = findServiceById(_selectedService?.id);
+      notifyListeners();
+      return true;
     } catch (_) {
       // offline: keep the cached catalogue
+      return false;
     }
   }
 

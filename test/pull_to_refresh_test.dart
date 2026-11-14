@@ -31,9 +31,9 @@ class _CountingService extends ServiceController {
   int refreshes = 0;
 
   @override
-  Future<void> refreshServices() {
+  Future<bool> refreshServices() {
     refreshes++;
-    return Future<void>.value();
+    return Future<bool>.value(true);
   }
 
   void emitChange() => notifyListeners();

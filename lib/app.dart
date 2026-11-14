@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'core/constants/app_routes.dart';
 import 'shared/widgets/app_notice.dart';
 import 'core/notifications/push_notifications.dart';
+import 'core/notifications/open_booking_notification.dart';
 import 'core/database/app_database.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/storage/token_storage.dart';
@@ -91,16 +92,25 @@ class _NotificationRouteObserver extends NavigatorObserver {
   final ValueChanged<bool> onReady;
   void _update(Route<dynamic>? route) {
     final name = route?.settings.name;
-    onReady(route != null && name != Navigator.defaultRouteName &&
-        name != AppRoutes.splash && name != AppRoutes.login &&
-        name != AppRoutes.onboarding && name != AppRoutes.register);
+    onReady(
+      route != null &&
+          name != Navigator.defaultRouteName &&
+          name != AppRoutes.splash &&
+          name != AppRoutes.login &&
+          name != AppRoutes.onboarding &&
+          name != AppRoutes.register,
+    );
   }
+
   @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => _update(route);
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _update(route);
   @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) => _update(newRoute);
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      _update(newRoute);
   @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) => _update(previousRoute);
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _update(previousRoute);
 }
 
 class _CleanGoAppState extends State<CleanGoApp> {
@@ -131,21 +141,16 @@ class _CleanGoAppState extends State<CleanGoApp> {
       return;
     }
     if (!context.mounted) return;
-    final orders = context.read<OrderController>();
     final bookingId = message.data['bookingId']?.toString();
-    if ((message.data['type'] == 'order' || message.data['type'] == 'payment') &&
-        bookingId != null && RegExp(r'^[1-9][0-9]*$').hasMatch(bookingId)) {
-      await orders.loadFromApi();
-      if (!mounted) return;
-      for (final order in orders.scheduledOrders) {
-        if (order.backendBookingId == bookingId) {
-          orders.selectScheduledOrder(order.orderNumber);
-          _navigatorKey.currentState?.pushNamed(AppRoutes.orderStatus);
-          return;
-        }
-      }
+    final type = message.data['type']?.toString() ?? '';
+    final opened = await openBookingNotification(
+      context,
+      type: type,
+      bookingId: bookingId,
+    );
+    if (!opened && mounted) {
+      _navigatorKey.currentState?.pushNamed(AppRoutes.messages);
     }
-    _navigatorKey.currentState?.pushNamed(AppRoutes.messages);
   }
 
   @override

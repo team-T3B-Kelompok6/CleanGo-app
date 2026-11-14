@@ -13,6 +13,8 @@ class MessageNotificationModel {
     this.isUnread = false,
     this.isWarning = false,
     this.badge,
+    this.type = 'system',
+    this.bookingId,
   });
 
   final String id;
@@ -24,6 +26,8 @@ class MessageNotificationModel {
   final bool isUnread;
   final bool isWarning;
   final String? badge;
+  final String type;
+  final String? bookingId;
 
   /// Maps a backend notification into the app's inbox model.
   factory MessageNotificationModel.fromApiJson(
@@ -47,6 +51,8 @@ class MessageNotificationModel {
       iconType: icon,
       isUnread: json['isRead'] != true,
       isWarning: warning,
+      type: type,
+      bookingId: json['bookingId']?.toString(),
     );
   }
 
@@ -85,6 +91,8 @@ class MessageNotificationModel {
       isUnread: isUnread ?? this.isUnread,
       isWarning: isWarning ?? this.isWarning,
       badge: badge ?? this.badge,
+      type: type,
+      bookingId: bookingId,
     );
   }
 }

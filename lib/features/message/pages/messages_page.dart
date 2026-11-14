@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/notifications/open_booking_notification.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/app_notice.dart';
@@ -119,6 +120,14 @@ class _MessagesPageState extends State<MessagesPage> {
                                               widget.onMessageTap?.call(
                                                 message,
                                               );
+                                              if (widget.onMessageTap == null &&
+                                                  message.bookingId != null) {
+                                                await openBookingNotification(
+                                                  context,
+                                                  type: message.type,
+                                                  bookingId: message.bookingId,
+                                                );
+                                              }
                                               if (!await result &&
                                                   context.mounted) {
                                                 AppNotice.show(

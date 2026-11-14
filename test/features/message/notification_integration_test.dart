@@ -39,6 +39,7 @@ void main() {
       final model = MessageNotificationModel.fromApiJson({
         'id': 12,
         'type': 'order',
+        'bookingId': 77,
         'title': 'Pesanan Dikonfirmasi',
         'message': 'Pesanan CG-1 telah dibuat.',
         'isRead': false,
@@ -46,12 +47,17 @@ void main() {
       });
 
       expect(model.id, '12');
+      expect(model.type, 'order');
+      expect(model.bookingId, '77');
       expect(model.title, 'Pesanan Dikonfirmasi');
       expect(model.category, MessageCategory.order);
       expect(model.iconType, MessageIconType.confirmed);
       expect(model.isUnread, isTrue);
       expect(model.isWarning, isFalse);
       expect(model.timeLabel, 'Baru saja');
+      final read = model.copyWith(isUnread: false);
+      expect(read.bookingId, '77');
+      expect(read.type, 'order');
     });
 
     test('maps promo and risk notifications', () {
@@ -143,13 +149,16 @@ void main() {
       },
     );
 
-    test('stays empty when the API fails and no backend data was loaded', () async {
-      final failing = MessageController(
-        notificationApi: _FakeNotificationApi(fail: true),
-      );
-      await failing.loadFromApi();
-      expect(failing.visibleMessages, isEmpty);
-    });
+    test(
+      'stays empty when the API fails and no backend data was loaded',
+      () async {
+        final failing = MessageController(
+          notificationApi: _FakeNotificationApi(fail: true),
+        );
+        await failing.loadFromApi();
+        expect(failing.visibleMessages, isEmpty);
+      },
+    );
 
     test('keeps previously loaded data when a later API call fails', () async {
       final api = _FakeNotificationApi(

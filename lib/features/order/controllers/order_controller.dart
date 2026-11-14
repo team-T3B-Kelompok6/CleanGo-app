@@ -54,12 +54,22 @@ class OrderController extends ChangeNotifier {
   List<ScheduledOrderModel> get scheduledOrders => List.unmodifiable(
     _orders.values.toList().reversed.map((state) => state.order),
   );
+  List<CustomerBookingSummary> _pendingPayments = const [];
+  List<CustomerBookingSummary> get pendingPayments {
+    final now = DateTime.now();
+    return List.unmodifiable(
+      _pendingPayments.where(
+        (b) => b.holdUntil == null || b.holdUntil!.isAfter(now),
+      ),
+    );
+  }
   OrderStatusStage get currentStage => _activeStage;
   int get currentStepNumber => _activeStage.index + 1;
   String get currentStepLabel => 'Langkah $currentStepNumber dari 5';
   List<OrderHistoryModel> get historyOrders => List.unmodifiable(_history);
   bool get reviewPhotoUploadFailed => _reviewPhotoUploadFailed;
   bool get hasScheduledOrder => _orders.isNotEmpty;
+  bool get usesServerBookings => _bookingApi != null;
   bool get etaLoading => _selected.etaLoading;
   String? get etaError => _selected.etaError;
   bool get isTravelStage =>
@@ -536,10 +546,21 @@ class OrderController extends ChangeNotifier {
     if (api == null || _disposed || _loadingBookings) return;
     _loadingBookings = true;
     try {
-      final bookings = (await api.fetchBookings()).where(
-        (booking) => booking.paymentStatus != 'expired',
-      );
+      final bookings = await api.fetchBookings();
       if (_disposed) return;
+      _pendingPayments = bookings
+          .where(
+            (booking) =>
+                !booking.isFinished &&
+                (booking.holdUntil == null ||
+                    booking.holdUntil!.isAfter(DateTime.now())) &&
+                (booking.status == 'Menunggu Pembayaran' ||
+                    (booking.paymentStatus != 'paid' &&
+                        booking.paymentMethod.toLowerCase() != 'cash' &&
+                        (booking.paymentMethod.isNotEmpty ||
+                            booking.paymentStatus != null))),
+          )
+          .toList();
 
       final selectedNumber = _scheduledOrder.orderNumber;
       final nextOrders = <String, _ActiveOrderState>{};

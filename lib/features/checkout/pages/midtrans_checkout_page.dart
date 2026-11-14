@@ -5,9 +5,10 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../controllers/payment_flow_controller.dart';
 
 class MidtransCheckoutPage extends StatefulWidget {
-  const MidtransCheckoutPage({required this.checkoutUri, super.key});
+  const MidtransCheckoutPage({required this.checkoutUri, this.onCheckStatus, super.key});
 
   final Uri checkoutUri;
+  final Future<void> Function()? onCheckStatus;
 
   /// Reuse checkout validation without accepting the legacy payment provider.
   static Uri? validatedCheckoutUri(String? url) {
@@ -38,6 +39,21 @@ class _MidtransCheckoutPageState extends State<MidtransCheckoutPage> {
   String? _error;
   String? _notice;
   int _progress = 0;
+  bool _checking = false;
+
+  Future<void> _checkStatus() async {
+    if (_checking) return;
+    final check = widget.onCheckStatus;
+    if (check == null) return;
+    setState(() => _checking = true);
+    try {
+      await check();
+    } catch (_) {
+      _showNotice('Status pembayaran belum dapat dipastikan. Cek kembali; jangan bayar ulang.');
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
 
   @override
   void initState() {
@@ -47,9 +63,21 @@ class _MidtransCheckoutPageState extends State<MidtransCheckoutPage> {
     );
     _retryUri = _initialUri;
     if (_initialUri == null) {
-      _error = 'Tautan checkout Midtrans tidak valid. Kembali dan coba lagi.';
+      _error = 'Tautan pembayaran tidak tersedia. Kembali dan hubungi admin.';
       return;
     }
+    _initialize();
+  }
+
+  @override
+  void didUpdateWidget(covariant MidtransCheckoutPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.checkoutUri == widget.checkoutUri) return;
+    final uri = MidtransCheckoutPage.validatedCheckoutUri(widget.checkoutUri.toString());
+    if (uri == null) return;
+    _initialUri = _retryUri = uri;
+    _error = null;
+    _progress = 0;
     _initialize();
   }
 
@@ -67,11 +95,11 @@ class _MidtransCheckoutPageState extends State<MidtransCheckoutPage> {
               _showNotice(
                 request.url.startsWith('blob:') ||
                         request.url.startsWith('data:')
-                    ? 'Unduh QR/blob tidak didukung di halaman ini. Gunakan '
-                          'tangkapan layar QR atau buka checkout di browser.'
-                    : 'Navigasi ini tidak didukung, termasuk tautan dompet dan '
-                          'pengalihan selesai. Pembayaran belum dikonfirmasi. '
-                          'Tekan Kembali & Cek Status untuk memeriksa server.',
+                    ? 'Kode QR belum dapat diunduh di sini. Ambil tangkapan layar '
+                          'atau buka pembayaran di browser.'
+                    : 'Tautan ini tidak dapat dibuka di aplikasi. '
+                          'Cek status pembayaran di bawah. '
+                          'Jangan bayar ulang jika sudah membayar.',
               );
             } else if (request.isMainFrame) {
               _retryUri = MidtransCheckoutPage.validatedCheckoutUri(
@@ -168,7 +196,10 @@ class _MidtransCheckoutPageState extends State<MidtransCheckoutPage> {
   Widget build(BuildContext context) {
     // No WebView history interception: system back pops this route too.
     return Scaffold(
-      appBar: AppBar(title: const Text('Pembayaran QRIS')),
+      appBar: AppBar(
+        title: const Text('Pembayaran QRIS'),
+        automaticallyImplyLeading: false,
+      ),
       body: Column(
         children: [
           if (_error == null && _progress < 100)
@@ -209,21 +240,19 @@ class _MidtransCheckoutPageState extends State<MidtransCheckoutPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Text(
-              'Unduh QR/blob belum didukung di halaman ini. Untuk HP yang sama, '
-              'gunakan tangkapan layar lalu impor QR di dompet jika tersedia, '
-              'atau coba unduh lewat browser. Scan QR dengan perangkat lain; '
-              'untuk Sandbox gunakan simulator Midtrans, bukan saldo asli. '
-              'Status pembayaran hanya dikonfirmasi server.',
-              style: TextStyle(fontSize: 12),
+              'Pindai kode QR dengan aplikasi pembayaran. Jika memakai HP yang sama, '
+              'ambil tangkapan layar lalu pilih dari galeri jika aplikasi pembayaran mendukungnya. '
+              'Setelah membayar, cek status di layar ini. Jangan bayar ulang.',
+              style: TextStyle(fontSize: 14, height: 1.45),
             ),
             if (_initialUri != null)
               TextButton(
                 onPressed: _openBrowser,
-                child: const Text('Buka checkout di browser'),
+                child: const Text('Buka pembayaran di browser'),
               ),
             FilledButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Kembali & Cek Status'),
+              onPressed: _checking ? null : _checkStatus,
+              child: Text(_checking ? 'Memeriksa pembayaran...' : 'Cek Status Pembayaran'),
             ),
           ],
         ),

@@ -12,6 +12,11 @@ import 'package:cleango_app/features/service/data/service_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('service-day routing uses the operational Jakarta date', () {
+    expect(PaymentFlowController.isServiceToday('2030-01-02', now: DateTime.utc(2030, 1, 1, 18)), isTrue);
+    expect(PaymentFlowController.isServiceToday('2030-01-03', now: DateTime.utc(2030, 1, 1, 18)), isFalse);
+  });
+
   test('only exposes QRIS and cash payment methods', () {
     expect(paymentMethods.map((method) => method.type), [
       PaymentMethodType.qris,
@@ -55,6 +60,52 @@ void main() {
       addresses.dispose();
       orders.dispose();
     });
+
+    test('cash completion clears draft before identical new booking', () async {
+      await controller.createOrder(
+        booking: booking,
+        addresses: addresses,
+        orders: orders,
+        method: paymentMethodByType(PaymentMethodType.cash),
+        totalPayment: 'Rp155.000',
+        servicePrice: 150000,
+        platformFee: 5000,
+        discountAmount: 0,
+        now: DateTime(2030, 1, 2),
+      );
+      expect(api.createdCount, 1);
+      expect(booking.serverBookingId, isNull);
+      await orders.cancelScheduledOrder();
+      await booking.createBookingOnServer();
+      expect(api.createdCount, 2);
+    });
+
+    test(
+      'Back then reopen and timeout retry reuse booking across routes',
+      () async {
+        api.status = 'pending';
+        Future<bool?> submit() => controller.createOrder(
+          booking: booking,
+          addresses: addresses,
+          orders: orders,
+          method: paymentMethodByType(PaymentMethodType.qris),
+          totalPayment: 'Rp155.000',
+          servicePrice: 150000,
+          platformFee: 5000,
+          discountAmount: 0,
+          now: DateTime(2030, 1, 2),
+        );
+        expect(await submit(), isNull);
+        controller = PaymentFlowController();
+        api.timeoutPayment = true;
+        await expectLater(submit(), throwsA(isA<TimeoutException>()));
+        controller = PaymentFlowController();
+        api.timeoutPayment = false;
+        expect(await submit(), isNull);
+        expect(api.createdCount, 1);
+        expect(api.paidCalls, 3);
+      },
+    );
 
     test('pending payment retry reuses booking and confirms only server-paid order', () async {
       api.status = 'pending';
@@ -391,6 +442,26 @@ class _BookingApi extends CustomerBookingApi {
     );
   }
 
+  @override
+  Future<CustomerBookingSummary> fetchBookingSummary(String bookingId) async {
+    fetchCalls++;
+    return CustomerBookingSummary.fromJson({
+      'id': bookingId,
+      'code': 'CG-42',
+      'date': '2030-01-02',
+      'time': '10:00',
+      'service': 'Deep Cleaning',
+      'servicePrice': 150000,
+      'platformFee': 5000,
+      'discountAmount': 0,
+      'totalAmount': 155000,
+      'status': status == 'paid' ? 'confirmed' : 'awaiting_payment',
+      'paymentStatus': status,
+      'paymentMethod': 'qris',
+      'address': 'Jl. Uji',
+    });
+  }
+
   BookingPayment _payment() => BookingPayment(
     booking: CreatedBooking(
       id: '42',
@@ -400,7 +471,7 @@ class _BookingApi extends CustomerBookingApi {
       paymentStatus: status,
     ),
     status: status,
-    checkoutUrl: 'https://checkout.xendit.co/42',
+    checkoutUrl: 'https://app.sandbox.midtrans.com/snap/v4/redirection/token',
     expiresAt: null,
   );
 }

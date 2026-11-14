@@ -102,6 +102,50 @@ CustomerBookingSummary _booking({
 );
 
 void main() {
+  test('unpaid bookings stay resumable, never counted as confirmed', () async {
+    final api = _FakeBookingApi(
+      bookings: [
+        _booking(code: 'pending', status: 'Menunggu Pembayaran'),
+        _booking(
+          code: 'link',
+          status: 'Menunggu Pembayaran',
+          paymentStatus: 'pending',
+          paymentMethod: 'qris',
+        ),
+        _booking(
+          code: 'expired',
+          status: 'Menunggu Pembayaran',
+          paymentStatus: 'expired',
+          paymentMethod: 'qris',
+        ),
+        _booking(
+          code: 'paid',
+          status: 'Menunggu Assign',
+          paymentStatus: 'paid',
+          paymentMethod: 'qris',
+        ),
+        _booking(
+          code: 'cash',
+          status: 'Menunggu Assign',
+          paymentStatus: 'pending',
+          paymentMethod: 'cash',
+        ),
+      ],
+    );
+    final controller = OrderController(bookingApi: api);
+    addTearDown(controller.dispose);
+    await controller.loadFromApi();
+    expect(controller.pendingPayments.map((booking) => booking.id), [
+      'pending',
+      'link',
+      'expired',
+    ]);
+    expect(
+      controller.scheduledOrders.map((order) => order.backendBookingId).toSet(),
+      {'paid', 'cash'},
+    );
+  });
+
   group('CustomerBookingSummary', () {
     test('parses the backend payload', () {
       final booking = CustomerBookingSummary.fromJson({

@@ -15,9 +15,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 class _BookingApi extends CustomerBookingApi {
-  _BookingApi({this.status = 'pending'});
+  _BookingApi({this.status = 'pending', this.checkoutUrl});
 
   String status;
+  final String? checkoutUrl;
   int createdCount = 0;
   int paidCalls = 0;
   int fetchCalls = 0;
@@ -60,7 +61,7 @@ class _BookingApi extends CustomerBookingApi {
     return BookingPayment(
       booking: serverBooking,
       status: status,
-      checkoutUrl: null,
+      checkoutUrl: checkoutUrl,
       expiresAt: null,
     );
   }
@@ -129,6 +130,17 @@ void main() {
     return orders;
   }
 
+  testWidgets('cash payment displays on-site instruction card without countdown timer', (
+    tester,
+  ) async {
+    await openPayment(tester, method: PaymentMethodType.cash);
+    expect(find.text('Bayar Tunai di Tempat'), findsOneWidget);
+    expect(find.textContaining('Siapkan uang pas saat cleaner tiba'), findsOneWidget);
+    expect(find.text('Konfirmasi Pembayaran Tunai'), findsOneWidget);
+    expect(find.byIcon(Icons.timer_outlined), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets(
     'cash confirmation shows a notice, navigates directly and ignores repeated submission',
     (tester) async {
@@ -151,6 +163,27 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('legacy checkout link fails closed without confirming order', (
+    tester,
+  ) async {
+    final api = _BookingApi(checkoutUrl: 'https://checkout.xendit.co/legacy');
+    final orders = await openPayment(
+      tester,
+      booking: BookingController(bookingApi: api),
+      method: PaymentMethodType.qris,
+    );
+    await tester.tap(find.text('Lanjutkan Pembayaran'));
+    await tester.pumpAndSettle();
+    expect(orders.hasScheduledOrder, isFalse);
+    expect(find.byType(PaymentPage), findsOneWidget);
+    expect(
+      find.text('Tautan pembayaran tidak valid. Hubungi admin.'),
+      findsOneWidget,
+    );
+    expect(api.createdCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('QRIS confirms only after server reports paid', (tester) async {
     final api = _BookingApi();
@@ -176,10 +209,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(orders.hasScheduledOrder, isFalse);
     expect(updates, 0);
-    expect(
-      find.textContaining('Pembayaran masih menunggu di penyedia pembayaran.'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('Pembayaran belum diterima.'), findsOneWidget);
 
     api.status = 'paid';
     await tester.tap(find.text('Cek Status Pembayaran'));
@@ -196,6 +226,83 @@ void main() {
     expect(api.createdCount, 1);
     expect(api.paidCalls, 1);
     expect(api.fetchCalls, 2);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('payment stays readable on narrow screen with large text', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 640));
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(() async {
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+      await tester.binding.setSurfaceSize(null);
+    });
+    await openPayment(tester, method: PaymentMethodType.qris);
+    final booking = tester
+        .element(find.byType(PaymentPage))
+        .read<BookingController>();
+    const note = 'Tolong bersihkan semua sudut ruangan dan area dekat jendela.';
+    booking.updateNote(note);
+    await tester.pump();
+    expect(find.text('Rp155.000'), findsOneWidget);
+    expect(find.text('Lanjutkan Pembayaran'), findsOneWidget);
+    expect(find.textContaining('Midtrans'), findsNothing);
+    expect(find.textContaining('Sandbox'), findsNothing);
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -600),
+    );
+    await tester.pump();
+    await tester.ensureVisible(find.text('Detail Pesanan'));
+    final waitingStyle = tester
+        .widget<Text>(find.text('Menunggu pembayaran'))
+        .style;
+    final detailStyle = tester.widget<Text>(find.text('Detail Pesanan')).style;
+    expect(detailStyle, waitingStyle);
+    expect(detailStyle?.fontSize, 16);
+    expect(detailStyle?.fontWeight, FontWeight.w600);
+    final bodyStyle = Theme.of(tester.element(find.byType(PaymentPage)))
+        .textTheme
+        .bodyMedium!;
+    for (final label in ['Layanan', 'Jadwal', 'Alamat', 'Catatan']) {
+      expect(
+        tester.widget<Text>(find.text(label)).style,
+        bodyStyle.copyWith(color: AppColors.slate500),
+      );
+    }
+    for (final value in [
+      booking.service!.title,
+      '${booking.formattedSelectedDate}, ${booking.formattedSelectedTime}',
+      '${booking.address.label}\n${booking.address.fullAddress}',
+      note,
+    ]) {
+      final text = tester.widget<Text>(find.text(value));
+      expect(text.style, bodyStyle.copyWith(color: AppColors.slate900));
+      expect(text.style?.fontFamily, 'Inter');
+      expect(text.style?.fontSize, 14);
+      expect(text.style?.fontWeight, FontWeight.w400);
+      expect(text.maxLines, isNull);
+      expect(text.overflow, isNull);
+      expect(text.softWrap, isNot(false));
+      await tester.ensureVisible(find.text(value));
+      await tester.pump();
+      expect(
+        tester
+            .getRect(find.text(value))
+            .overlaps(tester.getRect(find.byType(SingleChildScrollView))),
+        isTrue,
+      );
+    }
+    expect(tester.getSize(find.text(note)).height, greaterThan(14 * 2 * 1.45));
+    expect(tester.widget<Text>(find.text('Pembayaran')).style?.fontSize, 20);
+    expect(tester.widget<Text>(find.text('Rp155.000')).style?.fontSize, 28);
+    expect(tester.widget<Text>(find.text('QRIS')).style?.fontSize, 16);
+    expect(
+      tester.widget<Text>(find.text('Lanjutkan Pembayaran')).style?.fontWeight,
+      FontWeight.w600,
+    );
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

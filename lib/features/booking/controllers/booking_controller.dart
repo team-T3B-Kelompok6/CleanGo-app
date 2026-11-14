@@ -71,6 +71,14 @@ class BookingController extends ChangeNotifier {
   CleaningAddress _address;
   String? _addressId;
   String _note;
+  String? _serverDraftKey;
+  CreatedBooking? _serverDraft;
+  Future<CreatedBooking?>? _creatingDraft;
+
+  String get _draftKey =>
+      '${_service?.id}|${isoDate(_selectedDate)}|$_selectedTime|$_addressId|$_note';
+  String? get serverBookingId =>
+      _serverDraftKey == _draftKey ? _serverDraft?.id : null;
 
   ServiceModel? get service => _service;
   DateTime get selectedDate => _selectedDate;
@@ -119,11 +127,21 @@ class BookingController extends ChangeNotifier {
     notifyListeners();
     try {
       final info = await api.availability(date: date, serviceId: serviceId);
-      if (_disposed || request != _availabilityRequest || date != isoDate(_selectedDate) || serviceId != _service?.id) return;
+      if (_disposed ||
+          request != _availabilityRequest ||
+          date != isoDate(_selectedDate) ||
+          serviceId != _service?.id) {
+        return;
+      }
       _slotInfo = info;
-      _apiSlots = info.where((slot) => slot.available).map((slot) => slot.time).toList(growable: false);
+      _apiSlots = info
+          .where((slot) => slot.available)
+          .map((slot) => slot.time)
+          .toList(growable: false);
       _availabilityLoaded = true;
-      if (!_apiSlots.contains(_selectedTime)) _selectedTime = _apiSlots.firstOrNull ?? '';
+      if (!_apiSlots.contains(_selectedTime)) {
+        _selectedTime = _apiSlots.firstOrNull ?? '';
+      }
     } catch (error) {
       if (_disposed || request != _availabilityRequest) return;
       _availabilityError = error.toString();
@@ -148,15 +166,32 @@ class BookingController extends ChangeNotifier {
     if (service == null) {
       throw StateError('Pilih layanan terlebih dahulu.');
     }
+    final key = _draftKey;
+    if (_serverDraftKey == key) {
+      if (_serverDraft != null) return _serverDraft;
+      if (_creatingDraft != null) return _creatingDraft;
+    }
     final scheduleError = validateSchedule();
     if (scheduleError != null) throw StateError(scheduleError);
-    return api.create(
+    if (_serverDraftKey != key) _serverDraft = null;
+    _serverDraftKey = key;
+    final request = api.create(
       serviceId: service.id,
       date: isoDate(_selectedDate),
       time: _selectedTime,
       addressId: _addressId,
       notes: _note,
     );
+    _creatingDraft = request;
+    try {
+      final created = await request;
+      if (_serverDraftKey == key && identical(_creatingDraft, request)) {
+        _serverDraft = created;
+      }
+      return created;
+    } finally {
+      if (identical(_creatingDraft, request)) _creatingDraft = null;
+    }
   }
 
   Future<BookingPayment> payBooking(String bookingId, String method) {
@@ -169,6 +204,14 @@ class BookingController extends ChangeNotifier {
     final api = _bookingApi;
     if (api == null) throw StateError('Pembayaran memerlukan koneksi server.');
     return api.fetchBooking(bookingId);
+  }
+
+  Future<CustomerBookingSummary> fetchBookingSummary(String bookingId) {
+    final api = _bookingApi;
+    if (api == null) {
+      throw StateError('Notifikasi pesanan memerlukan koneksi server.');
+    }
+    return api.fetchBookingSummary(bookingId);
   }
 
   int get servicePriceValue => _parsePrice(_service?.price ?? '');
@@ -210,7 +253,9 @@ class BookingController extends ChangeNotifier {
 
   bool isTimeAvailable(String time, {DateTime? now}) {
     if (_bookingApi != null) {
-      return !_availabilityLoading && _availabilityLoaded && _apiSlots.contains(time);
+      return !_availabilityLoading &&
+          _availabilityLoaded &&
+          _apiSlots.contains(time);
     }
     if (!slots.contains(time)) return false;
     final hour = int.parse(time.substring(0, 2));
@@ -234,7 +279,9 @@ class BookingController extends ChangeNotifier {
 
   String? validateSchedule({DateTime? now}) {
     if (_bookingApi != null) {
-      return isTimeAvailable(_selectedTime) ? null : 'Pilih tanggal dan jam mulai yang masih tersedia.';
+      return isTimeAvailable(_selectedTime)
+          ? null
+          : 'Pilih tanggal dan jam mulai yang masih tersedia.';
     }
     final current = now ?? DateTime.now();
     if (_selectedDate.isBefore(DateUtils.dateOnly(current))) {
@@ -338,6 +385,9 @@ class BookingController extends ChangeNotifier {
   }
 
   Future<void> clearDraft() async {
+    _serverDraftKey = null;
+    _serverDraft = null;
+    _creatingDraft = null;
     await repository?.clearDraft();
   }
 

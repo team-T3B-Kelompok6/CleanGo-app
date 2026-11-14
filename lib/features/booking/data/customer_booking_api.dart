@@ -134,6 +134,20 @@ class CustomerBookingApi {
     return BookingPayment.fromJson(res);
   }
 
+  Future<CustomerBookingSummary> fetchBookingSummary(String bookingId) async {
+    final token = await _token();
+    if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    final res = await _client.get(
+      '${ApiConfig.customerBookings}/$bookingId',
+      token: token,
+    );
+    final data = res['data'] as Map<String, dynamic>? ?? const {};
+    if ('${data['id']}' != bookingId) {
+      throw StateError('Respons tidak cocok dengan booking.');
+    }
+    return CustomerBookingSummary.fromJson(data);
+  }
+
   Future<CreatedBooking> fetchBooking(String bookingId) async {
     final token = await _token();
     if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
@@ -336,6 +350,7 @@ class CustomerBookingSummary {
     this.cleanerCompletedBookings,
     this.paymentStatus,
     this.paymentMethod = '',
+    this.checkoutUrl,
     this.hasReview = false,
     this.reviewEditable = false,
     this.reviewRating,
@@ -370,6 +385,7 @@ class CustomerBookingSummary {
   final int? cleanerCompletedBookings;
   final String? paymentStatus;
   final String paymentMethod;
+  final String? checkoutUrl;
   final bool hasReview;
   final bool reviewEditable;
   final int? reviewRating;
@@ -398,7 +414,18 @@ class CustomerBookingSummary {
       platformFee: (json['platformFee'] as num?)?.toInt() ?? 0,
       discountAmount: (json['discountAmount'] as num?)?.toInt() ?? 0,
       totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
-      status: json['status'] as String? ?? 'Menunggu Assign',
+      // Detail endpoint uses DB statuses; list endpoint already uses labels.
+      status: switch (json['status']) {
+        'awaiting_payment' => 'Menunggu Pembayaran',
+        'confirmed' => 'Menunggu Assign',
+        'assigned' => 'Menunggu Lokasi',
+        'departed' || 'en_route' => 'Menuju Lokasi',
+        'in_progress' => 'Sedang Dikerjakan',
+        'completed' => 'Selesai',
+        'cancelled' => 'Batal',
+        'rescheduled' => 'Dijadwalkan Ulang',
+        _ => json['status'] as String? ?? 'Menunggu Assign',
+      },
       notes: json['notes'] as String? ?? '',
       address: json['address'] as String? ?? '',
       holdUntil: DateTime.tryParse(json['holdUntil'] as String? ?? '')
@@ -410,9 +437,11 @@ class CustomerBookingSummary {
       recipientPhone: json['recipientPhone'] as String? ?? '',
       landmark: json['landmark'] as String? ?? '',
       cleanerName: json['cleanerName'] as String? ?? '',
-      cleanerCompletedBookings: (json['cleanerCompletedBookings'] as num?)?.toInt(),
+      cleanerCompletedBookings: (json['cleanerCompletedBookings'] as num?)
+          ?.toInt(),
       paymentStatus: json['paymentStatus'] as String?,
       paymentMethod: json['paymentMethod'] as String? ?? '',
+      checkoutUrl: json['checkoutUrl'] as String?,
       hasReview: json['hasReview'] == true,
       reviewEditable: json['reviewEditable'] == true,
       reviewRating: (json['reviewRating'] as num?)?.toInt(),

@@ -15,7 +15,9 @@ import '../../../shared/widgets/chatbot_button.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../../booking/controllers/booking_controller.dart';
+import '../../booking/data/customer_booking_api.dart';
 import '../../booking/pages/booking_page.dart';
+import '../../checkout/pages/pending_payment_page.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../../service/controllers/service_controller.dart';
 import '../controllers/order_controller.dart';
@@ -377,6 +379,63 @@ class _OrderTabButton extends StatelessWidget {
   }
 }
 
+class _PendingPaymentCard extends StatefulWidget {
+  const _PendingPaymentCard({required this.booking, required this.onResume});
+  final CustomerBookingSummary booking;
+  final VoidCallback onResume;
+
+  @override
+  State<_PendingPaymentCard> createState() => _PendingPaymentCardState();
+}
+
+class _PendingPaymentCardState extends State<_PendingPaymentCard> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.booking.holdUntil != null) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (!mounted) return;
+        if (widget.booking.holdUntil!.isBefore(DateTime.now())) {
+          _timer?.cancel();
+          context.read<OrderController>().loadFromApi();
+        } else {
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    String countdown = '';
+    if (widget.booking.holdUntil != null) {
+      final diff = widget.booking.holdUntil!.difference(DateTime.now());
+      if (!diff.isNegative) {
+        final m = (diff.inSeconds ~/ 60).toString().padLeft(2, '0');
+        final s = (diff.inSeconds % 60).toString().padLeft(2, '0');
+        countdown = ' · Sisa $m:$s';
+      }
+    }
+    return Card(
+      child: ListTile(
+        title: const Text('Menunggu pembayaran'),
+        subtitle: Text(
+          '${widget.booking.service} · ${BookingController.formatRupiah(widget.booking.totalAmount)}$countdown',
+        ),
+        trailing: TextButton(onPressed: widget.onResume, child: const Text('Lanjutkan')),
+      ),
+    );
+  }
+}
+
 class _ScheduledOrdersView extends StatelessWidget {
   const _ScheduledOrdersView({
     required this.bottomSpacing,
@@ -392,7 +451,8 @@ class _ScheduledOrdersView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<OrderController>();
-    if (!controller.hasScheduledOrder) {
+    final pending = controller.pendingPayments;
+    if (!controller.hasScheduledOrder && pending.isEmpty) {
       return RefreshIndicator(
         onRefresh: () => context.read<OrderController>().loadFromApi(),
         child: ListView(
@@ -441,6 +501,8 @@ class _ScheduledOrdersView extends StatelessWidget {
         break;
       }
     }
+    final totalCount =
+        orders.length + pending.length + (holdOrder == null ? 0 : 1);
     return RefreshIndicator(
       onRefresh: () => context.read<OrderController>().loadFromApi(),
       child: ListView.separated(
@@ -448,7 +510,7 @@ class _ScheduledOrdersView extends StatelessWidget {
           parent: BouncingScrollPhysics(),
         ),
         padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
-        itemCount: orders.length + (holdOrder == null ? 0 : 1),
+        itemCount: totalCount,
         separatorBuilder: (_, _) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
           if (holdOrder != null && index == 0) {
@@ -458,7 +520,20 @@ class _ScheduledOrdersView extends StatelessWidget {
                   _confirmHoldCancellation(context, controller, holdOrder!),
             );
           }
-          final scheduledOrder = orders[index - (holdOrder == null ? 0 : 1)];
+          final offset = holdOrder == null ? 0 : 1;
+          if (index - offset < pending.length) {
+            final item = pending[index - offset];
+            return _PendingPaymentCard(
+              booking: item,
+              onResume: () => Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PendingPaymentPage(booking: item),
+                ),
+              ).then((_) => controller.loadFromApi()),
+            );
+          }
+          final scheduledOrder = orders[index - offset - pending.length];
           final displayAddress = scheduledOrder.destinationAddress.isNotEmpty
               ? scheduledOrder.destinationAddress
               : address;

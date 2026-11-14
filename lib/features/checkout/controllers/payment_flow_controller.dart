@@ -19,15 +19,17 @@ class PaymentFlowController {
             const {
               'app.midtrans.com',
               'app.sandbox.midtrans.com',
-              'checkout.xendit.co',
-              'checkout-staging.xendit.co',
-              'xen.to',
-              'dev.xen.to',
             }.contains(uri.host) &&
             uri.userInfo.isEmpty &&
             (!uri.hasPort || uri.port == 443)
         ? uri
         : null;
+  }
+
+  /// Backend slot rules use Asia/Jakarta (UTC+7, no daylight saving).
+  static bool isServiceToday(String date, {DateTime? now}) {
+    final today = (now ?? DateTime.now()).toUtc().add(const Duration(hours: 7));
+    return date == '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
   }
 
   /// Null means payment is not yet confirmed by the server.
@@ -44,6 +46,7 @@ class PaymentFlowController {
     DateTime? now,
   }) async {
     if (_completed) return _isSameDay;
+    _bookingId ??= booking.serverBookingId;
     if (_bookingId == null) {
       final scheduleError = booking.validateSchedule(now: now);
       if (scheduleError != null) throw StateError(scheduleError);
@@ -120,26 +123,30 @@ class PaymentFlowController {
       return null;
     }
     await booking.clearDraft();
-    orders.createOrderFromBooking(
-      serviceDurationMinutes: booking.service?.durationMinutes,
-      serviceName: booking.service?.title ?? 'Deep Cleaning',
-      serviceImagePath:
-          booking.service?.imagePath ??
-          'assets/images/service_deep_cleaning.jpeg',
-      price: totalPayment,
-      address: formattedAddress,
-      destinationSubAddress: selectedAddress.note,
-      destinationLatitude: selectedAddress.latitude,
-      destinationLongitude: selectedAddress.longitude,
-      scheduledAt: scheduledAt,
-      note: booking.note.trim(),
-      paymentMethod: method.name,
-      servicePrice: servicePrice,
-      platformFee: platformFee,
-      discountAmount: discountAmount,
-      customerName: selectedAddress.contactName,
-      customerPhone: selectedAddress.phoneNumber,
-    );
+    if (orders.usesServerBookings) {
+      await orders.loadFromApi();
+    } else {
+      orders.createOrderFromBooking(
+        serviceDurationMinutes: booking.service?.durationMinutes,
+        serviceName: booking.service?.title ?? 'Deep Cleaning',
+        serviceImagePath:
+            booking.service?.imagePath ??
+            'assets/images/service_deep_cleaning.jpeg',
+        price: totalPayment,
+        address: formattedAddress,
+        destinationSubAddress: selectedAddress.note,
+        destinationLatitude: selectedAddress.latitude,
+        destinationLongitude: selectedAddress.longitude,
+        scheduledAt: scheduledAt,
+        note: booking.note.trim(),
+        paymentMethod: method.name,
+        servicePrice: servicePrice,
+        platformFee: platformFee,
+        discountAmount: discountAmount,
+        customerName: selectedAddress.contactName,
+        customerPhone: selectedAddress.phoneNumber,
+      );
+    }
 
     _completed = true;
     _isSameDay = isSameDay;

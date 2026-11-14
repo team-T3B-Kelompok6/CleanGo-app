@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cleango_app/features/checkout/pages/midtrans_checkout_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,6 +82,25 @@ void main() {
     });
   });
 
+  testWidgets('status check stays in QRIS and ignores concurrent taps', (tester) async {
+    final done = Completer<void>();
+    var calls = 0;
+    await tester.pumpWidget(MaterialApp(home: MidtransCheckoutPage(
+      checkoutUri: Uri.parse('https://checkout.xendit.co/token'),
+      onCheckStatus: () async { calls++; await done.future; },
+    )));
+    expect(find.text('Kembali & Cek Status'), findsNothing);
+    expect(find.byType(BackButton), findsNothing);
+    await tester.tap(find.text('Cek Status Pembayaran'));
+    await tester.pump();
+    await tester.tap(find.byType(FilledButton));
+    expect(calls, 1);
+    done.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(MidtransCheckoutPage), findsOneWidget);
+    expect(find.text('Cek Status Pembayaran'), findsOneWidget);
+  });
+
   testWidgets('invalid initial URL never creates WebView and can return', (
     tester,
   ) async {
@@ -106,12 +127,12 @@ void main() {
 
     expect(find.byType(WebViewWidget), findsNothing);
     expect(
-      find.textContaining('Tautan checkout Midtrans tidak valid'),
+      find.textContaining('Tautan pembayaran tidak tersedia'),
       findsOneWidget,
     );
     expect(find.text('Buka checkout di browser'), findsNothing);
-    expect(find.text('Kembali & Cek Status'), findsOneWidget);
-    await tester.tap(find.text('Kembali & Cek Status'));
+    expect(find.text('Cek Status Pembayaran'), findsOneWidget);
+    await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Open checkout'), findsOneWidget);
   });

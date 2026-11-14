@@ -11,11 +11,11 @@ import '../../booking/controllers/booking_controller.dart';
 import '../../order/controllers/order_controller.dart';
 import '../../order/pages/order_status_page.dart';
 import '../../order/pages/orders_page.dart';
-import '../controllers/payment_countdown_controller.dart';
 import '../controllers/payment_flow_controller.dart';
 import '../domain/models/payment_method_model.dart';
 import '../widgets/payment_method_icon.dart';
 import 'midtrans_checkout_page.dart';
+import 'complete_booking_payment.dart';
 
 class PaymentPage extends StatefulWidget {
   const PaymentPage({
@@ -40,22 +40,15 @@ class PaymentPage extends StatefulWidget {
 class _PaymentPageState extends State<PaymentPage> {
   final _paymentFlowController = PaymentFlowController();
 
-  late final PaymentCountdownController _countdownController;
   bool _isSubmitting = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _countdownController = PaymentCountdownController();
-  }
-
-  @override
-  void dispose() {
-    _countdownController.dispose();
-    super.dispose();
-  }
-
   bool get _isCash => widget.method.type == PaymentMethodType.cash;
+
+  String _paymentDeadline(DateTime date) {
+    final local = date.toLocal();
+    return '${local.day}/${local.month}/${local.year}, '
+        '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -90,18 +83,46 @@ class _PaymentPageState extends State<PaymentPage> {
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
                       child: Column(
                         children: [
+                          _TotalPaymentCard(
+                            method: widget.method,
+                            totalPayment: widget.totalPayment,
+                          ),
+                          const SizedBox(height: 16),
                           if (_isCash)
-                            _PaymentCountdownCard(
-                              controller: _countdownController,
-                              isCash: true,
-                            )
+                            const _CashInstructionCard()
                           else
                             _PaymentSurface(
-                              child: Text(
-                                _paymentFlowController.payment?.expiresAt ==
-                                        null
-                                    ? 'Pembayaran melalui checkout aman Midtrans. Status pembayaran diverifikasi oleh server.'
-                                    : 'Batas waktu pembayaran: ${_paymentFlowController.payment!.expiresAt}. Cek status untuk konfirmasi pembayaran.',
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    switch (_paymentFlowController
+                                        .payment
+                                        ?.status) {
+                                      'failed' => 'Pembayaran gagal',
+                                      'expired' => 'Waktu pembayaran berakhir',
+                                      _ => 'Menunggu pembayaran',
+                                    },
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _paymentFlowController.bookingId == null
+                                        ? 'Kode QRIS akan muncul di langkah berikutnya. Pesanan dikonfirmasi setelah pembayaran diterima.'
+                                        : 'Selesaikan pembayaran lalu cek status. Jika sudah membayar, jangan bayar ulang.',
+                                  ),
+                                  if (_paymentFlowController
+                                          .payment
+                                          ?.expiresAt !=
+                                      null) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Bayar sebelum ${_paymentDeadline(_paymentFlowController.payment!.expiresAt!)}',
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                           if (!_isCash &&
@@ -112,12 +133,7 @@ class _PaymentPageState extends State<PaymentPage> {
                                   : () => _showPaymentInformation(context),
                               child: const Text('Buka / Coba Lagi Pembayaran'),
                             ),
-                          const SizedBox(height: 14),
-                          _TotalPaymentCard(
-                            method: widget.method,
-                            totalPayment: widget.totalPayment,
-                          ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                           _PaymentOrderCard(
                             serviceName: booking.service?.title ?? '-',
                             schedule:
@@ -136,26 +152,20 @@ class _PaymentPageState extends State<PaymentPage> {
             ),
           ),
         ),
-        bottomNavigationBar: AnimatedBuilder(
-          animation: _countdownController,
-          builder: (context, _) => _PaymentActionBar(
-            label: _isSubmitting
-                ? 'Memproses pesanan...'
-                : _isCash && _countdownController.isExpired
-                ? 'Waktu Pembayaran Berakhir'
-                : _isCash
-                ? 'Konfirmasi Pembayaran Tunai'
-                : _paymentFlowController.bookingId == null
-                ? 'Lanjutkan Pembayaran'
-                : 'Cek Status Pembayaran',
-            onPressed:
-                (_isCash && _countdownController.isExpired) || _isSubmitting
-                ? null
-                : () => _showPaymentInformation(
-                    context,
-                    checkStatus: _paymentFlowController.bookingId != null,
-                  ),
-          ),
+        bottomNavigationBar: _PaymentActionBar(
+          label: _isSubmitting
+              ? 'Memproses pesanan...'
+              : _isCash
+              ? 'Konfirmasi Pembayaran Tunai'
+              : _paymentFlowController.bookingId == null
+              ? 'Lanjutkan Pembayaran'
+              : 'Cek Status Pembayaran',
+          onPressed: _isSubmitting
+              ? null
+              : () => _showPaymentInformation(
+                  context,
+                  checkStatus: _paymentFlowController.bookingId != null,
+                ),
         ),
       ),
     );
@@ -165,7 +175,7 @@ class _PaymentPageState extends State<PaymentPage> {
     BuildContext context, {
     bool checkStatus = false,
   }) async {
-    if (_isSubmitting || (_countdownController.isExpired && _isCash)) return;
+    if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
       final isSameDay = await _paymentFlowController.createOrder(
@@ -182,14 +192,9 @@ class _PaymentPageState extends State<PaymentPage> {
       if (!context.mounted) return;
       if (isSameDay == null) {
         final payment = _paymentFlowController.payment;
-        AppNotice.show(context, switch (payment?.status) {
-          'failed' => 'Pembayaran gagal. Silakan coba lagi.',
-          'expired' => 'Sesi pembayaran berakhir. Silakan coba lagi.',
-          _ =>
-            checkStatus
-                ? 'Pembayaran masih menunggu di penyedia pembayaran. Jika memakai Sandbox, selesaikan simulasi pembayaran lalu cek lagi.'
-                : 'Checkout siap. Selesaikan pembayaran di halaman Midtrans.',
-        });
+        if (checkStatus) {
+          AppNotice.show(context, 'Pembayaran belum diterima. Cek kembali; jangan bayar ulang.');
+        }
         if (!checkStatus && !_isCash && payment?.checkoutUrl != null) {
           final uri = PaymentFlowController.checkoutUri(payment!.checkoutUrl);
           if (uri == null) {
@@ -197,12 +202,14 @@ class _PaymentPageState extends State<PaymentPage> {
           }
           await Navigator.of(context).push<void>(
             MaterialPageRoute<void>(
-              builder: (_) => MidtransCheckoutPage(checkoutUri: uri),
+              builder: (qrisContext) => MidtransCheckoutPage(
+                checkoutUri: uri,
+                onCheckStatus: () => completeBookingPayment(qrisContext, _paymentFlowController.bookingId!),
+              ),
             ),
           );
           if (!context.mounted) return;
           setState(() => _isSubmitting = false);
-          await _showPaymentInformation(context, checkStatus: true);
           return;
         }
         if (context.mounted) setState(() => _isSubmitting = false);
@@ -281,8 +288,8 @@ class _PaymentHeader extends StatelessWidget {
                   style: TextStyle(
                     color: AppColors.slate900,
                     fontFamily: AppTheme.fontFamily,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
                     height: 1.25,
                     letterSpacing: -0.2,
                   ),
@@ -293,7 +300,7 @@ class _PaymentHeader extends StatelessWidget {
                   style: const TextStyle(
                     color: AppColors.slate500,
                     fontFamily: AppTheme.fontFamily,
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w500,
                     height: 1.4,
                   ),
@@ -307,88 +314,53 @@ class _PaymentHeader extends StatelessWidget {
   }
 }
 
-class _PaymentCountdownCard extends StatelessWidget {
-  const _PaymentCountdownCard({required this.controller, required this.isCash});
-
-  final PaymentCountdownController controller;
-  final bool isCash;
+class _CashInstructionCard extends StatelessWidget {
+  const _CashInstructionCard();
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final expired = controller.isExpired;
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: expired ? const Color(0xFFFFF1F2) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: expired
-                  ? const Color(0xFFFDA4AF)
-                  : AppColors.primaryBorder,
-            ),
-          ),
-          child: Row(
+    return _PaymentSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: expired ? const Color(0xFFFFE4E6) : Colors.white,
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryContainer,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
-                  expired ? Icons.timer_off_outlined : Icons.timer_outlined,
-                  color: expired
-                      ? const Color(0xFFE11D48)
-                      : AppColors.primaryAction,
-                  size: 22,
+                child: const Icon(
+                  Icons.payments_outlined,
+                  color: AppColors.primaryAction,
+                  size: 20,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      expired
-                          ? 'Waktu pembayaran berakhir'
-                          : isCash
-                          ? 'Konfirmasi pesanan dalam'
-                          : 'Selesaikan pembayaran dalam',
-                      style: TextStyle(
-                        color: expired
-                            ? const Color(0xFFBE123C)
-                            : AppColors.slate600,
-                        fontFamily: AppTheme.fontFamily,
-                        fontSize: 12,
+                child: Text(
+                  'Bayar Tunai di Tempat',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      controller.formattedRemaining,
-                      style: TextStyle(
-                        color: expired
-                            ? const Color(0xFFE11D48)
-                            : AppColors.primary,
-                        fontFamily: AppTheme.fontFamily,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        height: 1.15,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
                 ),
               ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 12),
+          const Text(
+            'Siapkan uang pas saat cleaner tiba di lokasi Anda. Pesanan langsung dikonfirmasi setelah Anda menekan tombol di bawah.',
+            style: TextStyle(
+              color: AppColors.slate600,
+              fontFamily: AppTheme.fontFamily,
+              fontSize: 13,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -410,7 +382,7 @@ class _TotalPaymentCard extends StatelessWidget {
             style: TextStyle(
               color: AppColors.slate500,
               fontFamily: AppTheme.fontFamily,
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -439,7 +411,7 @@ class _TotalPaymentCard extends StatelessWidget {
                 style: const TextStyle(
                   color: AppColors.slate900,
                   fontFamily: AppTheme.fontFamily,
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -447,12 +419,14 @@ class _TotalPaymentCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            isCash ? 'Bayarkan kepada cleaner setelah layanan selesai.' : 'Lanjutkan ke checkout Midtrans untuk melihat QRIS dan menyelesaikan pembayaran.',
+            isCash
+                ? 'Bayar kepada petugas setelah layanan selesai.'
+                : 'Lanjutkan pembayaran untuk melihat kode QRIS.',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.slate500,
               fontFamily: AppTheme.fontFamily,
-              fontSize: 13,
+              fontSize: 14,
               height: 1.45,
             ),
           ),
@@ -481,22 +455,14 @@ class _PaymentOrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Detail Pesanan',
-            style: TextStyle(
-              color: AppColors.slate900,
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 14),
+          Text('Detail Pesanan', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 12),
           _PaymentDetailRow(label: 'Layanan', value: serviceName),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _PaymentDetailRow(label: 'Jadwal', value: schedule),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _PaymentDetailRow(label: 'Alamat', value: address),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           _PaymentDetailRow(label: 'Catatan', value: note),
         ],
       ),
@@ -512,34 +478,19 @@ class _PaymentDetailRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 72,
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.slate500,
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              height: 1.5,
-            ),
-          ),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: AppColors.slate500),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: AppColors.slate900,
-              fontFamily: AppTheme.fontFamily,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              height: 1.5,
-            ),
-          ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: AppColors.slate900),
         ),
       ],
     );
@@ -555,18 +506,11 @@ class _PaymentSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.slate100),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x080F172A),
-            blurRadius: 16,
-            offset: Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.slate200),
       ),
       child: child,
     );
@@ -603,7 +547,6 @@ class _PaymentActionBar extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
               child: SizedBox(
                 width: double.infinity,
-                height: 52,
                 child: FilledButton(
                   onPressed: onPressed,
                   style: FilledButton.styleFrom(
@@ -617,7 +560,7 @@ class _PaymentActionBar extends StatelessWidget {
                     label,
                     style: const TextStyle(
                       fontFamily: AppTheme.fontFamily,
-                      fontSize: 15,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

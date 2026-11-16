@@ -34,6 +34,7 @@ class PromoPage extends StatefulWidget {
 class _PromoPageState extends State<PromoPage> {
   late final CheckoutController _selection =
       CheckoutController(promoApi: widget.promoApi);
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -45,6 +46,7 @@ class _PromoPageState extends State<PromoPage> {
   }
 
   Future<void> _bootstrap() async {
+    setState(() => _isLoading = true);
     await _selection.loadPromos(serviceId: widget.serviceId);
     final code = widget.initialPromoCode ?? '';
     if (code.isNotEmpty) {
@@ -54,7 +56,7 @@ class _PromoPageState extends State<PromoPage> {
         servicePrice: widget.servicePrice,
       );
     }
-    if (mounted) setState(() {});
+    if (mounted) setState(() => _isLoading = false);
   }
 
   bool _appliesToService(PromoModel promo) {
@@ -137,7 +139,9 @@ class _PromoPageState extends State<PromoPage> {
                     ),
                   ),
                   Expanded(
-                    child: (() {
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : (() {
                       final applicable = _selection.promos
                           .where(_appliesToService)
                           .toList(growable: false);

@@ -52,7 +52,10 @@ class _SplashPageState extends State<SplashPage>
         destination = const OnboardingPage();
       } else if (hasSession) {
         try {
-          await context.read<ProfileController>().loadFromApi();
+          await context
+              .read<ProfileController>()
+              .loadFromApi()
+              .timeout(const Duration(seconds: 8));
         } catch (_) {}
         if (!mounted) return;
         destination = const HomePage();

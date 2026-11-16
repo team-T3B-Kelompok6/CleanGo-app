@@ -14,6 +14,10 @@ class ApiClient {
 
   final String? _baseUrl;
 
+  /// Default timeout for outbound HTTP requests so a dead backend does not
+  /// hang the mobile UI forever.
+  static const Duration defaultTimeout = Duration(seconds: 10);
+
   String get _root => ApiConfig.normalizeBaseUrl(_baseUrl ?? ApiConfig.baseUrl);
 
   Future<Map<String, dynamic>> post(
@@ -80,7 +84,7 @@ class ApiClient {
     }
 
     var pending = _client.get(uri, headers: headers);
-    if (timeout != null) pending = pending.timeout(timeout);
+    pending = pending.timeout(timeout ?? defaultTimeout);
     final response = await pending;
     return _handleResponse(response);
   }

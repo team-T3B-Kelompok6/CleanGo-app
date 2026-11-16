@@ -29,8 +29,14 @@ class AuthSessionController extends ChangeNotifier {
 
   Future<bool> hasSession() async {
     try {
-      final token = await _tokenStorage.readAccessToken();
-      final expiresAt = await _tokenStorage.readExpiresAt();
+      final token = await _tokenStorage.readAccessToken().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => null,
+      );
+      final expiresAt = await _tokenStorage.readExpiresAt().timeout(
+        const Duration(seconds: 8),
+        onTimeout: () => null,
+      );
       final isValid =
           token != null &&
           token.isNotEmpty &&

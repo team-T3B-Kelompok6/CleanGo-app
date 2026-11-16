@@ -8,7 +8,9 @@ class ApiConfig {
       return normalizeBaseUrl(configured);
     }
     if (Platform.isAndroid) {
-      return 'http://10.0.2.2:3101';
+      // 127.0.0.1 berjalan di HP fisik lewat `adb reverse tcp:3101 tcp:3101`.
+      // 10.0.2.2 hanya untuk emulator Android.
+      return 'http://127.0.0.1:3101';
     }
     return 'http://127.0.0.1:3101';
   }

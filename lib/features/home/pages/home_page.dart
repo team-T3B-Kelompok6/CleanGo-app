@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/refresh_scroll_physics.dart';
+import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../../shared/widgets/user_avatar.dart';
@@ -23,6 +25,7 @@ import '../data/home_catalog.dart';
 import '../../service/pages/service_detail_page.dart';
 import '../widgets/popular_service_card.dart';
 import '../widgets/service_category_item.dart';
+import '../widgets/promo_banner_section.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -31,20 +34,55 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  Timer? _notificationTimer;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<HomeController>().loadFromApi();
+      context.read<MessageController>().loadFromApi();
     });
+    // Polling ringan agar titik notifikasi langsung muncul tanpa menekan
+    // lonceng; berhenti saat halaman ditutup.
+    _notificationTimer = Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => context.read<MessageController>().loadFromApi(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    if (state == AppLifecycleState.resumed) {
+      context.read<MessageController>().loadFromApi();
+      _notificationTimer ??= Timer.periodic(
+        const Duration(seconds: 20),
+        (_) => context.read<MessageController>().loadFromApi(),
+      );
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden) {
+      _notificationTimer?.cancel();
+      _notificationTimer = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _refresh() {
     return Future.wait([
       context.read<HomeController>().loadFromApi(),
       context.read<ServiceController>().refreshServices(),
+      context.read<MessageController>().loadFromApi(),
     ]);
   }
 
@@ -52,7 +90,8 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final homeController = context.watch<HomeController>();
     final services = context.watch<ServiceController>().allServices;
-    final hasRealApi = homeController.hasApi ||
+    final hasRealApi =
+        homeController.hasApi ||
         services.any((service) => RegExp(r'^\d+$').hasMatch(service.id));
     final derivedCategories = HomeCatalog.categories(services);
     final derivedPopular = HomeCatalog.popularServices(services);
@@ -65,15 +104,13 @@ class _HomePageState extends State<HomePage> {
     final catalogCategories = rankedCategories.isNotEmpty
         ? rankedCategories
         : (hasRealApi
-            ? derivedCategories
-            : (derivedCategories.isEmpty
-                ? HomeData.categories
-                : derivedCategories));
+              ? derivedCategories
+              : (derivedCategories.isEmpty
+                    ? HomeData.categories
+                    : derivedCategories));
     final catalogPopular = hasRealApi
         ? derivedPopular
-        : (derivedPopular.isEmpty
-            ? HomeData.popularServices
-            : derivedPopular);
+        : (derivedPopular.isEmpty ? HomeData.popularServices : derivedPopular);
     final mediaQuery = MediaQuery.of(context);
     final double screenWidth = mediaQuery.size.width;
     final double cardWidth = math.min(256, math.max(224, screenWidth * 0.70));
@@ -102,12 +139,10 @@ class _HomePageState extends State<HomePage> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: SafeArea(
                   bottom: false,
-                  child: RefreshIndicator(
+                  child: AnchoredRefreshIndicator(
                     onRefresh: _refresh,
                     child: CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
+                      physics: refreshScrollPhysics,
                       slivers: [
                         const SliverToBoxAdapter(child: _HomeIntroSection()),
                         SliverToBoxAdapter(
@@ -213,7 +248,11 @@ class _HomeIntroSection extends StatelessWidget {
       child: Column(
         children: [
           _HomeHeader(),
-          _PromoSection(bannerPaths: context.watch<HomeController>().banners),
+          PromoBannerSection(
+            bannerPaths: context.watch<HomeController>().banners,
+            status: context.watch<HomeController>().bannerStatus,
+            onRetry: context.read<HomeController>().loadBanners,
+          ),
         ],
       ),
     );
@@ -435,180 +474,6 @@ class _LocationLabel extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _PromoSection extends StatefulWidget {
-  const _PromoSection({required this.bannerPaths});
-
-  final List<String> bannerPaths;
-
-  @override
-  State<_PromoSection> createState() => _PromoSectionState();
-}
-
-class _PromoSectionState extends State<_PromoSection> {
-  late final PageController _pageController;
-  Timer? _autoSlideTimer;
-  int _activePage = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-    _startAutoSlide();
-  }
-
-  void _startAutoSlide() {
-    _autoSlideTimer?.cancel();
-    if (widget.bannerPaths.length < 2) return;
-
-    _autoSlideTimer = Timer.periodic(const Duration(seconds: 6), (_) {
-      if (!mounted || !_pageController.hasClients) return;
-      final nextPage = (_activePage + 1) % widget.bannerPaths.length;
-      _pageController.animateToPage(
-        nextPage,
-        duration: const Duration(milliseconds: 520),
-        curve: Curves.easeInOutCubic,
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _autoSlideTimer?.cancel();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  void _selectPage(int page) {
-    _pageController.animateToPage(
-      page,
-      duration: const Duration(milliseconds: 320),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.bannerPaths.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        child: AspectRatio(
-          aspectRatio: 3,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF2F2F2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      child: Column(
-        children: [
-          AspectRatio(
-            aspectRatio: 3,
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: widget.bannerPaths.length,
-              onPageChanged: (page) {
-                setState(() => _activePage = page);
-              },
-              itemBuilder: (context, index) {
-                return Semantics(
-                  image: true,
-                  label: 'Promo ${index + 1} dari ${widget.bannerPaths.length}',
-                  child: _BannerImage(source: widget.bannerPaths[index]),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-              widget.bannerPaths.length,
-              (index) => Padding(
-                padding: EdgeInsets.only(
-                  right: index == widget.bannerPaths.length - 1 ? 0 : 8,
-                ),
-                child: _CarouselIndicator(
-                  selected: _activePage == index,
-                  onTap: () => _selectPage(index),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BannerImage extends StatelessWidget {
-  const _BannerImage({required this.source});
-
-  final String source;
-
-  @override
-  Widget build(BuildContext context) {
-    if (source.startsWith('http')) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Image.network(
-          source,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, _, _) => const SizedBox.shrink(),
-        ),
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Image.asset(
-        source,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      ),
-    );
-  }
-}
-
-class _CarouselIndicator extends StatelessWidget {
-  const _CarouselIndicator({required this.selected, required this.onTap});
-
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: selected ? 'Promo aktif' : 'Buka promo',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            width: selected ? 24 : 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: selected ? AppColors.primary : AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(999),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
-import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../data/api_auth_service.dart';
 import 'reset_password_page.dart';
 
@@ -118,13 +117,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         title: const Text('Lupa Kata Sandi'),
       ),
       body: SafeArea(
-        child: AnchoredRefreshIndicator(
-          onRefresh: () async {},
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
                 const Text(
                   'Masukkan nomor telepon atau email akun Anda. Kami akan mengirim kode OTP untuk mengatur ulang kata sandi.',
                   style: TextStyle(
@@ -173,7 +170,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             ),
           ),
         ),
-      ),
     );
   }
 }

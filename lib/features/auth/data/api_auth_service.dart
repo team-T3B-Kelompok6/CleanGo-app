@@ -60,6 +60,31 @@ class ApiAuthService {
     return _parseAuthResult(response);
   }
 
+  Future<void> forgotPassword({
+    required String identifier,
+    required String channel,
+  }) async {
+    await _client.post(
+      '${ApiConfig.customerAuth}/forgot-password',
+      body: {'identifier': identifier, 'channel': channel},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String identifier,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _client.post(
+      '${ApiConfig.customerAuth}/reset-password',
+      body: {
+        'identifier': identifier,
+        'otp': otp,
+        'newPassword': newPassword,
+      },
+    );
+  }
+
   AuthResult _parseAuthResult(Map<String, dynamic> response) {
     final data = response['data'] as Map<String, dynamic>?;
     final token = data?['token'] as String?;

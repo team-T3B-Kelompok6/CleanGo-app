@@ -6,9 +6,9 @@ import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
-import '../../../shared/widgets/app_sheet.dart';
 import '../../address/controllers/address_controller.dart';
 import '../../auth/controllers/auth_session_controller.dart';
+import '../../auth/pages/forgot_password_page.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/change_password_controller.dart';
 import '../controllers/profile_controller.dart';
@@ -118,50 +118,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   }
 
   void _showForgotPasswordModal() {
-    final profile = context.read<ProfileController>().profile;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return AppSheet(
-          title: 'Lupa kata sandi?',
-          actions: SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-                AppNotice.show(
-                  context,
-                  'Tautan pemulihan dikirim ke email Anda.',
-                );
-              },
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                backgroundColor: AppColors.primaryAction,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                'Kirim Tautan Pemulihan',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
-          child: Text(
-            'Tautan pemulihan akan dikirim ke ${profile.email}. '
-            'Nomor telepon akun Anda: ${profile.phoneNumber}.',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ForgotPasswordPage()),
     );
   }
 

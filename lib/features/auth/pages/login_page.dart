@@ -12,6 +12,7 @@ import '../data/dummy_auth_service.dart';
 import '../data/google_sign_in_service.dart';
 import '../../service/controllers/service_controller.dart';
 import 'register_page.dart';
+import 'forgot_password_page.dart';
 import '../widgets/auth_social_buttons.dart';
 import '../widgets/auth_text_field.dart';
 import '../../profile/controllers/profile_controller.dart';
@@ -218,7 +219,11 @@ class _LoginPageState extends State<LoginPage> {
                           const SizedBox(height: 8),
                           Center(
                             child: TextButton(
-                              onPressed: () {},
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const ForgotPasswordPage(),
+                                ),
+                              ),
                               style: TextButton.styleFrom(
                                 foregroundColor: AppColors.primary,
                                 minimumSize: Size.zero,

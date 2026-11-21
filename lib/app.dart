@@ -18,6 +18,7 @@ import 'features/address/domain/models/address_model.dart';
 import 'features/address/pages/address_list_page.dart';
 import 'features/address/pages/add_address_page.dart';
 import 'features/auth/pages/login_page.dart';
+import 'features/auth/pages/forgot_password_page.dart';
 import 'features/auth/pages/register_page.dart';
 import 'features/auth/controllers/auth_session_controller.dart';
 import 'features/booking/controllers/booking_controller.dart';
@@ -267,6 +268,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
           AppRoutes.splash: (_) => const SplashPage(),
           AppRoutes.onboarding: (_) => const OnboardingPage(),
           AppRoutes.login: (_) => const LoginPage(),
+          AppRoutes.forgotPassword: (_) => const ForgotPasswordPage(),
           AppRoutes.home: (_) => const HomePage(),
           AppRoutes.register: (_) => const RegisterPage(),
           AppRoutes.services: (_) => const ServiceListPage(),

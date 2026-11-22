@@ -1,8 +1,7 @@
 import 'package:cleango_app/core/theme/app_theme.dart';
+import 'package:cleango_app/features/auth/pages/forgot_password_page.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
 import 'package:cleango_app/features/profile/pages/change_password_page.dart';
-import 'package:cleango_app/features/auth/pages/forgot_password_page.dart';
-import 'package:cleango_app/shared/widgets/app_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';

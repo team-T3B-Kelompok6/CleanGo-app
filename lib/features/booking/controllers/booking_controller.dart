@@ -13,6 +13,7 @@ class BookingController extends ChangeNotifier {
   BookingController({
     this.repository,
     BookingDraft? initialDraft,
+    ServerBookingDraft? initialServerBooking,
     ServiceModel? initialService,
     CleaningAddress? initialAddress,
     CustomerBookingApi? bookingApi,
@@ -24,6 +25,16 @@ class BookingController extends ChangeNotifier {
        _addressId = initialDraft?.addressId,
        _note = initialDraft?.note ?? initialNote {
     _ensureTimeSelection();
+    if (initialServerBooking != null &&
+        initialServerBooking.key == _draftKey) {
+      _serverDraftKey = _draftKey;
+      _serverDraft = CreatedBooking(
+        id: initialServerBooking.id,
+        code: '',
+        status: '',
+        totalAmount: 0,
+      );
+    }
   }
 
   static DateTime get initialDate => DateUtils.dateOnly(DateTime.now());
@@ -188,6 +199,9 @@ class BookingController extends ChangeNotifier {
       if (_serverDraftKey == key && identical(_creatingDraft, request)) {
         _serverDraft = created;
       }
+      await repository?.saveServerBooking(
+        ServerBookingDraft(id: created.id, key: key),
+      );
       return created;
     } finally {
       if (identical(_creatingDraft, request)) _creatingDraft = null;
@@ -389,6 +403,7 @@ class BookingController extends ChangeNotifier {
     _serverDraft = null;
     _creatingDraft = null;
     await repository?.clearDraft();
+    await repository?.clearServerBooking();
   }
 
   void _persistDraft() {

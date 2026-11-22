@@ -81,12 +81,17 @@ class _BootstrapViewState extends State<_BootstrapView> {
       const <ServiceModel>[],
     );
     final bookingDraftFuture = _guard(bookingRepository.readDraft, null);
+    final serverBookingFuture = _guard(
+      bookingRepository.readServerBooking,
+      null,
+    );
     final filterFuture = _guard(preferences.readLastServiceFilter, null);
 
     final pushNotifications = await pushFuture;
     final addressSnapshot = await addressFuture;
     final services = await servicesFuture;
     final bookingDraft = await bookingDraftFuture;
+    final serverBooking = await serverBookingFuture;
     final lastServiceFilter = await filterFuture;
 
     ServiceModel? initialBookingService;
@@ -115,6 +120,7 @@ class _BootstrapViewState extends State<_BootstrapView> {
       initialServiceFilter: lastServiceFilter,
       bookingRepository: bookingRepository,
       initialBookingDraft: bookingDraft,
+      initialServerBookingDraft: serverBooking,
       initialBookingService: initialBookingService,
       initialBookingAddress: selectedDraftAddress?.toCleaningAddress(),
       preferences: preferences,

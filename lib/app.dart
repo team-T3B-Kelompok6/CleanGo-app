@@ -63,6 +63,7 @@ class CleanGoApp extends StatefulWidget {
     required this.tokenStorage,
     this.initialServiceFilter,
     this.initialBookingDraft,
+    this.initialServerBookingDraft,
     this.initialBookingService,
     this.initialBookingAddress,
     this.pushNotifications,
@@ -77,6 +78,7 @@ class CleanGoApp extends StatefulWidget {
   final String? initialServiceFilter;
   final BookingDraftRepository bookingRepository;
   final BookingDraft? initialBookingDraft;
+  final ServerBookingDraft? initialServerBookingDraft;
   final ServiceModel? initialBookingService;
   final CleaningAddress? initialBookingAddress;
   final AppPreferences preferences;
@@ -200,6 +202,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
           create: (_) => AuthSessionController(
             widget.tokenStorage,
             pushNotifications: _push,
+            draftRepository: widget.bookingRepository,
           ),
         ),
         ChangeNotifierProvider(
@@ -217,6 +220,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
           create: (_) => BookingController(
             repository: widget.bookingRepository,
             initialDraft: widget.initialBookingDraft,
+            initialServerBooking: widget.initialServerBookingDraft,
             initialService: widget.initialBookingService,
             initialAddress: widget.initialBookingAddress,
             bookingApi: CustomerBookingApi(tokenStorage: widget.tokenStorage),

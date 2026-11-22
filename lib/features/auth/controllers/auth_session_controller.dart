@@ -6,12 +6,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/notifications/push_notifications.dart';
 import '../../../core/storage/token_storage.dart';
+import '../../booking/data/booking_draft_repository.dart';
 
 class AuthSessionController extends ChangeNotifier {
-  AuthSessionController(this._tokenStorage, {this.pushNotifications});
+  AuthSessionController(this._tokenStorage, {this.pushNotifications, this.draftRepository});
 
   final TokenStorage _tokenStorage;
   final PushNotifications? pushNotifications;
+  final BookingDraftRepository? draftRepository;
 
   bool _started = false;
 
@@ -62,6 +64,8 @@ class AuthSessionController extends ChangeNotifier {
   /// Persists the session so the customer stays signed in after the app is
   /// closed. Without a stored expiry [hasSession] would always be false.
   Future<void> createSession(String token, {int? expiresInSeconds}) async {
+    await draftRepository?.clearDraft();
+    await draftRepository?.clearServerBooking();
     await _tokenStorage.writeAccessToken(token);
     final seconds =
         expiresInSeconds ?? _secondsUntilExpiry(token) ?? _fallbackSeconds;
@@ -131,6 +135,8 @@ class AuthSessionController extends ChangeNotifier {
       // Keep JWT available until ownership-scoped unregister finishes.
       await pushNotifications?.unregisterCurrentDevice();
     } finally {
+      await draftRepository?.clearDraft();
+      await draftRepository?.clearServerBooking();
       await _tokenStorage.clearSession();
     }
   }

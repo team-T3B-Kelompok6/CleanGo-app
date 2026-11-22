@@ -4,16 +4,23 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../core/database/app_database.dart';
 import '../../../core/notifications/push_notifications.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../booking/data/booking_draft_repository.dart';
 
 class AuthSessionController extends ChangeNotifier {
-  AuthSessionController(this._tokenStorage, {this.pushNotifications, this.draftRepository});
+  AuthSessionController(
+    this._tokenStorage, {
+    this.pushNotifications,
+    this.draftRepository,
+    this.database,
+  });
 
   final TokenStorage _tokenStorage;
   final PushNotifications? pushNotifications;
   final BookingDraftRepository? draftRepository;
+  final AppDatabase? database;
 
   bool _started = false;
 
@@ -66,6 +73,7 @@ class AuthSessionController extends ChangeNotifier {
   Future<void> createSession(String token, {int? expiresInSeconds}) async {
     await draftRepository?.clearDraft();
     await draftRepository?.clearServerBooking();
+    await _clearAccountCaches();
     await _tokenStorage.writeAccessToken(token);
     final seconds =
         expiresInSeconds ?? _secondsUntilExpiry(token) ?? _fallbackSeconds;
@@ -129,6 +137,13 @@ class AuthSessionController extends ChangeNotifier {
     );
   }
 
+  Future<void> _clearAccountCaches() async {
+    final db = database;
+    if (db == null) return;
+    await db.clearAddressCache();
+    await db.clearServiceCache();
+  }
+
   Future<void> signOut() async {
     stop();
     try {
@@ -137,6 +152,7 @@ class AuthSessionController extends ChangeNotifier {
     } finally {
       await draftRepository?.clearDraft();
       await draftRepository?.clearServerBooking();
+      await _clearAccountCaches();
       await _tokenStorage.clearSession();
     }
   }

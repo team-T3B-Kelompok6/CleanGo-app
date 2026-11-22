@@ -124,6 +124,10 @@ final class AppDatabase extends _$AppDatabase {
     return (delete(bookingDrafts)..where((draft) => draft.id.equals(id))).go();
   }
 
+  Future<void> clearAddressCache() => delete(storedAddresses).go();
+
+  Future<void> clearServiceCache() => delete(serviceCaches).go();
+
   Stream<List<ServiceCacheRow>> watchServiceCache() {
     return (select(
       serviceCaches,

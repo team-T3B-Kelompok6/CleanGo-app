@@ -203,6 +203,7 @@ class _CleanGoAppState extends State<CleanGoApp> {
             widget.tokenStorage,
             pushNotifications: _push,
             draftRepository: widget.bookingRepository,
+            database: widget.database,
           ),
         ),
         ChangeNotifierProvider(

@@ -6,6 +6,8 @@ import 'package:cleango_app/features/order/data/eta_repository.dart';
 import 'package:cleango_app/features/order/domain/models/order_model.dart';
 import 'package:cleango_app/features/service/controllers/service_controller.dart';
 
+import '../../fixtures/demo_services.dart';
+
 class FakeEtaRepository extends EtaRepository {
   int calls = 0;
   Future<EtaEstimate>? pendingResult;
@@ -91,6 +93,18 @@ void main() {
         note: 'Catatan $serviceName',
       );
       return controller.scheduledOrder.orderNumber;
+    }
+
+    String addCompletedOrder(String serviceName) {
+      controller.createOrderFromBooking(
+        serviceName: serviceName,
+        serviceImagePath: 'assets/icons/service_placeholder.svg',
+        price: 'Rp155.000',
+        address: 'Alamat $serviceName',
+      );
+      final id = controller.scheduledOrder.orderNumber;
+      controller.completeScheduledOrder();
+      return id;
     }
 
     test(
@@ -191,6 +205,12 @@ void main() {
       repository.pendingResult = pending.future;
       final tracking = OrderController(etaRepository: repository);
       addTearDown(tracking.dispose);
+      tracking.createOrderFromBooking(
+        serviceName: 'Pesanan pertama',
+        serviceImagePath: 'assets/icons/service_placeholder.svg',
+        price: 'Rp155.000',
+        address: 'Alamat pertama',
+      );
       tracking.setStage(OrderStatusStage.ditugaskan);
       final firstId = tracking.scheduledOrder.orderNumber;
       final request = tracking.refreshEta();
@@ -229,7 +249,7 @@ void main() {
       expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
       expect(controller.currentStepNumber, 1);
       expect(controller.currentStepLabel, 'Langkah 1 dari 5');
-      expect(controller.scheduledOrder.orderNumber, '#CG-82910');
+      expect(controller.scheduledOrder.orderNumber, isEmpty);
       expect(controller.scheduledOrder.cleanerName, isEmpty);
       expect(controller.scheduledOrder.cleanerPhone, isEmpty);
       expect(controller.scheduledOrder.destinationSubAddress, isEmpty);
@@ -242,6 +262,12 @@ void main() {
     });
 
     test('setStage updates progress, status text, and step label correctly across all 5 stages', () {
+      controller.createOrderFromBooking(
+        serviceName: 'Layanan uji',
+        serviceImagePath: 'assets/icons/service_placeholder.svg',
+        price: 'Rp155.000',
+        address: 'Alamat uji',
+      );
       // 1. Dikonfirmasi
       controller.setStage(OrderStatusStage.dikonfirmasi);
       expect(controller.currentStage, OrderStatusStage.dikonfirmasi);
@@ -281,6 +307,12 @@ void main() {
     });
 
     test('nextStage advances step sequentially and stops at selesai', () {
+      controller.createOrderFromBooking(
+        serviceName: 'Layanan uji',
+        serviceImagePath: 'assets/icons/service_placeholder.svg',
+        price: 'Rp155.000',
+        address: 'Alamat uji',
+      );
       controller.setStage(OrderStatusStage.dikonfirmasi);
       expect(controller.currentStepNumber, 1);
 
@@ -324,6 +356,14 @@ void main() {
       () async {
         final repository = FakeEtaRepository();
         final trackingController = OrderController(etaRepository: repository);
+        trackingController.createOrderFromBooking(
+          serviceName: 'Deep Cleaning',
+          serviceImagePath: 'assets/icons/service_placeholder.svg',
+          price: 'Rp155.000',
+          address: 'Alamat uji',
+          destinationLatitude: -7.94,
+          destinationLongitude: 112.62,
+        );
 
         trackingController.setStage(OrderStatusStage.dikonfirmasi);
         await trackingController.refreshEta();
@@ -375,8 +415,9 @@ void main() {
     );
 
     test('submitReview records review data and keeps it editable', () async {
+      final orderId = addCompletedOrder('Deep Cleaning');
       final initialReviewable = controller.historyOrders.firstWhere(
-        (o) => o.canReview,
+        (o) => o.orderId == orderId,
       );
       expect(initialReviewable.canReview, true);
 
@@ -389,7 +430,7 @@ void main() {
 
       final updatedOrders = controller.historyOrders;
       final target = updatedOrders.firstWhere(
-        (o) => o.serviceName == initialReviewable.serviceName,
+        (o) => o.orderId == orderId,
       );
       expect(target.canReview, true);
       expect(target.hasReview, true);
@@ -401,12 +442,13 @@ void main() {
     });
 
     test('Cuci AC history item is initially unreviewed (canReview == true, rating == null)', () {
+      final orderId = addCompletedOrder('Cuci AC');
       final cuciAc = controller.historyOrders.firstWhere(
-        (o) => o.serviceName == 'Cuci AC',
+        (o) => o.orderId == orderId,
       );
       expect(cuciAc.canReview, true);
       expect(cuciAc.rating, isNull);
-      expect(cuciAc.orderId, '#CG-99012');
+      expect(cuciAc.orderId, orderId);
     });
 
     test(
@@ -430,8 +472,9 @@ void main() {
           ),
           isFalse,
         );
+        final orderId = addCompletedOrder('Deep Cleaning');
         final order = controller.historyOrders.firstWhere(
-          (item) => item.canReview,
+          (item) => item.orderId == orderId,
         );
         expect(
           await controller.submitReview(
@@ -468,23 +511,24 @@ void main() {
       },
     );
 
-    test('submitReview on scheduled order (#CG-82910) does NOT overwrite Cuci AC review status', () async {
-      controller.completeScheduledOrder();
+    test('submitReview on scheduled order does NOT overwrite another order review status', () async {
+      final deepId = addCompletedOrder('Deep Cleaning');
+      final cuciAcId = addCompletedOrder('Cuci AC');
       await controller.submitReview(
-        orderId: '#CG-82910',
+        orderId: deepId,
         rating: 5,
         tags: ['Bersih Maksimal ✨'],
         comment: 'Deep cleaning luar biasa!',
       );
 
       final cuciAc = controller.historyOrders.firstWhere(
-        (o) => o.serviceName == 'Cuci AC',
+        (o) => o.orderId == cuciAcId,
       );
       expect(cuciAc.canReview, true);
       expect(cuciAc.rating, isNull);
 
       final scheduledHistory = controller.historyOrders.firstWhere(
-        (o) => o.orderId == '#CG-82910',
+        (o) => o.orderId == deepId,
       );
       expect(scheduledHistory.canReview, true);
       expect(scheduledHistory.rating, 5.0);
@@ -494,37 +538,43 @@ void main() {
   group('Service Mapping for Reorder Tests', () {
     late ServiceController serviceController;
 
-    setUp(() => serviceController = ServiceController());
+    setUp(() => serviceController = ServiceController(
+      initialServices: DemoServices.demoServices,
+    ));
 
     test(
-      'Maps history "Cuci AC" correctly to "Cuci & Perawatan AC" (ac-care)',
+      'does not guess a service for a near-miss history name',
       () {
         final mappedService = serviceController.findServiceForHistory(
           'Cuci AC',
         );
-        expect(mappedService.id, 'ac-care');
-        expect(mappedService.title, 'Cuci & Perawatan AC');
-        expect(mappedService.category, 'AC');
+        expect(mappedService, isNull);
       },
     );
 
-    test('Maps history "Deep Cleaning" correctly to "Deep Cleaning" (deep-cleaning)', () {
-      final mappedService = serviceController.findServiceForHistory(
-        'Deep Cleaning',
-      );
-      expect(mappedService.id, 'deep-cleaning');
-      expect(mappedService.title, 'Deep Cleaning');
-    });
+    test(
+      'maps exact history service names',
+      () {
+        final deep = serviceController.findServiceForHistory(
+          'Deep Cleaning',
+        );
+        expect(deep, isNotNull);
+        expect(deep!.id, 'deep-cleaning');
+        expect(deep.title, 'Deep Cleaning');
+      },
+    );
 
     test('maps office and daily cleaning to their matching services', () {
-      expect(
-        serviceController.findServiceForHistory('Cleaning Kantor & Usaha').id,
-        'office-cleaning',
+      final office = serviceController.findServiceForHistory(
+        'Cleaning Kantor & Usaha',
       );
-      expect(
-        serviceController.findServiceForHistory('Cleaning Harian (Reguler)').id,
-        'daily-cleaning',
+      final daily = serviceController.findServiceForHistory(
+        'Cleaning Harian (Reguler)',
       );
+      expect(office, isNotNull);
+      expect(daily, isNotNull);
+      expect(office!.id, 'office-cleaning');
+      expect(daily!.id, 'daily-cleaning');
     });
   });
 }

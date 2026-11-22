@@ -284,10 +284,6 @@ class _ServiceSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRaster =
-        order.serviceAssetPath.endsWith('.jpg') ||
-        order.serviceAssetPath.endsWith('.jpeg') ||
-        order.serviceAssetPath.endsWith('.png');
     return _SectionCard(
       title: 'Layanan',
       child: Row(
@@ -296,15 +292,10 @@ class _ServiceSummary extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: SizedBox.square(
               dimension: 64,
-              child: isRaster
-                  ? Image.asset(order.serviceAssetPath, fit: BoxFit.cover)
-                  : ColoredBox(
-                      color: const Color(0xFFE8FAF7),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: SvgPicture.asset(order.serviceAssetPath),
-                      ),
-                    ),
+              child: RemoteOrAssetImage(
+                source: order.serviceAssetPath,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: 14),

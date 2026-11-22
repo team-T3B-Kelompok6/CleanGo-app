@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/refresh_scroll_physics.dart';
+import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../data/customer_service_reviews_api.dart';
 import '../domain/models/service_model.dart';
 import '../widgets/review_card.dart';
@@ -106,10 +108,10 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
 
   Widget _body() {
     if (_loading && _reviews.isEmpty) {
-      return RefreshIndicator(
+      return AnchoredRefreshIndicator(
         onRefresh: () => _load(reset: true),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: refreshScrollPhysics,
           children: const [
             Center(
               child: Padding(
@@ -122,10 +124,10 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
       );
     }
     if (_error != null && _reviews.isEmpty) {
-      return RefreshIndicator(
+      return AnchoredRefreshIndicator(
         onRefresh: () => _load(reset: true),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: refreshScrollPhysics,
           padding: const EdgeInsets.all(24),
           children: [
             Center(
@@ -150,10 +152,10 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
       );
     }
     if (_reviews.isEmpty) {
-      return RefreshIndicator(
+      return AnchoredRefreshIndicator(
         onRefresh: () => _load(reset: true),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: refreshScrollPhysics,
           children: const [
             Center(
               child: Padding(
@@ -169,12 +171,10 @@ class _AllReviewsPageState extends State<AllReviewsPage> {
       );
     }
 
-    return RefreshIndicator(
+    return AnchoredRefreshIndicator(
       onRefresh: () => _load(reset: true),
       child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
+        physics: refreshScrollPhysics,
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
         itemCount: _reviews.length + 2,
         itemBuilder: (context, index) {

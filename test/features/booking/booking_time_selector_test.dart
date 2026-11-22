@@ -6,7 +6,7 @@ import 'dart:async';
 import 'package:cleango_app/features/booking/controllers/booking_controller.dart';
 import 'package:cleango_app/features/booking/data/customer_booking_api.dart';
 import 'package:cleango_app/features/booking/pages/booking_page.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
+import '../../fixtures/demo_services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -36,7 +36,7 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(480, 1000));
       addTearDown(() => tester.binding.setSurfaceSize(null));
       final api = _AvailabilityApi();
-      final service = ServiceData.services.first;
+      final service = DemoServices.demoServices.first;
       final booking = BookingController(
         bookingApi: api,
         initialService: service,
@@ -127,8 +127,8 @@ void main() {
     'reusing booking page for another service reloads its own availability',
     (tester) async {
       final api = _AvailabilityApi();
-      final firstService = ServiceData.services.first;
-      final nextService = ServiceData.services[1];
+      final firstService = DemoServices.demoServices.first;
+      final nextService = DemoServices.demoServices[1];
       final booking = BookingController(
         bookingApi: api,
         initialService: firstService,
@@ -170,7 +170,7 @@ void main() {
   ) async {
     await tester.binding.setSurfaceSize(const Size(375, 812));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final service = ServiceData.services.first;
+    final service = DemoServices.demoServices.first;
     final booking = BookingController()
       ..startBooking(service)
       ..selectDate(DateTime.now().add(const Duration(days: 1)));

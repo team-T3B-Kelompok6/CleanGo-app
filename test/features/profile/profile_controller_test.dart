@@ -1,6 +1,46 @@
+import 'package:cleango_app/core/network/api_exception.dart';
+import 'package:cleango_app/core/storage/token_storage.dart';
+import 'package:cleango_app/features/profile/data/customer_profile_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:cleango_app/features/profile/models/user_profile_model.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
+
+class _MemoryTokens implements TokenStorage {
+  _MemoryTokens(this.token);
+
+  final String? token;
+
+  @override
+  Future<String?> readAccessToken() async => token;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _PasswordService extends CustomerProfileService {
+  String _password = 'ExistingPassword123';
+  int calls = 0;
+  String? lastToken;
+  bool unavailable = false;
+
+  @override
+  Future<void> changePassword(
+    String token, {
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    calls++;
+    lastToken = token;
+    if (unavailable) throw StateError('Service unavailable');
+    if (currentPassword != _password) {
+      throw const ApiException(
+        statusCode: 400,
+        message: 'Kata sandi saat ini tidak sesuai.',
+      );
+    }
+    _password = newPassword;
+  }
+}
 
 void main() {
   group('UserProfileModel Tests', () {
@@ -61,9 +101,10 @@ void main() {
       expect(fromJson.fullName, model.fullName);
       expect(fromJson.email, model.email);
       expect(fromJson.gender, model.gender);
-      expect(fromJson.birthDate.year, 1995);
-      expect(fromJson.birthDate.month, 5);
-      expect(fromJson.birthDate.day, 14);
+      expect(fromJson.birthDate, isNotNull);
+      expect(fromJson.birthDate!.year, 1995);
+      expect(fromJson.birthDate!.month, 5);
+      expect(fromJson.birthDate!.day, 14);
     });
   });
 
@@ -116,19 +157,110 @@ void main() {
     });
 
     test(
-      'verifyPassword and changePassword operate on current password 321321',
-      () {
-        expect(controller.password, '321321');
-        expect(controller.verifyPassword('321321'), true);
-        expect(controller.verifyPassword('wrong'), false);
-
-        final changed = controller.changePassword(
-          currentPassword: '321321',
-          newPassword: 'NewPassword123',
+      'remote password change rejects the old password after success',
+      () async {
+        final service = _PasswordService();
+        final remote = ProfileController(
+          tokenStorage: _MemoryTokens('test-session'),
+          service: service,
         );
-        expect(changed, true);
-        expect(controller.password, 'NewPassword123');
-        expect(controller.verifyPassword('NewPassword123'), true);
+        addTearDown(remote.dispose);
+
+        expect(
+          await remote.changePasswordRemote(
+            currentPassword: 'ExistingPassword123',
+            newPassword: 'NewPassword123',
+          ),
+          isTrue,
+        );
+        expect(service.lastToken, 'test-session');
+        expect(remote.error, isNull);
+        expect(
+          await remote.changePasswordRemote(
+            currentPassword: 'ExistingPassword123',
+            newPassword: 'AnotherPassword456',
+          ),
+          isFalse,
+        );
+        expect(remote.error, contains('Kata sandi saat ini tidak sesuai.'));
+        expect(
+          await remote.changePasswordRemote(
+            currentPassword: 'NewPassword123',
+            newPassword: 'AnotherPassword456',
+          ),
+          isTrue,
+        );
+        expect(remote.error, isNull);
+        expect(service.calls, 3);
+      },
+    );
+
+    test(
+      'remote password check preserves whitespace and propagates rejection',
+      () async {
+        final service = _PasswordService();
+        final remote = ProfileController(
+          tokenStorage: _MemoryTokens('test-session'),
+          service: service,
+        );
+        addTearDown(remote.dispose);
+        var notifications = 0;
+        remote.addListener(() => notifications++);
+
+        expect(
+          await remote.changePasswordRemote(
+            currentPassword: ' ExistingPassword123 ',
+            newPassword: 'NewPassword123',
+          ),
+          isFalse,
+        );
+        expect(remote.error, contains('Kata sandi saat ini tidak sesuai.'));
+        expect(notifications, 1);
+        expect(service.calls, 1);
+      },
+    );
+
+    test(
+      'remote password change fails without a session and never calls API',
+      () async {
+        for (final token in [null, '']) {
+          final service = _PasswordService();
+          final remote = ProfileController(
+            tokenStorage: _MemoryTokens(token),
+            service: service,
+          );
+          addTearDown(remote.dispose);
+          expect(
+            await remote.changePasswordRemote(
+              currentPassword: 'ExistingPassword123',
+              newPassword: 'NewPassword123',
+            ),
+            isFalse,
+          );
+          expect(service.calls, 0);
+          expect(remote.error, 'Sesi tidak ditemukan. Silakan masuk kembali.');
+        }
+      },
+    );
+
+    test(
+      'remote password change never reports success when API is unavailable',
+      () async {
+        final service = _PasswordService()..unavailable = true;
+        final remote = ProfileController(
+          tokenStorage: _MemoryTokens('test-session'),
+          service: service,
+        );
+        addTearDown(remote.dispose);
+        expect(
+          await remote.changePasswordRemote(
+            currentPassword: 'ExistingPassword123',
+            newPassword: 'NewPassword123',
+          ),
+          isFalse,
+        );
+        expect(remote.error, contains('Service unavailable'));
+        expect(service.calls, 1);
       },
     );
   });

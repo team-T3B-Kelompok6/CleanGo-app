@@ -127,14 +127,12 @@ class ProfileController extends ChangeNotifier {
     phoneNumber: '',
     isPhoneVerified: true,
     email: '',
-    gender: 'Laki-laki',
-    birthDate: DateTime(1995, 5, 14),
-    avatarAsset: 'assets/images/user_profile.jpeg',
+    gender: null,
+    birthDate: null,
+    avatarAsset: '',
   );
 
   late UserProfileModel _profile;
-  // Demo-only credential kept out of the serializable profile model.
-  String _password = '321321';
 
   UserProfileModel get profile => _profile;
 
@@ -144,27 +142,12 @@ class ProfileController extends ChangeNotifier {
   String get phoneNumber => _profile.phoneNumber;
   bool get isPhoneVerified => _profile.isPhoneVerified;
   String get email => _profile.email;
-  String get gender => _profile.gender;
-  DateTime get birthDate => _profile.birthDate;
+  String? get gender => _profile.gender;
+  DateTime? get birthDate => _profile.birthDate;
   String get formattedBirthDate => _profile.formattedBirthDate;
   String get avatarAsset => _profile.avatarAsset;
   String? get avatarUrl => _profile.avatarUrl;
   String get avatarSource => _profile.avatarSource;
-  String get password => _password;
-
-  bool verifyPassword(String input) => input == _password;
-
-  bool changePassword({
-    required String currentPassword,
-    required String newPassword,
-  }) {
-    if (verifyPassword(currentPassword)) {
-      _password = newPassword;
-      notifyListeners();
-      return true;
-    }
-    return false;
-  }
 
   void updateProfile({
     String? fullName,

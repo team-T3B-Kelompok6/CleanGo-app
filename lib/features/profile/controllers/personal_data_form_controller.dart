@@ -17,15 +17,17 @@ class PersonalDataFormController {
   final TextEditingController phone;
   final TextEditingController email;
 
-  String selectedGender;
-  DateTime selectedBirthDate;
+  String? selectedGender;
+  DateTime? selectedBirthDate;
   bool isPhoneEditable = false;
 
   String get formattedBirthDate =>
-      UserProfileModel.formatBirthDate(selectedBirthDate);
+      selectedBirthDate == null
+          ? 'Belum diisi'
+          : UserProfileModel.formatBirthDate(selectedBirthDate!);
 
   void selectGender(String gender) => selectedGender = gender;
-  void selectBirthDate(DateTime date) => selectedBirthDate = date;
+  void selectBirthDate(DateTime? date) => selectedBirthDate = date;
 
   bool togglePhoneEditing() {
     isPhoneEditable = !isPhoneEditable;

@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
 import '../../booking/pages/booking_page.dart';
-import '../../service/data/service_data.dart';
+import '../../service/controllers/service_controller.dart';
+import '../../service/pages/service_list_page.dart';
 import '../controllers/order_controller.dart';
 import '../domain/models/order_model.dart';
 import '../widgets/hold_countdown_banner.dart';
@@ -313,9 +315,16 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   }
 
   void _reorder(BuildContext context, ScheduledOrderModel order) {
-    final service = ServiceData.services.firstWhere(
+    final services = context.read<ServiceController>().allServices;
+    if (services.isEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const ServiceListPage()),
+      );
+      return;
+    }
+    final service = services.firstWhere(
       (item) => item.title.toLowerCase() == order.serviceName.toLowerCase(),
-      orElse: () => ServiceData.services.first,
+      orElse: () => services.first,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => BookingPage(service: service)),
@@ -619,14 +628,11 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   border: Border.all(color: const Color(0xFF00685F), width: 2),
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    order.cleanerAvatarPath,
+                  child: RemoteOrAssetImage(
+                    source: order.cleanerAvatarPath,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Icon(
-                      Icons.person,
-                      size: 28,
-                      color: Color(0xFF00685F),
-                    ),
+                    width: 50,
+                    height: 50,
                   ),
                 ),
               ),

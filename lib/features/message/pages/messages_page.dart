@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../core/notifications/open_booking_notification.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/refresh_scroll_physics.dart';
+import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/chatbot_button.dart';
@@ -78,13 +80,10 @@ class _MessagesPageState extends State<MessagesPage> {
                               switchInCurve: Curves.easeOut,
                               switchOutCurve: Curves.easeIn,
                               child: visibleMessages.isEmpty
-                                  ? RefreshIndicator(
+                                  ? AnchoredRefreshIndicator(
                                       onRefresh: _controller.loadFromApi,
                                       child: ListView(
-                                        physics:
-                                            const AlwaysScrollableScrollPhysics(
-                                              parent: BouncingScrollPhysics(),
-                                            ),
+                                        physics: refreshScrollPhysics,
                                         children: [
                                           _EmptyMessages(
                                             tab: _controller.selectedTab,
@@ -92,14 +91,11 @@ class _MessagesPageState extends State<MessagesPage> {
                                         ],
                                       ),
                                     )
-                                  : RefreshIndicator(
+                                  : AnchoredRefreshIndicator(
                                       onRefresh: _controller.loadFromApi,
                                       child: ListView.separated(
                                         key: ValueKey(_controller.selectedTab),
-                                        physics:
-                                            const AlwaysScrollableScrollPhysics(
-                                              parent: BouncingScrollPhysics(),
-                                            ),
+                                        physics: refreshScrollPhysics,
                                         padding: EdgeInsets.fromLTRB(
                                           16,
                                           16,

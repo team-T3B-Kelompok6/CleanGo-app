@@ -8,9 +8,9 @@ class UserProfileModel {
     required this.phoneNumber,
     this.isPhoneVerified = true,
     required this.email,
-    required this.gender,
-    required this.birthDate,
-    this.avatarAsset = 'assets/images/user_profile.jpeg',
+    this.gender,
+    this.birthDate,
+    this.avatarAsset = '',
     this.avatarUrl,
   });
 
@@ -20,14 +20,15 @@ class UserProfileModel {
   final String phoneNumber;
   final bool isPhoneVerified;
   final String email;
-  final String gender; // 'Laki-laki' | 'Perempuan'
-  final DateTime birthDate;
+  final String? gender;
+  final DateTime? birthDate;
   final String avatarAsset;
   final String? avatarUrl;
 
   String get avatarSource => avatarUrl ?? avatarAsset;
 
-  String get formattedBirthDate => formatBirthDate(birthDate);
+  String get formattedBirthDate =>
+      birthDate == null ? 'Belum diisi' : formatBirthDate(birthDate!);
 
   static String formatBirthDate(DateTime date) {
     const months = [
@@ -83,7 +84,7 @@ class UserProfileModel {
       'isPhoneVerified': isPhoneVerified,
       'email': email,
       'gender': gender,
-      'birthDate': birthDate.toIso8601String(),
+      'birthDate': birthDate?.toIso8601String(),
       'avatarAsset': avatarAsset,
       'avatarUrl': avatarUrl,
     };
@@ -99,9 +100,12 @@ class UserProfileModel {
           json['phone'] as String? ?? json['phoneNumber'] as String? ?? '',
       isPhoneVerified: true,
       email: json['email'] as String? ?? '',
-      gender: 'Laki-laki',
-      birthDate: DateTime(1995, 5, 14),
-      avatarAsset: 'assets/images/user_profile.jpeg',
+      gender: json['gender'] as String?,
+      birthDate:
+          json['birthDate'] == null
+              ? null
+              : DateTime.tryParse(json['birthDate'] as String),
+      avatarAsset: '',
       avatarUrl: ApiConfig.mediaUrl(json['avatarUrl'] as String?),
     );
   }
@@ -114,13 +118,13 @@ class UserProfileModel {
       phoneNumber: json['phoneNumber'] as String? ?? '',
       isPhoneVerified: json['isPhoneVerified'] as bool? ?? true,
       email: json['email'] as String? ?? '',
-      gender: json['gender'] as String? ?? 'Laki-laki',
-      birthDate: json['birthDate'] != null
-          ? DateTime.tryParse(json['birthDate'] as String) ??
-                DateTime(1995, 5, 14)
-          : DateTime(1995, 5, 14),
+      gender: json['gender'] as String?,
+      birthDate:
+          json['birthDate'] == null
+              ? null
+              : DateTime.tryParse(json['birthDate'] as String),
       avatarAsset:
-          json['avatarAsset'] as String? ?? 'assets/images/user_profile.jpeg',
+          json['avatarAsset'] as String? ?? '',
       avatarUrl: ApiConfig.mediaUrl(json['avatarUrl'] as String?),
     );
   }

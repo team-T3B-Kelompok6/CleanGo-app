@@ -1,7 +1,8 @@
 import 'package:cleango_app/core/theme/app_theme.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
 import 'package:cleango_app/features/profile/pages/change_password_page.dart';
-import 'package:cleango_app/shared/widgets/app_sheet.dart';
+import 'package:cleango_app/features/auth/pages/forgot_password_page.dart';
+import 'package:cleango_app/shared/widgets/app_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -43,11 +44,10 @@ void main() {
 
     await tester.tap(find.text('Lupa Sandi?'));
     await tester.pumpAndSettle();
-    expect(find.byType(AppSheet), findsOneWidget);
-    expect(find.textContaining('uji@cleango.id'), findsOneWidget);
-    await tester.tap(find.byTooltip('Tutup'));
+    expect(find.byType(ForgotPasswordPage), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    expect(find.byType(AppSheet), findsNothing);
+    expect(find.byType(ForgotPasswordPage), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

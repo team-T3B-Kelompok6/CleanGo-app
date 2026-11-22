@@ -6,9 +6,20 @@ import '../../booking/controllers/booking_controller.dart';
 import '../../booking/data/customer_booking_api.dart';
 import '../../booking/domain/models/review_photo_model.dart';
 import '../../../core/network/api_exception.dart';
-import '../data/order_data.dart';
 import '../data/eta_repository.dart';
 import '../domain/models/order_model.dart';
+
+ScheduledOrderModel _emptyScheduledOrder() => ScheduledOrderModel(
+  status: '',
+  arrivalEstimate: '',
+  travelDescription: '',
+  progress: 0,
+  serviceName: '',
+  serviceImagePath: 'assets/icons/service_placeholder.svg',
+  orderNumber: '',
+  price: '',
+  paymentStatus: '',
+);
 
 class OrderController extends ChangeNotifier {
   OrderController({
@@ -16,17 +27,8 @@ class OrderController extends ChangeNotifier {
     CustomerBookingApi? bookingApi,
   }) : _etaRepository = etaRepository ?? EtaRepository(),
        _bookingApi = bookingApi {
-    _selected = _ActiveOrderState(
-      OrderData.scheduledOrder.copyWith(
-        scheduledAt: DateTime.now().add(const Duration(days: 3)),
-      ),
-    );
-    if (_bookingApi == null) {
-      _orders[_scheduledOrder.orderNumber] = _selected;
-      _history = List<OrderHistoryModel>.from(OrderData.history);
-    } else {
-      _history = <OrderHistoryModel>[];
-    }
+    _selected = _ActiveOrderState(_emptyScheduledOrder());
+    _history = <OrderHistoryModel>[];
     _stageUpdatedAt[_activeStage] = DateTime.now();
     _resetTripTracking();
   }
@@ -625,11 +627,7 @@ class OrderController extends ChangeNotifier {
               ? _orders.values.last
               : finished.isNotEmpty
               ? _ActiveOrderState(_fromBooking(finished.first))
-              : _ActiveOrderState(
-                  OrderData.scheduledOrder.copyWith(
-                    scheduledAt: DateTime.now().add(const Duration(days: 3)),
-                  ),
-                ));
+              : _ActiveOrderState(_emptyScheduledOrder()));
       _history = finished.map(_historyFromBooking).toList(growable: false);
       notifyListeners();
     } catch (_) {
@@ -677,13 +675,17 @@ class OrderController extends ChangeNotifier {
 
   ScheduledOrderModel _fromBooking(CustomerBookingSummary booking) {
     final stage = _stageFor(booking.status);
-    return OrderData.scheduledOrder.copyWith(
+    return _emptyScheduledOrder().copyWith(
       backendBookingId: booking.id,
       holdUntil: booking.holdUntil,
       canCancel: booking.canCancel,
       canReschedule: booking.canReschedule,
       hasCleanerCoordinates: false,
       serviceName: booking.service,
+      serviceImagePath:
+          (booking.serviceImage != null && booking.serviceImage!.isNotEmpty)
+              ? booking.serviceImage!
+              : 'assets/icons/service_placeholder.svg',
       serviceDurationMinutes: booking.serviceDurationMinutes,
       workStartedAt: booking.startedAt,
       price: BookingController.formatRupiah(booking.totalAmount),
@@ -727,7 +729,10 @@ class OrderController extends ChangeNotifier {
     return OrderHistoryModel(
       orderId: '#${booking.code}',
       serviceName: booking.service,
-      serviceAssetPath: OrderData.scheduledOrder.serviceImagePath,
+      serviceAssetPath:
+          (booking.serviceImage != null && booking.serviceImage!.isNotEmpty)
+              ? booking.serviceImage!
+              : 'assets/icons/service_placeholder.svg',
       schedule: scheduled == null
           ? 'Jadwal layanan'
           : _formatDateTime(scheduled),
@@ -783,7 +788,7 @@ class OrderController extends ChangeNotifier {
   }) {
     final createdAt = DateTime.now();
     _selected = _ActiveOrderState(
-      OrderData.scheduledOrder.copyWith(
+      _emptyScheduledOrder().copyWith(
         serviceDurationMinutes: serviceDurationMinutes,
         serviceName: serviceName,
         serviceImagePath: serviceImagePath,

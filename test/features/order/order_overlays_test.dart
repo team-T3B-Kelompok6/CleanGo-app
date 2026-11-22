@@ -134,6 +134,7 @@ void main() {
   ) async {
     final orders = OrderController();
     addTearDown(orders.dispose);
+    _addOrder(orders, 'Layanan uji');
     await tester.pumpWidget(_host(orders, const OrdersPage()));
 
     Future<void> openCancellation() async {
@@ -162,6 +163,8 @@ void main() {
   ) async {
     final orders = OrderController();
     addTearDown(orders.dispose);
+    _addOrder(orders, 'Layanan review');
+    orders.completeScheduledOrder();
     final order = orders.historyOrders.first;
     await tester.pumpWidget(
       _host(

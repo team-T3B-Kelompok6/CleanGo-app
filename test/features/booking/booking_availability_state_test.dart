@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:cleango_app/features/booking/controllers/booking_controller.dart';
 import 'package:cleango_app/features/booking/data/customer_booking_api.dart';
 import 'package:cleango_app/features/booking/widgets/booking_widgets.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
+import '../../fixtures/demo_services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,7 +47,7 @@ void main() {
     final api = _QueuedApi();
     final booking = BookingController(
       bookingApi: api,
-      initialService: ServiceData.services.first,
+      initialService: DemoServices.demoServices.first,
     );
     addTearDown(booking.dispose);
     final first = booking.loadAvailability();
@@ -79,15 +79,15 @@ void main() {
     final api = _QueuedApi();
     final booking = BookingController(
       bookingApi: api,
-      initialService: ServiceData.services.first,
+      initialService: DemoServices.demoServices.first,
     );
     addTearDown(booking.dispose);
     final old = booking.loadAvailability();
-    booking.startBooking(ServiceData.services[1]);
+    booking.startBooking(DemoServices.demoServices[1]);
     api.requests[0].complete(open);
     await old;
     expect(booking.availabilityLoading, isTrue);
-    expect(api.services[1], ServiceData.services[1].id);
+    expect(api.services[1], DemoServices.demoServices[1].id);
     api.requests[1].complete([]);
     await Future<void>.delayed(Duration.zero);
     expect(booking.hasServerAvailability, isTrue);
@@ -98,8 +98,8 @@ void main() {
 
   test('service switch cannot submit stale time; duplicate board disables only that service', () async {
     final api = _QueuedApi();
-    final firstService = ServiceData.services.first;
-    final secondService = ServiceData.services[1];
+    final firstService = DemoServices.demoServices.first;
+    final secondService = DemoServices.demoServices[1];
     final booking = BookingController(bookingApi: api, initialService: firstService);
     addTearDown(booking.dispose);
     final initial = booking.loadAvailability();

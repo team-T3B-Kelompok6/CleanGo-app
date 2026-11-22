@@ -30,8 +30,8 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
   TextEditingController get _nameController => _personalDataForm.name;
   TextEditingController get _phoneController => _personalDataForm.phone;
   TextEditingController get _emailController => _personalDataForm.email;
-  String get _selectedGender => _personalDataForm.selectedGender;
-  DateTime get _selectedBirthDate => _personalDataForm.selectedBirthDate;
+  String? get _selectedGender => _personalDataForm.selectedGender;
+  DateTime? get _selectedBirthDate => _personalDataForm.selectedBirthDate;
   bool get _isPhoneEditable => _personalDataForm.isPhoneEditable;
 
   @override
@@ -51,7 +51,7 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedBirthDate,
+      initialDate: _selectedBirthDate ?? DateTime(2000, 1, 1),
       firstDate: DateTime(1940),
       lastDate: DateTime.now(),
       builder: (context, child) {

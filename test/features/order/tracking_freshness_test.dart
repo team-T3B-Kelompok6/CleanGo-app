@@ -1,10 +1,11 @@
 import 'package:cleango_app/features/order/data/eta_repository.dart';
-import 'package:cleango_app/features/order/data/order_data.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../fixtures/order_fixture.dart';
 
 void main() {
   final now = DateTime.utc(2026, 11, 13, 10);
-  final order = OrderData.scheduledOrder.copyWith(
+  final order = testScheduledOrder().copyWith(
     backendBookingId: '9',
     hasCleanerCoordinates: true,
     cleanerLatitude: -7.97,

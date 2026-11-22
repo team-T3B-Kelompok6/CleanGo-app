@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/refresh_scroll_physics.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../controllers/address_controller.dart';
 import '../domain/models/address_model.dart';
@@ -44,13 +46,11 @@ class _AddressListPageState extends State<AddressListPage> {
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
-              child: RefreshIndicator(
+              child: AnchoredRefreshIndicator(
                 onRefresh: () =>
                     context.read<AddressController>().loadFromApi(),
                 child: CustomScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(
-                    parent: BouncingScrollPhysics(),
-                  ),
+                  physics: refreshScrollPhysics,
                   slivers: [
                     // Header
                     SliverToBoxAdapter(

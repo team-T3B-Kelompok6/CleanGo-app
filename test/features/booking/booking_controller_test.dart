@@ -2,13 +2,13 @@ import 'package:cleango_app/features/address/domain/models/address_model.dart';
 import 'package:cleango_app/features/booking/controllers/booking_controller.dart';
 import 'package:cleango_app/features/booking/domain/models/cleaning_address.dart';
 import 'package:cleango_app/features/booking/domain/models/booking_draft.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
+import '../../fixtures/demo_services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('offers all nine hourly slots and keeps one selected time', () {
     final booking = BookingController()
-      ..startBooking(ServiceData.services.first)
+      ..startBooking(DemoServices.demoServices.first)
       ..selectDate(DateTime(2030, 1, 2));
     addTearDown(booking.dispose);
     expect(BookingController.availableTimes, [
@@ -34,7 +34,7 @@ void main() {
 
   test('treats a slot within the 60 minute lead time as unavailable', () {
     final booking = BookingController()
-      ..startBooking(ServiceData.services.first)
+      ..startBooking(DemoServices.demoServices.first)
       ..selectDate(DateTime(2030, 1, 2));
     addTearDown(booking.dispose);
 
@@ -45,7 +45,7 @@ void main() {
 
   test('rejects elapsed hours and dates when submitting a booking', () {
     final booking = BookingController()
-      ..startBooking(ServiceData.services.first)
+      ..startBooking(DemoServices.demoServices.first)
       ..selectDate(DateTime(2030, 1, 2))
       ..selectTime('09:00');
     addTearDown(booking.dispose);
@@ -74,9 +74,9 @@ void main() {
 
   test('normalizes an invalid restored time without losing booking notes', () {
     final booking = BookingController(
-      initialService: ServiceData.services.first,
+      initialService: DemoServices.demoServices.first,
       initialDraft: BookingDraft(
-        serviceId: ServiceData.services.first.id,
+        serviceId: DemoServices.demoServices.first.id,
         selectedDate: DateTime(2030, 1, 2),
         selectedTime: '17:00',
         note: 'Fokus di dapur',
@@ -108,7 +108,7 @@ void main() {
 
   test('blocks continuing until an owned address is chosen', () {
     final booking = BookingController()
-      ..startBooking(ServiceData.services.first)
+      ..startBooking(DemoServices.demoServices.first)
       ..selectDate(DateTime(2030, 1, 2));
     addTearDown(booking.dispose);
 

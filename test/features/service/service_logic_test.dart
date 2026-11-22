@@ -1,14 +1,14 @@
 import 'package:cleango_app/features/service/controllers/review_sort.dart';
 import 'package:cleango_app/features/service/controllers/service_controller.dart';
 import 'package:cleango_app/features/service/controllers/service_sort.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
+import '../../fixtures/demo_services.dart';
 import 'package:cleango_app/features/service/domain/models/service_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('sortServices', () {
     test('sorts alphabetically without mutating the source list', () {
-      final source = ServiceData.services.toList();
+      final source = DemoServices.demoServices.toList();
       final originalIds = source.map((service) => service.id).toList();
 
       final ascending = sortServices(source, ServiceSort.az);
@@ -20,8 +20,8 @@ void main() {
     });
 
     test('sorts popular and newest using existing metadata', () {
-      final popular = sortServices(ServiceData.services, ServiceSort.popular);
-      final newest = sortServices(ServiceData.services, ServiceSort.newest);
+      final popular = sortServices(DemoServices.demoServices, ServiceSort.popular);
+      final newest = sortServices(DemoServices.demoServices, ServiceSort.newest);
 
       expect(popular.first.popularity, 95);
       expect(newest.first.releaseOrder, 5);
@@ -59,7 +59,9 @@ void main() {
 
   group('ServiceController search state', () {
     test('distinguishes a no-result search and restores data after reset', () {
-      final controller = ServiceController();
+      final controller = ServiceController(
+        initialServices: DemoServices.demoServices,
+      );
 
       controller.updateSearchQuery('xyz999tidakada');
       expect(controller.visibleServices, isEmpty);

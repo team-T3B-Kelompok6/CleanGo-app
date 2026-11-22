@@ -18,7 +18,7 @@ class ReviewRatingPage extends StatefulWidget {
     this.orderId = '#CG-82910',
     this.bookingId,
     this.serviceName = 'Deep Cleaning',
-    this.serviceImagePath = 'assets/images/service_deep_cleaning.jpeg',
+    this.serviceImagePath = 'assets/icons/service_placeholder.svg',
     this.initialRating,
     this.initialComment = '',
     this.initialPhotos = const [],
@@ -372,7 +372,6 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
   }
 
   Widget _buildServiceCard() {
-    final isSvg = widget.serviceImagePath.toLowerCase().endsWith('.svg');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -394,32 +393,10 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
             child: SizedBox(
               width: 56,
               height: 56,
-              child: isSvg
-                  ? ColoredBox(
-                      color: const Color(0xFFE8FAF7),
-                      child: Padding(
-                        padding: const EdgeInsets.all(13),
-                        child: SvgPicture.asset(
-                          widget.serviceImagePath,
-                          colorFilter: const ColorFilter.mode(
-                            Color(0xFF00685F),
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Image.asset(
-                      widget.serviceImagePath,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: const Color(0xFFE8FAF7),
-                        child: const Icon(
-                          Icons.cleaning_services_outlined,
-                          size: 26,
-                          color: Color(0xFF00685F),
-                        ),
-                      ),
-                    ),
+              child: RemoteOrAssetImage(
+                source: widget.serviceImagePath,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: 14),

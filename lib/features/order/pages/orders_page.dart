@@ -7,12 +7,15 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/refresh_scroll_physics.dart';
+import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_sheet.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import '../../../shared/widgets/remote_or_asset_image.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../../booking/data/customer_booking_api.dart';
@@ -20,6 +23,7 @@ import '../../booking/pages/booking_page.dart';
 import '../../checkout/pages/pending_payment_page.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../../service/controllers/service_controller.dart';
+import '../../service/pages/service_list_page.dart';
 import '../controllers/order_controller.dart';
 import '../domain/models/order_model.dart';
 import '../widgets/hold_countdown_banner.dart';
@@ -430,7 +434,10 @@ class _PendingPaymentCardState extends State<_PendingPaymentCard> {
         subtitle: Text(
           '${widget.booking.service} · ${BookingController.formatRupiah(widget.booking.totalAmount)}$countdown',
         ),
-        trailing: TextButton(onPressed: widget.onResume, child: const Text('Lanjutkan')),
+        trailing: TextButton(
+          onPressed: widget.onResume,
+          child: const Text('Lanjutkan'),
+        ),
       ),
     );
   }
@@ -453,10 +460,10 @@ class _ScheduledOrdersView extends StatelessWidget {
     final controller = context.watch<OrderController>();
     final pending = controller.pendingPayments;
     if (!controller.hasScheduledOrder && pending.isEmpty) {
-      return RefreshIndicator(
+      return AnchoredRefreshIndicator(
         onRefresh: () => context.read<OrderController>().loadFromApi(),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
+          physics: refreshScrollPhysics,
           padding: EdgeInsets.fromLTRB(24, 54, 24, bottomSpacing),
           children: const [
             Icon(
@@ -503,12 +510,10 @@ class _ScheduledOrdersView extends StatelessWidget {
     }
     final totalCount =
         orders.length + pending.length + (holdOrder == null ? 0 : 1);
-    return RefreshIndicator(
+    return AnchoredRefreshIndicator(
       onRefresh: () => context.read<OrderController>().loadFromApi(),
       child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
+        physics: refreshScrollPhysics,
         padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
         itemCount: totalCount,
         separatorBuilder: (_, _) => const SizedBox(height: 16),
@@ -1135,12 +1140,10 @@ class _OrderHistoryView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final history = context.watch<OrderController>().historyOrders;
-    return RefreshIndicator(
+    return AnchoredRefreshIndicator(
       onRefresh: () => context.read<OrderController>().loadFromApi(),
       child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
+        physics: refreshScrollPhysics,
         padding: EdgeInsets.fromLTRB(16, 20, 16, bottomSpacing),
         itemCount: history.length,
         separatorBuilder: (_, _) => const SizedBox(height: 14),
@@ -1420,6 +1423,14 @@ class _HistoryOrderCard extends StatelessWidget {
     final targetService = context
         .read<ServiceController>()
         .findServiceForHistory(order.serviceName);
+    if (targetService == null) {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const ServiceListPage(),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => BookingPage(service: targetService),
@@ -1436,28 +1447,11 @@ class _ServiceVisual extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isImage = assetPath.endsWith('.jpeg') || assetPath.endsWith('.jpg');
-
     return SizedBox.square(
       dimension: size,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: isImage
-            ? Image.asset(assetPath, fit: BoxFit.cover)
-            : ColoredBox(
-                color: const Color(0xFFE8FAF7),
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: SvgPicture.asset(
-                    assetPath,
-                    fit: BoxFit.contain,
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.primaryAction,
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                ),
-              ),
+        child: RemoteOrAssetImage(source: assetPath, fit: BoxFit.cover),
       ),
     );
   }

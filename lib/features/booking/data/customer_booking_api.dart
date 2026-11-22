@@ -332,6 +332,7 @@ class CustomerBookingSummary {
     required this.date,
     required this.time,
     required this.service,
+    this.serviceImage,
     required this.servicePrice,
     required this.platformFee,
     required this.discountAmount,
@@ -367,6 +368,7 @@ class CustomerBookingSummary {
   final String date;
   final String time;
   final String service;
+  final String? serviceImage;
   final int servicePrice;
   final int platformFee;
   final int discountAmount;
@@ -410,6 +412,7 @@ class CustomerBookingSummary {
       date: json['date'] as String? ?? '',
       time: json['time'] as String? ?? '',
       service: json['service'] as String? ?? 'Layanan',
+      serviceImage: json['serviceImage'] as String?,
       servicePrice: (json['servicePrice'] as num?)?.toInt() ?? 0,
       platformFee: (json['platformFee'] as num?)?.toInt() ?? 0,
       discountAmount: (json['discountAmount'] as num?)?.toInt() ?? 0,

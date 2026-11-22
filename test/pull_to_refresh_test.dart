@@ -104,15 +104,22 @@ void main() {
     final services = _CountingService();
     addTearDown(home.dispose);
     addTearDown(services.dispose);
+    final notifications = <String>[];
     await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<HomeController>.value(value: home),
-          ChangeNotifierProvider<ServiceController>.value(value: services),
-          ChangeNotifierProvider(create: (_) => MessageController()),
-          ChangeNotifierProvider(create: (_) => ProfileController()),
-        ],
-        child: const MaterialApp(home: HomePage()),
+      NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          notifications.add(notification.runtimeType.toString());
+          return false;
+        },
+        child: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<HomeController>.value(value: home),
+            ChangeNotifierProvider<ServiceController>.value(value: services),
+            ChangeNotifierProvider(create: (_) => MessageController()),
+            ChangeNotifierProvider(create: (_) => ProfileController()),
+          ],
+          child: const MaterialApp(home: HomePage()),
+        ),
       ),
     );
     await tester.pump();
@@ -121,10 +128,41 @@ void main() {
     await tester.pump();
     expect(home.calls, equals(beforeHome));
     expect(services.refreshes, equals(beforeService));
-    await dragDown(tester);
-    expect(home.calls, greaterThan(beforeHome));
-    expect(services.refreshes, greaterThan(beforeService));
+    for (int i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    final header = find.text('Halo, Pengguna');
+    final yBefore = tester.getTopLeft(header).dy;
+    // Tahan gesture saat refresh tertunda: konten halaman tidak ikut turun.
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(CustomScrollView)),
+    );
+    for (int i = 0; i < 3; i++) {
+      await gesture.moveBy(const Offset(0, 100));
+      await tester.pump();
+    }
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester.getTopLeft(header).dy,
+      yBefore,
+      reason:
+          'pixels='
+          '${tester.state<ScrollableState>(find.byType(Scrollable).first).position.pixels} '
+          'scrollY=${tester.getTopLeft(find.byType(CustomScrollView)).dy} '
+          'headerRect=${tester.getRect(header)} '
+          'viewPadding=${tester.view.padding} '
+          'mqPadding=${MediaQuery.of(tester.element(find.byType(HomePage))).padding}',
+    );
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(home.calls, beforeHome + 1);
+    expect(services.refreshes, beforeService + 1);
     expect(find.byType(RefreshIndicator), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.getTopLeft(header).dy, yBefore);
 
     final afterDragHome = home.calls;
     final afterDragService = services.refreshes;

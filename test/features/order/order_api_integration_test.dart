@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:cleango_app/core/network/api_config.dart';
 import 'package:cleango_app/features/booking/data/customer_booking_api.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
-import 'package:cleango_app/features/order/data/order_data.dart';
 import 'package:cleango_app/features/order/data/eta_repository.dart';
 import 'package:cleango_app/features/order/domain/models/order_model.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -700,10 +699,8 @@ void main() {
 
       await controller.loadFromApi();
 
-      expect(
-        controller.scheduledOrder.orderNumber,
-        OrderData.scheduledOrder.orderNumber,
-      );
+      expect(controller.scheduledOrder.orderNumber, isEmpty);
+      expect(controller.hasScheduledOrder, isFalse);
     });
 
     test('does nothing without a configured api', () async {
@@ -711,10 +708,8 @@ void main() {
 
       await controller.loadFromApi();
 
-      expect(
-        controller.scheduledOrder.orderNumber,
-        OrderData.scheduledOrder.orderNumber,
-      );
+      expect(controller.scheduledOrder.orderNumber, isEmpty);
+      expect(controller.hasScheduledOrder, isFalse);
     });
   });
 }

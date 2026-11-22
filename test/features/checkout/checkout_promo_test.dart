@@ -4,7 +4,7 @@ import 'package:cleango_app/features/booking/controllers/booking_controller.dart
 import 'package:cleango_app/features/checkout/pages/checkout_page.dart';
 import 'package:cleango_app/features/checkout/pages/payment_page.dart';
 import 'package:cleango_app/features/checkout/pages/promo_page.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
+import '../../fixtures/demo_services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -56,7 +56,7 @@ void main() {
             phoneNumber: '081200000001',
           );
           return BookingController()
-            ..startBooking(ServiceData.services.first)
+            ..startBooking(DemoServices.demoServices.first)
             ..updateAddress(uji.toCleaningAddress(), addressId: uji.id)
             ..selectDate(DateTime.now().add(const Duration(days: 1)))
             ..selectTime('12:00');
@@ -103,7 +103,7 @@ void main() {
       phoneNumber: '081234567890',
     );
     final booking = BookingController(
-      initialService: ServiceData.services.first,
+      initialService: DemoServices.demoServices.first,
       initialAddress: address.toCleaningAddress(),
     )
       ..updateAddress(address.toCleaningAddress(), addressId: address.id)

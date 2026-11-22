@@ -128,25 +128,69 @@ void main() {
       expect(controller.confirmPasswordError, isNull);
     });
 
-    test('ProfileController changePassword updates stored password', () {
+    test('valid form cannot change a password without an authenticated API session', () async {
       final profileController = ProfileController();
-      expect(profileController.password, '321321');
+      addTearDown(profileController.dispose);
+      controller.setCurrentPassword('ExistingPassword123');
+      controller.setNewPassword('CleanGo123');
+      controller.setConfirmPassword('CleanGo123');
 
-      final success = profileController.changePassword(
-        currentPassword: '321321',
-        newPassword: 'CleanGo123',
+      expect(controller.validate(null), isTrue);
+      final success = await profileController.changePasswordRemote(
+        currentPassword: controller.currentPassword,
+        newPassword: controller.newPassword,
       );
 
-      expect(success, true);
-      expect(profileController.password, 'CleanGo123');
-
-      // Old password should now fail
-      final secondAttempt = profileController.changePassword(
-        currentPassword: '321321',
-        newPassword: 'AnotherPassword456',
+      expect(success, isFalse);
+      expect(
+        profileController.error,
+        'Sesi tidak ditemukan. Silakan masuk kembali.',
       );
-      expect(secondAttempt, false);
     });
+
+    test('remote form validation requires all fields', () {
+      expect(controller.validate(null), isFalse);
+      expect(
+        controller.currentPasswordError,
+        'Kata sandi saat ini wajib diisi.',
+      );
+      expect(controller.newPasswordError, 'Kata sandi baru wajib diisi.');
+      expect(
+        controller.confirmPasswordError,
+        'Konfirmasi kata sandi wajib diisi.',
+      );
+    });
+
+    test('remote form rejects unchanged and overlong new passwords', () {
+      controller.setCurrentPassword('ExistingPassword123');
+      controller.setNewPassword('ExistingPassword123');
+      controller.setConfirmPassword('ExistingPassword123');
+      expect(controller.validate(null), isFalse);
+      expect(
+        controller.newPasswordError,
+        'Kata sandi baru tidak boleh sama dengan kata sandi saat ini.',
+      );
+      controller.setNewPassword('Aa1${'a' * 30}');
+      controller.setConfirmPassword(controller.newPassword);
+      expect(controller.validate(null), isFalse);
+      expect(
+        controller.newPasswordError,
+        'Kata sandi baru belum memenuhi semua kriteria.',
+      );
+    });
+
+    test(
+      'server rejection remains visible until current password is edited',
+      () {
+        controller.setCurrentPasswordError('Kata sandi saat ini tidak sesuai.');
+        expect(
+          controller.currentPasswordError,
+          'Kata sandi saat ini tidak sesuai.',
+        );
+        controller.setCurrentPassword('CorrectedPassword123');
+        expect(controller.currentPasswordError, isNull);
+      },
+    );
 
     test('toggleVisibility switches visibility booleans', () {
       controller.toggleCurrentPasswordVisibility();

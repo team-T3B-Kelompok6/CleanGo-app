@@ -8,7 +8,7 @@ import 'package:cleango_app/features/checkout/controllers/payment_flow_controlle
 import 'package:cleango_app/features/checkout/domain/models/payment_method_model.dart';
 import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/domain/models/order_model.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
+import '../../fixtures/demo_services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -46,7 +46,7 @@ void main() {
         longitude: 112.61,
       );
       booking = BookingController(bookingApi: api)
-        ..startBooking(ServiceData.services.first);
+        ..startBooking(DemoServices.demoServices.first);
       booking.selectDate(DateTime(2030, 1, 3));
       await booking.loadAvailability();
       booking.selectTime('10:00');

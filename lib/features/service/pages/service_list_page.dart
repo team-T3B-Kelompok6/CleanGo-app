@@ -4,6 +4,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/refresh_scroll_physics.dart';
+import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../../../shared/widgets/app_sheet.dart';
 import '../../../core/constants/app_routes.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
@@ -67,13 +69,11 @@ class _ServiceListPageState extends State<ServiceListPage> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: SafeArea(
                   bottom: false,
-                  child: RefreshIndicator(
+                  child: AnchoredRefreshIndicator(
                     onRefresh: () =>
                         context.read<ServiceController>().refreshServices(),
                     child: CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
+                      physics: refreshScrollPhysics,
                       slivers: [
                         SliverToBoxAdapter(
                           child: _ServiceListHeader(

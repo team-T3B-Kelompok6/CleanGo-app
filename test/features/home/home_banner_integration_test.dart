@@ -1,7 +1,6 @@
 import 'package:cleango_app/core/network/api_config.dart';
 import 'package:cleango_app/features/home/controllers/home_controller.dart';
 import 'package:cleango_app/features/home/data/customer_banner_api.dart';
-import 'package:cleango_app/features/home/data/home_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _FakeBannerApi extends CustomerBannerApi {
@@ -78,26 +77,29 @@ void main() {
       expect(controller.error, isNotNull);
     });
 
-    test('sukses kemudian gagal mempertahankan banner backend sebelumnya', () async {
-      final api = _FakeBannerApi(banners: ['http://x/a.png']);
-      final controller = HomeController(bannerApi: api);
+    test(
+      'sukses kemudian gagal mempertahankan banner backend sebelumnya',
+      () async {
+        final api = _FakeBannerApi(banners: ['http://x/a.png']);
+        final controller = HomeController(bannerApi: api);
 
-      await controller.loadFromApi();
-      expect(controller.banners, ['http://x/a.png']);
-      expect(controller.error, isNull);
+        await controller.loadFromApi();
+        expect(controller.banners, ['http://x/a.png']);
+        expect(controller.error, isNull);
 
-      api.fail = true;
-      await controller.loadFromApi();
-      expect(controller.banners, ['http://x/a.png']);
-      expect(controller.error, isNotNull);
-    });
+        api.fail = true;
+        await controller.loadFromApi();
+        expect(controller.banners, ['http://x/a.png']);
+        expect(controller.error, isNotNull);
+      },
+    );
 
     test('does nothing without a configured api', () async {
       final controller = HomeController();
 
       await controller.loadFromApi();
 
-      expect(controller.banners, HomeData.promoBanners);
+      expect(controller.banners, isEmpty);
     });
   });
 }

@@ -128,10 +128,10 @@ class PaymentFlowController {
     } else {
       orders.createOrderFromBooking(
         serviceDurationMinutes: booking.service?.durationMinutes,
-        serviceName: booking.service?.title ?? 'Deep Cleaning',
+        serviceName: booking.service?.title ?? '',
         serviceImagePath:
             booking.service?.imagePath ??
-            'assets/images/service_deep_cleaning.jpeg',
+            'assets/icons/service_placeholder.svg',
         price: totalPayment,
         address: formattedAddress,
         destinationSubAddress: selectedAddress.note,

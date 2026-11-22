@@ -2,62 +2,91 @@ import 'package:flutter/foundation.dart';
 
 import '../data/customer_banner_api.dart';
 import '../data/customer_category_api.dart';
-import '../data/home_data.dart';
 import '../domain/models/popular_category_model.dart';
 
-/// Home screen data that comes from the backend (promo banners today,
-/// categories and popular services next). Falls back to the bundled demo data
-/// when there is no session or the request fails.
+enum BannerStatus { loading, success, error }
+
+/// Banner dan kategori memiliki siklus request serta kegagalan independen.
 class HomeController extends ChangeNotifier {
-  HomeController({CustomerBannerApi? bannerApi, CustomerCategoryApi? categoryApi})
-      : _bannerApi = bannerApi,
-        _categoryApi = categoryApi,
-        _banners = bannerApi == null ? HomeData.promoBanners : const [];
+  HomeController({this.bannerApi, this.categoryApi})
+    : _bannerStatus = bannerApi == null
+          ? BannerStatus.error
+          : BannerStatus.loading,
+      _bannerError = bannerApi == null ? 'Promo belum tersedia' : null;
 
-  final CustomerBannerApi? _bannerApi;
-  final CustomerCategoryApi? _categoryApi;
+  final CustomerBannerApi? bannerApi;
+  final CustomerCategoryApi? categoryApi;
   List<PopularCategoryModel> _popularCategories = const [];
-  List<String> _banners;
-  String? _error;
-  bool _loading = false;
+  List<String> _banners = const [];
+  BannerStatus _bannerStatus;
+  String? _bannerError;
+  String? _categoryError;
+  bool _bannerLoading = false;
+  bool _categoryLoading = false;
+  bool _disposed = false;
 
-  bool get hasBannerApi => _bannerApi != null;
-  bool get hasCategoryApi => _categoryApi != null;
-  bool get hasApi => _bannerApi != null || _categoryApi != null;
-
+  bool get hasBannerApi => bannerApi != null;
+  bool get hasCategoryApi => categoryApi != null;
+  bool get hasApi => hasBannerApi || hasCategoryApi;
   List<String> get banners => List.unmodifiable(_banners);
-
-  /// Service categories ranked by bookings (home "Layanan" grid).
   List<PopularCategoryModel> get popularCategories =>
       List.unmodifiable(_popularCategories);
-  String? get error => _error;
-  bool get loading => _loading;
+  BannerStatus get bannerStatus => _bannerStatus;
+  String? get bannerError => _bannerError;
+  String? get categoryError => _categoryError;
+  String? get error => (hasBannerApi ? _bannerError : null) ?? _categoryError;
+  bool get loading => _bannerLoading || _categoryLoading;
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  Future<void> loadBanners() async {
+    final api = bannerApi;
+    if (_disposed || _bannerLoading || api == null) return;
+    _bannerLoading = true;
+    _bannerStatus = BannerStatus.loading;
+    _bannerError = null;
+    _notify();
+    try {
+      final banners = await api.fetchBanners();
+      if (_disposed) return;
+      _banners = List.of(banners);
+      _bannerStatus = BannerStatus.success;
+    } catch (error) {
+      if (_disposed) return;
+      _bannerError = error.toString();
+      _bannerStatus = BannerStatus.error;
+    } finally {
+      _bannerLoading = false;
+      _notify();
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    final api = categoryApi;
+    if (_disposed || _categoryLoading || api == null) return;
+    _categoryLoading = true;
+    _categoryError = null;
+    _notify();
+    try {
+      final categories = await api.fetchPopularCategories();
+      if (!_disposed) _popularCategories = categories;
+    } catch (error) {
+      if (!_disposed) _categoryError = error.toString();
+    } finally {
+      _categoryLoading = false;
+      _notify();
+    }
+  }
 
   Future<void> loadFromApi() async {
-    if (_bannerApi == null && _categoryApi == null) return;
-    _loading = true;
-    _error = null;
-    notifyListeners();
-    try {
-      // Each call is independent: one failing must not hide the other.
-      if (_bannerApi != null) {
-        try {
-          final banners = await _bannerApi.fetchBanners();
-          _banners = banners;
-        } catch (error) {
-          _error = error.toString();
-        }
-      }
-      if (_categoryApi != null) {
-        try {
-          _popularCategories = await _categoryApi.fetchPopularCategories();
-        } catch (error) {
-          _error = error.toString();
-        }
-      }
-    } finally {
-      _loading = false;
-      notifyListeners();
-    }
+    await Future.wait([loadBanners(), _loadCategories()]);
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

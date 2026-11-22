@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/refresh_scroll_physics.dart';
+import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
@@ -79,7 +81,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: SafeArea(
                   bottom: false,
-                  child: RefreshIndicator(
+                  child: AnchoredRefreshIndicator(
                     onRefresh: () {
                       return Future.wait([
                         context.read<ProfileController>().loadFromApi(),
@@ -87,9 +89,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       ]);
                     },
                     child: ListView(
-                      physics: const AlwaysScrollableScrollPhysics(
-                        parent: BouncingScrollPhysics(),
-                      ),
+                      physics: refreshScrollPhysics,
                       padding: EdgeInsets.fromLTRB(16, 18, 16, bottomSpacing),
                       children: [
                         const Padding(

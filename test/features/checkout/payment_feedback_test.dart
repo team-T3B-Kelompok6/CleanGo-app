@@ -9,7 +9,7 @@ import 'package:cleango_app/features/order/controllers/order_controller.dart';
 import 'package:cleango_app/features/order/pages/orders_page.dart';
 import 'package:cleango_app/features/profile/controllers/profile_controller.dart';
 import 'package:cleango_app/features/service/controllers/service_controller.dart';
-import 'package:cleango_app/features/service/data/service_data.dart';
+import '../../fixtures/demo_services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -96,7 +96,7 @@ void main() {
     );
     final draft = booking ?? BookingController(bookingApi: _BookingApi());
     draft
-      ..startBooking(ServiceData.services.first)
+      ..startBooking(DemoServices.demoServices.first)
       ..updateAddress(uji.toCleaningAddress(), addressId: uji.id)
       ..selectDate(DateTime.now().add(const Duration(days: 1)));
     await draft.loadAvailability();

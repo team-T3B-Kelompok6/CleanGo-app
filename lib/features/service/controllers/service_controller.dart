@@ -18,7 +18,7 @@ class ServiceController extends ChangeNotifier {
   }) : _detailApi = detailApi,
        _repository = repository,
        _allServices = List<ServiceModel>.from(
-         initialServices ?? ServiceData.services,
+         initialServices ?? const <ServiceModel>[],
        ),
        _selectedFilter = filters.contains(initialFilter)
            ? initialFilter!
@@ -74,31 +74,13 @@ class ServiceController extends ChangeNotifier {
     return null;
   }
 
-  ServiceModel findServiceForHistory(String historyServiceName) {
-    final normalizedName = historyServiceName.toLowerCase();
-
-    final targetId = switch (normalizedName) {
-      final name when name.contains('ac') || name.contains('cuci ac') =>
-        'ac-care',
-      final name when name.contains('kantor') || name.contains('usaha') =>
-        'office-cleaning',
-      final name when name.contains('harian') || name.contains('reguler') =>
-        'daily-cleaning',
-      final name when name.contains('sofa') || name.contains('kasur') =>
-        'sofa-mattress',
-      final name when name.contains('deep') || name.contains('cleaning') =>
-        'deep-cleaning',
-      _ => null,
-    };
-
-    if (targetId != null) {
-      return findServiceById(targetId) ?? _allServices.first;
+  ServiceModel? findServiceForHistory(String historyServiceName) {
+    final normalizedName = historyServiceName.toLowerCase().trim();
+    if (normalizedName.isEmpty) return null;
+    for (final service in _allServices) {
+      if (service.title.toLowerCase() == normalizedName) return service;
     }
-
-    return _allServices.firstWhere(
-      (service) => service.title.toLowerCase().contains(normalizedName),
-      orElse: () => _allServices.first,
-    );
+    return null;
   }
 
   /// Re-reads the catalogue from the backend (new photos, prices, categories)

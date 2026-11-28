@@ -133,6 +133,8 @@ class ScheduledOrderModel {
     this.customerPhone = '(+62) 81223728077',
     this.serviceDurationMinutes,
     this.workStartedAt,
+    this.travelDepartedAt,
+    this.travelArrivedAt,
   });
 
   final String status;
@@ -195,6 +197,11 @@ class ScheduledOrderModel {
   final int? serviceDurationMinutes;
   final DateTime? workStartedAt;
 
+  /// Timestamp berangkat/tiba perjalanan cleaner dari respons tracking.
+  /// Null berarti backend belum mencatat fase tersebut.
+  final DateTime? travelDepartedAt;
+  final DateTime? travelArrivedAt;
+
   ScheduledOrderModel copyWith({
     String? status,
     String? arrivalEstimate,
@@ -244,11 +251,15 @@ class ScheduledOrderModel {
     String? customerPhone,
     int? serviceDurationMinutes,
     DateTime? workStartedAt,
+    DateTime? travelDepartedAt,
+    DateTime? travelArrivedAt,
   }) {
     return ScheduledOrderModel(
       serviceDurationMinutes:
           serviceDurationMinutes ?? this.serviceDurationMinutes,
       workStartedAt: workStartedAt ?? this.workStartedAt,
+      travelDepartedAt: travelDepartedAt ?? this.travelDepartedAt,
+      travelArrivedAt: travelArrivedAt ?? this.travelArrivedAt,
       status: status ?? this.status,
       arrivalEstimate: arrivalEstimate ?? this.arrivalEstimate,
       travelDescription: travelDescription ?? this.travelDescription,
@@ -369,7 +380,7 @@ class OrderHistoryModel {
   bool get isCancelled =>
       ['BATAL', 'DIBATALKAN', 'CANCELLED'].contains(status.toUpperCase());
   bool get needsRefundContact =>
-      isCancelled &&
+      backendBookingId != null &&
       paymentMethod.toLowerCase() == 'qris' &&
       paymentStatus == 'paid';
   final String cleanerName;

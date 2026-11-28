@@ -12,7 +12,6 @@ class OrderTrackingMap extends StatefulWidget {
     this.height = 250,
     this.borderRadius = 18,
     this.controlsBottomInset = 12,
-    this.onCleanerPositionChanged,
     super.key,
   });
 
@@ -20,9 +19,6 @@ class OrderTrackingMap extends StatefulWidget {
   final double height;
   final double borderRadius;
   final double controlsBottomInset;
-  final Future<void> Function(double latitude, double longitude)?
-  onCleanerPositionChanged;
-
   @override
   State<OrderTrackingMap> createState() => _OrderTrackingMapState();
 }
@@ -103,31 +99,17 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
 
   bool get _isTravelActive => _isTravelStage && _hasDestination && _hasCleaner;
 
-  List<LatLng> get _remainingRoutePoints {
-    final points = widget.order.routePoints
-        .map((point) => LatLng(point.latitude, point.longitude))
-        .toList(growable: false);
-    if (points.length >= 2) return points;
-    return [_currentCleanerPosition, _destinationPoint];
-  }
+  List<LatLng> get _routePoints => widget.order.routePoints
+      .map((point) => LatLng(point.latitude, point.longitude))
+      .toList(growable: false);
 
-  List<LatLng> get _displayRoutePoints =>
-      _isSimulating ? _simulationRoutePoints : _remainingRoutePoints;
-
-  late LatLng _currentCleanerPosition;
-  double _routeFraction = 0;
-  List<LatLng> _simulationRoutePoints = const [];
-  Timer? _simulationTimer;
-  bool _isSimulating = false;
+  LatLng get _currentCleanerPosition =>
+      LatLng(widget.order.cleanerLatitude, widget.order.cleanerLongitude);
 
   @override
   void initState() {
     super.initState();
     _mapController = MapController();
-    _currentCleanerPosition = LatLng(
-      widget.order.cleanerLatitude,
-      widget.order.cleanerLongitude,
-    );
     _syncedDestination = _hasDestination;
     _syncedCleaner = _isTravelStage && _hasCleaner;
     _scheduleLocationExpiry();
@@ -140,96 +122,16 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
       _userPanned = false;
       _syncedDestination = false;
       _syncedCleaner = false;
-      _simulationTimer?.cancel();
-      _isSimulating = false;
-      _currentCleanerPosition = LatLng(
-        widget.order.cleanerLatitude,
-        widget.order.cleanerLongitude,
-      );
     }
     _scheduleLocationExpiry();
-    if (!_isSimulating &&
-        (oldWidget.order.cleanerLatitude != widget.order.cleanerLatitude ||
-            oldWidget.order.cleanerLongitude !=
-                widget.order.cleanerLongitude)) {
-      _currentCleanerPosition = LatLng(
-        widget.order.cleanerLatitude,
-        widget.order.cleanerLongitude,
-      );
-    }
     _scheduleInitialSync();
-    if (!_isTravelActive && _isSimulating) {
-      _simulationTimer?.cancel();
-      _isSimulating = false;
-    }
   }
 
   @override
   void dispose() {
     _locationExpiryTimer?.cancel();
-    _simulationTimer?.cancel();
     _mapController.dispose();
     super.dispose();
-  }
-
-  LatLng _interpolatePointOnRoute(double fraction) {
-    final routePoints = _simulationRoutePoints;
-    if (routePoints.length < 2) return _destinationPoint;
-    final clamped = fraction.clamp(0.0, 1.0);
-    final totalSegments = routePoints.length - 1;
-    final targetSegmentFloat = clamped * totalSegments;
-    final segmentIndex = targetSegmentFloat.floor().clamp(0, totalSegments - 1);
-    final segmentFraction = targetSegmentFloat - segmentIndex;
-
-    final p1 = routePoints[segmentIndex];
-    final p2 = routePoints[segmentIndex + 1];
-
-    final lat = p1.latitude + (p2.latitude - p1.latitude) * segmentFraction;
-    final lng = p1.longitude + (p2.longitude - p1.longitude) * segmentFraction;
-    return LatLng(lat, lng);
-  }
-
-  void _toggleSimulation() {
-    if (!_isTravelActive || widget.order.backendBookingId != null) return;
-    if (_isSimulating) {
-      _simulationTimer?.cancel();
-      setState(() {
-        _isSimulating = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isSimulating = true;
-      _routeFraction = 0;
-      _simulationRoutePoints = List<LatLng>.from(_remainingRoutePoints);
-    });
-
-    _simulationTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      setState(() {
-        _routeFraction += 0.1;
-        if (_routeFraction >= 1.0) {
-          _routeFraction = 1.0;
-          _isSimulating = false;
-          timer.cancel();
-        }
-        _currentCleanerPosition = _interpolatePointOnRoute(_routeFraction);
-      });
-      final callback = widget.onCleanerPositionChanged;
-      if (callback != null) {
-        unawaited(
-          callback(
-            _currentCleanerPosition.latitude,
-            _currentCleanerPosition.longitude,
-          ),
-        );
-      }
-    });
   }
 
   void _recenterMap() {
@@ -265,9 +167,17 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
     return widget.order.distanceKm;
   }
 
+  String get _routeTitle {
+    if (!_hasDestination) return 'Alamat belum memiliki titik';
+    if (_isTravelActive) return '${widget.order.originLocation} ➔ Tujuan';
+    return 'Status perjalanan';
+  }
+
   @override
   Widget build(BuildContext context) {
     final centerPoint = _centerPoint;
+    final cleanerPosition = _hasCleaner ? _currentCleanerPosition : null;
+    final showRoute = _isTravelActive && _routePoints.length >= 2;
 
     return Container(
       height: widget.height,
@@ -325,18 +235,16 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                         'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.example.cleango_app',
                   ),
-                  if (_isTravelActive &&
-                      _displayRoutePoints.length >= 2 &&
-                      (widget.order.routePoints.length >= 2 || _isSimulating))
+                  if (showRoute)
                     PolylineLayer(
                       polylines: [
                         Polyline(
-                          points: _displayRoutePoints,
+                          points: _routePoints,
                           strokeWidth: 7.0,
                           color: Colors.white.withValues(alpha: 0.85),
                         ),
                         Polyline(
-                          points: _displayRoutePoints,
+                          points: _routePoints,
                           strokeWidth: 4.5,
                           color: _isLocationStale
                               ? const Color(0xFF64748B)
@@ -354,9 +262,9 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                           height: 80,
                           child: _buildDestinationMarker(),
                         ),
-                      if (_isTravelStage && _hasCleaner)
+                      if (cleanerPosition != null && _isTravelStage)
                         Marker(
-                          point: _currentCleanerPosition,
+                          point: cleanerPosition,
                           width: 120,
                           height: 72,
                           child: _buildCleanerMarker(),
@@ -371,29 +279,12 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                 ],
               ),
 
-            // Kontrol simulasi di kiri bawah area peta.
             Positioned(
               left: 12,
               bottom: widget.controlsBottomInset,
-              child: Row(
-                children: [
-                  if (_isTravelActive &&
-                      widget.order.backendBookingId == null) ...[
-                    _buildMapActionPill(
-                      icon: _isSimulating
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      label: _isSimulating ? 'Pause' : 'Simulasi',
-                      onTap: _toggleSimulation,
-                      isHighlighted: _isSimulating,
-                    ),
-                    const SizedBox(width: 7),
-                  ],
-                  _buildMiniCircleButton(
-                    icon: Icons.my_location_rounded,
-                    onTap: _recenterMap,
-                  ),
-                ],
+              child: _buildMiniCircleButton(
+                icon: Icons.my_location_rounded,
+                onTap: _recenterMap,
               ),
             ),
 
@@ -434,11 +325,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          !_hasDestination
-                              ? 'Alamat belum memiliki titik'
-                              : _isTravelActive
-                              ? '${widget.order.originLocation} ➔ Tujuan'
-                              : 'Status perjalanan',
+                          _routeTitle,
                           style: const TextStyle(
                             fontFamily: 'Inter',
                             fontSize: 10.5,
@@ -470,6 +357,11 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
   }
 
   Widget _buildCleanerMarker() {
+    final label = _isLocationStale
+        ? 'Lokasi terakhir'
+        : widget.order.cleanerName.split(' ').first.isNotEmpty
+        ? '${widget.order.cleanerName.split(' ').first} (Cleaner)'
+        : 'Cleaner';
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -521,11 +413,7 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
             ],
           ),
           child: Text(
-            _isLocationStale
-                ? 'Lokasi terakhir'
-                : widget.order.cleanerName.split(' ').first.isNotEmpty
-                ? '${widget.order.cleanerName.split(' ').first} (Cleaner)'
-                : 'Cleaner',
+            label,
             style: TextStyle(
               color: _isLocationStale
                   ? const Color(0xFF64748B)
@@ -591,56 +479,6 @@ class _OrderTrackingMapState extends State<OrderTrackingMap> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMapActionPill({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-    bool isHighlighted = false,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        decoration: BoxDecoration(
-          color: isHighlighted ? const Color(0xFF00685F) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isHighlighted
-                ? const Color(0xFF00685F)
-                : const Color(0xFFCBD5E1),
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x14000000),
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isHighlighted ? Colors.white : const Color(0xFF00685F),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                color: isHighlighted ? Colors.white : const Color(0xFF0F172A),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../shared/widgets/app_notice.dart';
+import '../../../shared/contact/contact_launcher.dart';
 import '../../chatbot/pages/chatbot_page.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -50,6 +48,18 @@ class HistoryOrderDetailPage extends StatelessWidget {
                           _CancelledNotice(order: order),
                           const SizedBox(height: 14),
                         ],
+                        if (!isCancelled && order.needsRefundContact) ...[
+                          _SectionCard(
+                            title: 'Pengembalian Dana',
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  openRefundChat(context, order.orderId),
+                              icon: const Icon(Icons.open_in_new, size: 18),
+                              label: const Text('Ajukan lewat WhatsApp CS'),
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                        ],
                         if (order.address.isNotEmpty) ...[
                           _SectionCard(
                             title: 'Alamat Pengerjaan',
@@ -93,8 +103,14 @@ class HistoryOrderDetailPage extends StatelessWidget {
                                 value: order.note.trim().isEmpty
                                     ? 'Tidak ada catatan'
                                     : order.note,
-                                isLast: true,
+                                isLast: order.paymentStatus != 'refunded',
                               ),
+                              if (order.paymentStatus == 'refunded')
+                                const _DetailRow(
+                                  label: 'Status pembayaran',
+                                  value: 'Dana dikembalikan',
+                                  isLast: true,
+                                ),
                             ],
                           ),
                         ),
@@ -568,23 +584,6 @@ class _CancelledNotice extends StatelessWidget {
 
   final OrderHistoryModel order;
 
-  Future<void> _contactSupport(BuildContext context) async {
-    final uri = Uri.https('wa.me', '/6282140636747', {
-      'text':
-          'Halo CS CleanGo, saya ingin mengajukan pengembalian dana untuk pesanan ${order.orderId} yang dibatalkan. Pembayaran menggunakan QRIS. Mohon bantuannya.',
-    });
-    try {
-      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
-    } catch (_) {}
-    if (context.mounted) {
-      AppNotice.show(
-        context,
-        'WhatsApp belum dapat dibuka. Hubungi CS di 082140636747.',
-        type: AppNoticeType.error,
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -631,7 +630,7 @@ class _CancelledNotice extends StatelessWidget {
               spacing: 8,
               children: [
                 OutlinedButton.icon(
-                  onPressed: () => _contactSupport(context),
+                  onPressed: () => openRefundChat(context, order.orderId),
                   icon: const Icon(Icons.open_in_new, size: 18),
                   label: const Text('WhatsApp CS'),
                 ),

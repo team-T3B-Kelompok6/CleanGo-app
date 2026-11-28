@@ -40,7 +40,9 @@ class OrderController extends ChangeNotifier {
   final CustomerBookingApi? _bookingApi;
   bool _disposed = false;
   bool _loadingBookings = false;
+  String? _cancellingPendingId;
   bool _reviewPhotoUploadFailed = false;
+  String? reviewSubmissionError;
   // shortcut: IDs are unique in this local session; use backend IDs on integration.
   int _nextOrderNumber = DateTime.now().millisecondsSinceEpoch % 1000000;
 
@@ -65,6 +67,7 @@ class OrderController extends ChangeNotifier {
       ),
     );
   }
+
   OrderStatusStage get currentStage => _activeStage;
   int get currentStepNumber => _activeStage.index + 1;
   String get currentStepLabel => 'Langkah $currentStepNumber dari 5';
@@ -83,11 +86,37 @@ class OrderController extends ChangeNotifier {
           _scheduledOrder.backendBookingId != null) &&
       (_scheduledOrder.backendBookingId == null ||
           _activeStage == OrderStatusStage.dalamPerjalanan);
-  bool get etaAvailable =>
-      canCalculateEta &&
-      _scheduledOrder.etaUpdatedAt != null &&
-      (_scheduledOrder.backendBookingId == null ||
-          _scheduledOrder.hasFreshCleanerLocation(DateTime.now()));
+
+  /// Backend ETA difetch hanya setelah cleaner berangkat atau saat pekerjaan
+  /// sedang dikerjakan, agar metadata 'tiba' masih diambil setelah pindah stage.
+  bool get canRefreshBackendEta =>
+      _scheduledOrder.backendBookingId != null &&
+      (_activeStage == OrderStatusStage.dalamPerjalanan ||
+          _activeStage == OrderStatusStage.sedangDikerjakan);
+  bool get etaAvailable {
+    return canCalculateEta &&
+        _scheduledOrder.etaUpdatedAt != null &&
+        (_scheduledOrder.backendBookingId == null ||
+            _scheduledOrder.hasFreshCleanerLocation(DateTime.now()));
+  }
+
+  /// Durasi perjalanan live dari timestamp asli backend. Setelah tiba, nilai
+  /// dibekukan di [ScheduledOrderModel.travelArrivedAt].
+  String get travelElapsedLabel {
+    final departed = _scheduledOrder.travelDepartedAt;
+    if (departed == null) return 'Belum tercatat';
+    var end = DateTime.now();
+    final arrived = _scheduledOrder.travelArrivedAt;
+    if (!isTravelStage && arrived == null) return 'Belum tercatat';
+    if (departed.isAfter(end) ||
+        (arrived != null && arrived.isBefore(departed))) {
+      return 'Belum tercatat';
+    }
+    if (arrived != null && arrived.isBefore(end)) end = arrived;
+    final elapsed = end.difference(departed);
+    return _formatElapsed(elapsed.isNegative ? Duration.zero : elapsed);
+  }
+
   DateTime? get estimatedWorkCompletedAt {
     if (_activeStage != OrderStatusStage.sedangDikerjakan) return null;
     final started = _scheduledOrder.workStartedAt;
@@ -216,7 +245,13 @@ class OrderController extends ChangeNotifier {
   }
 
   Future<void> refreshEta() async {
-    if (_disposed || !_hasSelectedOrder || !canCalculateEta) return;
+    if (_disposed || !_hasSelectedOrder) return;
+    final bookingId = _scheduledOrder.backendBookingId;
+    if (bookingId != null) {
+      if (!canRefreshBackendEta) return;
+    } else if (!canCalculateEta) {
+      return;
+    }
     final selected = _selected;
     if (selected.etaLoading) {
       selected.etaRefreshPending = true;
@@ -227,7 +262,6 @@ class OrderController extends ChangeNotifier {
     notifyListeners();
     try {
       final tripRevision = selected.tripRevision;
-      final bookingId = _scheduledOrder.backendBookingId;
       final estimate = bookingId != null
           ? await _etaRepository.calculateForBooking(bookingId)
           : await _etaRepository.calculate(
@@ -239,7 +273,6 @@ class OrderController extends ChangeNotifier {
       if (_disposed ||
           !identical(selected, _selected) ||
           !_hasSelectedOrder ||
-          !canCalculateEta ||
           tripRevision != selected.tripRevision) {
         return;
       }
@@ -401,6 +434,39 @@ class OrderController extends ChangeNotifier {
     return true;
   }
 
+  CustomerBookingSummary? _pendingPaymentById(String bookingId) {
+    for (final booking in _pendingPayments) {
+      if (booking.id == bookingId) return booking;
+    }
+    return null;
+  }
+
+  /// Membatalkan booking menunggu pembayaran berdasarkan ID booking.
+  /// Izin diambil dari payload daftar backend, bukan dari pesanan terpilih.
+  Future<bool> cancelPendingPayment(String bookingId) async {
+    final api = _bookingApi;
+    if (api == null || _disposed || _cancellingPendingId != null) {
+      return false;
+    }
+    final booking = _pendingPaymentById(bookingId);
+    if (booking == null || !booking.canCancel) return false;
+    _cancellingPendingId = bookingId;
+    try {
+      await api.cancelBooking(bookingId);
+    } catch (_) {
+      return false;
+    } finally {
+      _cancellingPendingId = null;
+    }
+    if (_disposed) return true;
+    _pendingPayments = _pendingPayments
+        .where((item) => item.id != bookingId)
+        .toList(growable: false);
+    notifyListeners();
+    await loadFromApi();
+    return true;
+  }
+
   void completeScheduledOrder() {
     if (!_hasSelectedOrder || _scheduledOrder.backendBookingId != null) return;
     setStage(OrderStatusStage.selesai);
@@ -419,6 +485,7 @@ class OrderController extends ChangeNotifier {
     List<ReviewPhotoModel> photos = const [],
     List<String> removedPhotoIds = const [],
   }) async {
+    reviewSubmissionError = null;
     if (rating < 1 || rating > 5 || photos.length > 3) return false;
     final matching = _history.where((order) => order.orderId == orderId);
     final existing = matching.isEmpty ? null : matching.first;
@@ -449,6 +516,20 @@ class OrderController extends ChangeNotifier {
             comment: comment,
           );
         }
+      } on ApiException catch (error) {
+        reviewSubmissionError = switch (error.code) {
+          'REVIEW_EXISTS' =>
+            'Pesanan ini sudah diulas. Buka kembali riwayat pesanan.',
+          'REVIEW_NOT_READY' => 'Ulasan tersedia setelah pesanan selesai.',
+          'REVIEW_WINDOW_CLOSED' =>
+            existing?.hasReview == true
+                ? 'Batas waktu edit ulasan 24 jam sudah berakhir.'
+                : 'Batas waktu mengirim ulasan sudah berakhir.',
+          'VALIDATION_ERROR' =>
+            'Periksa rating dan pastikan ulasan maksimal 1.000 karakter.',
+          _ => null,
+        };
+        return false;
       } catch (_) {
         return false;
       }
@@ -490,7 +571,7 @@ class OrderController extends ChangeNotifier {
       satisfactionTags: tags,
       comment: comment,
       photos: savedPhotos,
-      createdAt: DateTime.now(),
+      createdAt: existing?.review?.createdAt ?? DateTime.now(),
     );
 
     bool matched = false;
@@ -557,7 +638,7 @@ class OrderController extends ChangeNotifier {
                 (booking.holdUntil == null ||
                     booking.holdUntil!.isAfter(DateTime.now())) &&
                 (booking.status == 'Menunggu Pembayaran' ||
-                    (booking.paymentStatus != 'paid' &&
+                    (!['paid', 'refunded'].contains(booking.paymentStatus) &&
                         booking.paymentMethod.toLowerCase() != 'cash' &&
                         (booking.paymentMethod.isNotEmpty ||
                             booking.paymentStatus != null))),
@@ -570,7 +651,7 @@ class OrderController extends ChangeNotifier {
       for (final booking in bookings) {
         final method = booking.paymentMethod.toLowerCase();
         final unverifiedPayment =
-            booking.paymentStatus != 'paid' &&
+            !['paid', 'refunded'].contains(booking.paymentStatus) &&
             (method.isNotEmpty || booking.paymentStatus != null);
         if (booking.status == 'Menunggu Pembayaran' ||
             (!booking.isFinished && method != 'cash' && unverifiedPayment)) {
@@ -603,6 +684,8 @@ class OrderController extends ChangeNotifier {
                 routePoints: previous.routePoints,
                 arrivalEstimate: previous.arrivalEstimate,
                 travelDescription: previous.travelDescription,
+                travelDepartedAt: previous.travelDepartedAt,
+                travelArrivedAt: previous.travelArrivedAt,
               )
             : incoming;
         if (!sameTrip) {
@@ -662,6 +745,8 @@ class OrderController extends ChangeNotifier {
     switch (status) {
       case 'paid':
         return 'Lunas';
+      case 'refunded':
+        return 'Dana dikembalikan';
       case 'pending':
         return 'Menunggu pembayaran';
       case 'failed':
@@ -684,8 +769,8 @@ class OrderController extends ChangeNotifier {
       serviceName: booking.service,
       serviceImagePath:
           (booking.serviceImage != null && booking.serviceImage!.isNotEmpty)
-              ? booking.serviceImage!
-              : 'assets/icons/service_placeholder.svg',
+          ? booking.serviceImage!
+          : 'assets/icons/service_placeholder.svg',
       serviceDurationMinutes: booking.serviceDurationMinutes,
       workStartedAt: booking.startedAt,
       price: BookingController.formatRupiah(booking.totalAmount),
@@ -731,8 +816,8 @@ class OrderController extends ChangeNotifier {
       serviceName: booking.service,
       serviceAssetPath:
           (booking.serviceImage != null && booking.serviceImage!.isNotEmpty)
-              ? booking.serviceImage!
-              : 'assets/icons/service_placeholder.svg',
+          ? booking.serviceImage!
+          : 'assets/icons/service_placeholder.svg',
       schedule: scheduled == null
           ? 'Jadwal layanan'
           : _formatDateTime(scheduled),
@@ -930,6 +1015,13 @@ class OrderController extends ChangeNotifier {
     final hour = value.hour.toString().padLeft(2, '0');
     final minute = value.minute.toString().padLeft(2, '0');
     return '$hour:$minute WIB';
+  }
+
+  static String _formatElapsed(Duration value) {
+    final hours = value.inHours.toString().padLeft(2, '0');
+    final minutes = (value.inMinutes % 60).toString().padLeft(2, '0');
+    final seconds = (value.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$seconds';
   }
 
   @override

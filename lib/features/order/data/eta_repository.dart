@@ -17,6 +17,8 @@ class EtaEstimate {
     this.cleanerLongitude,
     this.estimatedArrivalAt,
     this.locationUpdatedAt,
+    this.travelDepartedAt,
+    this.travelArrivedAt,
     this.routeStatus = 'available',
     this.routeMessage,
   });
@@ -33,29 +35,42 @@ class EtaEstimate {
   final double? cleanerLongitude;
   final DateTime? estimatedArrivalAt;
   final DateTime? locationUpdatedAt;
+  final DateTime? travelDepartedAt;
+  final DateTime? travelArrivedAt;
   final String routeStatus;
   final String? routeMessage;
   bool get hasRoute => routeStatus == 'available';
 
   ScheduledOrderModel applyTo(ScheduledOrderModel order) {
-    final arrival = estimatedArrivalAt ?? updatedAt.add(Duration(seconds: etaSeconds));
-    final clock = '${arrival.hour.toString().padLeft(2, '0')}:${arrival.minute.toString().padLeft(2, '0')} WIB';
+    final arrival =
+        estimatedArrivalAt ?? updatedAt.add(Duration(seconds: etaSeconds));
+    final clock =
+        '${arrival.hour.toString().padLeft(2, '0')}:${arrival.minute.toString().padLeft(2, '0')} WIB';
     return order.copyWith(
       cleanerLatitude: cleanerLatitude,
       cleanerLongitude: cleanerLongitude,
-      hasCleanerCoordinates: (cleanerLatitude != null && cleanerLongitude != null) ||
+      hasCleanerCoordinates:
+          (cleanerLatitude != null && cleanerLongitude != null) ||
           (order.backendBookingId == null && order.hasCleanerCoordinates),
       locationUpdatedAt: locationUpdatedAt,
       clearLocationUpdatedAt: locationUpdatedAt == null,
       etaUpdatedAt: hasRoute ? updatedAt : null,
       clearEtaUpdatedAt: !hasRoute,
       routePoints: hasRoute ? path : const [],
-      distanceKm: hasRoute ? '${(distanceMeters / 1000).toStringAsFixed(1)} km lagi' : 'Rute belum tersedia',
+      distanceKm: hasRoute
+          ? '${(distanceMeters / 1000).toStringAsFixed(1)} km lagi'
+          : 'Rute belum tersedia',
       estimatedMinutes: hasRoute ? '±$etaMinutes menit' : 'Belum tersedia',
       estimatedArrivalTime: hasRoute ? clock : 'Belum tersedia',
-      etaSource: hasRoute ? 'Perhitungan rute OSRM' : routeMessage ?? 'Rute belum tersedia',
+      etaSource: hasRoute
+          ? 'Perhitungan rute OSRM'
+          : routeMessage ?? 'Rute belum tersedia',
       arrivalEstimate: hasRoute ? 'Tiba ~$clock' : 'ETA belum tersedia',
-      travelDescription: hasRoute ? '${(distanceMeters / 1000).toStringAsFixed(1)} km lagi • ±$etaMinutes menit' : routeMessage ?? 'Rute belum tersedia',
+      travelDescription: hasRoute
+          ? '${(distanceMeters / 1000).toStringAsFixed(1)} km lagi • ±$etaMinutes menit'
+          : routeMessage ?? 'Rute belum tersedia',
+      travelDepartedAt: travelDepartedAt ?? order.travelDepartedAt,
+      travelArrivedAt: travelArrivedAt ?? order.travelArrivedAt,
     );
   }
 
@@ -81,7 +96,9 @@ class EtaEstimate {
       routeStatus: routeStatus,
       routeMessage: json['routeMessage'] as String?,
       distanceMeters: hasRoute ? (json['distanceMeters'] as num).round() : 0,
-      baselineEtaSeconds: hasRoute ? (json['baselineEtaSeconds'] as num).round() : 0,
+      baselineEtaSeconds: hasRoute
+          ? (json['baselineEtaSeconds'] as num).round()
+          : 0,
       etaSeconds: hasRoute ? (json['etaSeconds'] as num).round() : 0,
       etaMinutes: hasRoute ? (json['etaMinutes'] as num).round() : 0,
       source: json['source'] as String? ?? '',
@@ -114,7 +131,16 @@ class EtaEstimate {
       estimatedArrivalAt: DateTime.tryParse(
         json['estimatedArrivalAt'] as String? ?? '',
       )?.toLocal(),
+      travelDepartedAt: _parseDate(json['departedAt']),
+      travelArrivedAt: _parseDate(json['arrivedAt']),
     );
+  }
+
+  /// Parse ISO timestamp backend secara defensif; format tak valid jadi null
+  /// supaya metadata perjalanan lama tetap dipakai.
+  static DateTime? _parseDate(Object? raw) {
+    if (raw is! String || raw.isEmpty) return null;
+    return DateTime.tryParse(raw)?.toLocal();
   }
 }
 

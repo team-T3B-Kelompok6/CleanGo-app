@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_routes.dart';
@@ -12,6 +11,7 @@ import '../../../shared/widgets/anchored_refresh_indicator.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/app_sheet.dart';
+import '../../../shared/widgets/booking_price.dart';
 import '../../../shared/widgets/bottom_navigation.dart';
 import '../../../shared/widgets/chatbot_button.dart';
 import '../../../shared/widgets/user_avatar.dart';
@@ -384,9 +384,15 @@ class _OrderTabButton extends StatelessWidget {
 }
 
 class _PendingPaymentCard extends StatefulWidget {
-  const _PendingPaymentCard({required this.booking, required this.onResume});
+  const _PendingPaymentCard({
+    super.key,
+    required this.booking,
+    required this.onResume,
+    this.onCancel,
+  });
   final CustomerBookingSummary booking;
   final VoidCallback onResume;
+  final Future<void> Function()? onCancel;
 
   @override
   State<_PendingPaymentCard> createState() => _PendingPaymentCardState();
@@ -394,6 +400,7 @@ class _PendingPaymentCard extends StatefulWidget {
 
 class _PendingPaymentCardState extends State<_PendingPaymentCard> {
   Timer? _timer;
+  bool _canceling = false;
 
   @override
   void initState() {
@@ -417,6 +424,16 @@ class _PendingPaymentCardState extends State<_PendingPaymentCard> {
     super.dispose();
   }
 
+  Future<void> _handleCancel() async {
+    if (_canceling) return;
+    setState(() => _canceling = true);
+    try {
+      await widget.onCancel?.call();
+    } finally {
+      if (mounted) setState(() => _canceling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     String countdown = '';
@@ -431,12 +448,47 @@ class _PendingPaymentCardState extends State<_PendingPaymentCard> {
     return Card(
       child: ListTile(
         title: const Text('Menunggu pembayaran'),
-        subtitle: Text(
-          '${widget.booking.service} · ${BookingController.formatRupiah(widget.booking.totalAmount)}$countdown',
+        subtitle: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
+          runSpacing: 2,
+          children: [
+            Text(widget.booking.service),
+            BookingPrice(
+              finalLabel: BookingController.formatRupiah(
+                widget.booking.totalAmount,
+              ),
+              originalLabel: _discountOriginalLabel(
+                discountAmount: widget.booking.discountAmount,
+                servicePrice: widget.booking.servicePrice,
+                platformFee: widget.booking.platformFee,
+              ),
+              hasDiscount: widget.booking.discountAmount > 0,
+              fontSize: 13.5,
+              crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            if (countdown.isNotEmpty) Text(countdown),
+          ],
         ),
-        trailing: TextButton(
-          onPressed: widget.onResume,
-          child: const Text('Lanjutkan'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.booking.canCancel)
+              TextButton(
+                onPressed:
+                    widget.onCancel == null || _canceling
+                        ? null
+                        : _handleCancel,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.notification,
+                ),
+                child: const Text('Batalkan'),
+              ),
+            TextButton(
+              onPressed: _canceling ? null : widget.onResume,
+              child: const Text('Lanjutkan'),
+            ),
+          ],
         ),
       ),
     );
@@ -529,6 +581,7 @@ class _ScheduledOrdersView extends StatelessWidget {
           if (index - offset < pending.length) {
             final item = pending[index - offset];
             return _PendingPaymentCard(
+              key: ValueKey(item.id),
               booking: item,
               onResume: () => Navigator.push<void>(
                 context,
@@ -536,6 +589,14 @@ class _ScheduledOrdersView extends StatelessWidget {
                   builder: (_) => PendingPaymentPage(booking: item),
                 ),
               ).then((_) => controller.loadFromApi()),
+              onCancel:
+                  item.canCancel
+                      ? () => _confirmPendingCancellation(
+                          context,
+                          controller,
+                          item,
+                        )
+                      : null,
             );
           }
           final scheduledOrder = orders[index - offset - pending.length];
@@ -596,6 +657,35 @@ class _ScheduledOrdersView extends StatelessWidget {
     AppNotice.show(
       context,
       result ? 'Pesanan berhasil dibatalkan.' : 'Pesanan tidak dapat dibatalkan. Muat ulang; petugas mungkin sudah ditugaskan.',
+      type: result ? AppNoticeType.success : AppNoticeType.error,
+    );
+  }
+
+  Future<void> _confirmPendingCancellation(
+    BuildContext context,
+    OrderController controller,
+    CustomerBookingSummary booking,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AppDialog(
+        title: 'Batalkan pesanan?',
+        message:
+            'Pesanan menunggu pembayaran akan dibatalkan dan dipindahkan ke Riwayat.',
+        confirmLabel: 'Batalkan Pesanan',
+        cancelLabel: 'Kembali',
+        onConfirm: () => Navigator.pop(context, true),
+        isDestructive: true,
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final result = await controller.cancelPendingPayment(booking.id);
+    if (!context.mounted) return;
+    AppNotice.show(
+      context,
+      result
+          ? 'Pesanan berhasil dibatalkan.'
+          : 'Pesanan tidak dapat dibatalkan. Muat ulang dan coba lagi.',
       type: result ? AppNoticeType.success : AppNoticeType.error,
     );
   }
@@ -956,14 +1046,14 @@ class _ScheduledOrderCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    order.price,
-                    style: const TextStyle(
-                      color: AppColors.primaryAction,
-                      fontFamily: AppTheme.fontFamily,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                  BookingPrice(
+                    finalLabel: order.price,
+                    originalLabel: _discountOriginalLabel(
+                      discountAmount: order.discountAmount,
+                      servicePrice: order.servicePrice,
+                      platformFee: order.platformFee,
                     ),
+                    hasDiscount: order.discountAmount > 0,
                   ),
                   Text(
                     order.paymentStatus,
@@ -1111,6 +1201,16 @@ class _ScheduledDetailRow extends StatelessWidget {
   }
 }
 
+String _discountOriginalLabel({
+  required int discountAmount,
+  required int servicePrice,
+  required int platformFee,
+}) {
+  // Harga asal hanya dari data backend; default model (300000) tidak dipakai.
+  if (discountAmount <= 0 || servicePrice <= 0) return '';
+  return BookingController.formatRupiah(servicePrice + platformFee);
+}
+
 String _formatOrderSchedule(DateTime value) {
   const days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
   const months = [
@@ -1249,15 +1349,15 @@ class _HistoryOrderCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  order.price,
-                  style: const TextStyle(
-                    color: AppColors.primaryAction,
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    height: 1.35,
+                BookingPrice(
+                  finalLabel: order.price,
+                  originalLabel: _discountOriginalLabel(
+                    discountAmount: order.discountAmount,
+                    servicePrice: order.servicePrice,
+                    platformFee: order.platformFee,
                   ),
+                  hasDiscount: order.discountAmount > 0,
+                  fontSize: 15,
                 ),
               ],
             ),

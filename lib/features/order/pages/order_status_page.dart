@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/contact/contact_launcher.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/remote_or_asset_image.dart';
@@ -33,6 +34,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   double _sheetSize = 0.56;
   Timer? _trackingTimer;
   Timer? _statusTimer;
+  Timer? _elapsedTimer;
 
   @override
   void initState() {
@@ -53,9 +55,19 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
       }
       final controller = context.read<OrderController>();
       if (controller.scheduledOrder.backendBookingId != null &&
-          !controller.etaLoading) {
+          !controller.etaLoading &&
+          controller.canRefreshBackendEta) {
         unawaited(controller.refreshEta());
       }
+    });
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      // Hanya repaint label durasi; polling ETA/status tidak diubah.
+      if (!context.read<OrderController>().isTravelStage) return;
+      setState(() {});
     });
   }
 
@@ -76,6 +88,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   void dispose() {
     _trackingTimer?.cancel();
     _statusTimer?.cancel();
+    _elapsedTimer?.cancel();
     _sheetController.removeListener(_syncMapControlsWithSheet);
     _sheetController.dispose();
     super.dispose();
@@ -116,14 +129,13 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
     if (confirmed != true || !context.mounted) return;
     final controller = context.read<OrderController>();
-    final ok = controller.selectScheduledOrder(order.orderNumber) &&
+    final ok =
+        controller.selectScheduledOrder(order.orderNumber) &&
         await controller.cancelScheduledOrder();
     if (!context.mounted) return;
     AppNotice.show(
       context,
-      ok
-          ? 'Pesanan dibatalkan.'
-          : 'Pembatalan gagal karena sudah ditugaskan.',
+      ok ? 'Pesanan dibatalkan.' : 'Pembatalan gagal karena sudah ditugaskan.',
       type: ok ? AppNoticeType.success : AppNoticeType.error,
     );
     if (ok) _navigateBackToScheduled(context);
@@ -148,12 +160,12 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     });
   }
 
-  void _openWhatsApp(BuildContext context, String target, String phone) {
-    AppNotice.show(
-      context,
-      'Membuka chat WhatsApp dengan $target ($phone)...',
-      type: AppNoticeType.info,
-    );
+  Future<void> _openWhatsApp(
+    BuildContext context,
+    String target,
+    String phone,
+  ) {
+    return openWhatsApp(context, phone: phone, targetLabel: target);
   }
 
   @override
@@ -189,8 +201,6 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                   borderRadius: 0,
                   controlsBottomInset:
                       MediaQuery.sizeOf(context).height * _sheetSize + 12,
-                  onCleanerPositionChanged:
-                      orderController.updateCleanerLocation,
                 ),
               ),
               DraggableScrollableSheet(
@@ -232,21 +242,37 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                           ),
                           const SizedBox(height: 14),
                         ],
-                         if (orderController.canModifyScheduledOrder || orderController.canCancelScheduledOrder) ...[
-                           Row(children: [
-                             Expanded(child: OutlinedButton(
-                               onPressed: orderController.canModifyScheduledOrder ? () => showOrderReschedulePicker(context, orderController) : null,
-                               child: const Text('Ubah Jadwal'),
-                             )),
-                             const SizedBox(width: 8),
-                             Expanded(child: OutlinedButton(
-                               onPressed: orderController.canCancelScheduledOrder ? () => _cancelDuringHold(context, order) : null,
-                               child: const Text('Batalkan Pesanan'),
-                             )),
-                           ]),
-                           const SizedBox(height: 14),
-                         ],
-                         _buildEstimatedArrivalCard(orderController),
+                        if (orderController.canModifyScheduledOrder ||
+                            orderController.canCancelScheduledOrder) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed:
+                                      orderController.canModifyScheduledOrder
+                                      ? () => showOrderReschedulePicker(
+                                          context,
+                                          orderController,
+                                        )
+                                      : null,
+                                  child: const Text('Ubah Jadwal'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed:
+                                      orderController.canCancelScheduledOrder
+                                      ? () => _cancelDuringHold(context, order)
+                                      : null,
+                                  child: const Text('Batalkan Pesanan'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                        ],
+                        _buildEstimatedArrivalCard(orderController),
                         const SizedBox(height: 14),
                         currentStage == OrderStatusStage.dikonfirmasi
                             ? _buildWaitingCleanerCard()
@@ -296,7 +322,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                           ),
                         ],
                         const SizedBox(height: 14),
-                        _buildSupportHelpCard(context),
+                        _buildSupportHelpCard(context, order),
                       ],
                     ),
                   );
@@ -317,9 +343,9 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
   void _reorder(BuildContext context, ScheduledOrderModel order) {
     final services = context.read<ServiceController>().allServices;
     if (services.isEmpty) {
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const ServiceListPage()),
-      );
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const ServiceListPage()));
       return;
     }
     final service = services.firstWhere(
@@ -556,6 +582,37 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.timer_outlined,
+                      size: 14,
+                      color: Color(0xFF00685F),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Durasi perjalanan',
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontFamily: 'Inter',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      controller.travelElapsedLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontFamily: 'Inter',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -673,13 +730,13 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
                     if (order.cleanerCompletedBookings != null)
                       Text(
                         '${order.cleanerCompletedBookings} pesanan selesai',
-                      style: const TextStyle(
-                        color: Color(0xFF64748B),
-                        fontFamily: 'Inter',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontFamily: 'Inter',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -1075,7 +1132,21 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
     );
   }
 
-  Widget _buildSupportHelpCard(BuildContext context) {
+  Widget _buildSupportHelpCard(
+    BuildContext context,
+    ScheduledOrderModel order,
+  ) {
+    final showRefund =
+        order.backendBookingId != null &&
+        order.paymentMethod.toLowerCase() == 'qris' &&
+        order.paymentState == 'paid';
+    if (showRefund) {
+      return OutlinedButton.icon(
+        onPressed: () => openRefundChat(context, order.orderNumber),
+        icon: const Icon(Icons.support_agent_rounded, size: 20),
+        label: const Text('Ajukan pengembalian dana lewat WhatsApp CS'),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -1119,7 +1190,7 @@ class _OrderStatusPageState extends State<OrderStatusPage> {
           ),
           InkWell(
             onTap: () =>
-                _openWhatsApp(context, 'Admin CleanGo', '+62 811-2233-4455'),
+                _openWhatsApp(context, 'CS CleanGo', cleanGoSupportPhoneWa),
             borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

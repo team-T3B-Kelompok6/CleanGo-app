@@ -23,6 +23,8 @@ class MessageController extends ChangeNotifier {
   int _readRevision = 0;
   int _loadRevision = 0;
   bool _disposed = false;
+  int _olderUnreadOrders = 0;
+  int _olderUnreadPromo = 0;
 
   /// Loads the inbox from the backend; keeps the demo list on failure/empty.
   Future<void> loadFromApi() async {
@@ -31,17 +33,36 @@ class MessageController extends ChangeNotifier {
     final loadRevision = ++_loadRevision;
     final readRevision = _readRevision;
     try {
-      final rows = await api.fetchNotifications();
+      final inbox = await api.fetchNotifications();
       if (_disposed ||
           loadRevision != _loadRevision ||
           readRevision != _readRevision) {
         return;
       }
+      final messages = inbox.rows
+          .map(MessageNotificationModel.fromApiJson)
+          .toList();
+      final visibleOrders = messages
+          .where(
+            (item) => item.isUnread && item.category == MessageCategory.order,
+          )
+          .length;
+      final visiblePromo = messages
+          .where(
+            (item) => item.isUnread && item.category == MessageCategory.promo,
+          )
+          .length;
+      _olderUnreadOrders =
+          ((inbox.unreadOrders ?? visibleOrders) - visibleOrders).clamp(
+            0,
+            1 << 31,
+          );
+      _olderUnreadPromo = ((inbox.unreadPromo ?? visiblePromo) - visiblePromo)
+          .clamp(0, 1 << 31);
       _messages
         ..clear()
         ..addAll(
-          rows.map((row) {
-            final message = MessageNotificationModel.fromApiJson(row);
+          messages.map((message) {
             return _pendingReads.containsKey(message.id)
                 ? message.copyWith(isUnread: false)
                 : message;
@@ -57,7 +78,22 @@ class MessageController extends ChangeNotifier {
   final List<MessageNotificationModel> _messages;
 
   MessageTab get selectedTab => _selectedTab;
-  int get unreadCount => _messages.where((message) => message.isUnread).length;
+  int get unreadCount =>
+      _messages.where((message) => message.isUnread).length +
+      _olderUnreadOrders +
+      _olderUnreadPromo;
+
+  bool hasUnread(MessageTab tab) => switch (tab) {
+    MessageTab.all => unreadCount > 0,
+    MessageTab.orders =>
+      _olderUnreadOrders > 0 || _hasUnread(MessageCategory.order),
+    MessageTab.promo =>
+      _olderUnreadPromo > 0 || _hasUnread(MessageCategory.promo),
+  };
+
+  bool _hasUnread(MessageCategory category) => _messages.any(
+    (message) => message.isUnread && message.category == category,
+  );
 
   List<MessageNotificationModel> get visibleMessages {
     final messages = switch (_selectedTab) {
@@ -92,6 +128,34 @@ class MessageController extends ChangeNotifier {
     _pendingReads[id] = result;
     notifyListeners();
     return result;
+  }
+
+  /// Menandai semua notifikasi terbaca; gagal berarti status lokal tetap utuh.
+  Future<bool> markAllAsRead() async {
+    if (_disposed) return false;
+    if (unreadCount == 0) return true;
+    final api = _notificationApi;
+    if (api == null) {
+      for (var i = 0; i < _messages.length; i++) {
+        _messages[i] = _messages[i].copyWith(isUnread: false);
+      }
+      notifyListeners();
+      return true;
+    }
+    try {
+      await api.markAllRead();
+    } catch (_) {
+      return false;
+    }
+    if (_disposed) return true;
+    _olderUnreadOrders = 0;
+    _olderUnreadPromo = 0;
+    for (var i = 0; i < _messages.length; i++) {
+      _messages[i] = _messages[i].copyWith(isUnread: false);
+    }
+    _readRevision++;
+    notifyListeners();
+    return true;
   }
 
   Future<bool> _saveRead(String id) async {

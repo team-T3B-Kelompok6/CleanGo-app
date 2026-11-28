@@ -69,9 +69,13 @@ class _MessagesPageState extends State<MessagesPage> {
                       bottom: false,
                       child: Column(
                         children: [
-                          _MessagesHeader(unreadCount: _controller.unreadCount),
+                          _MessagesHeader(
+                            unreadCount: _controller.unreadCount,
+                            onMarkAllRead: _controller.markAllAsRead,
+                          ),
                           _MessageTabs(
                             selectedTab: _controller.selectedTab,
+                            hasUnread: _controller.hasUnread,
                             onSelected: _controller.selectTab,
                           ),
                           Expanded(
@@ -186,50 +190,67 @@ class _MessagesPageState extends State<MessagesPage> {
 }
 
 class _MessagesHeader extends StatelessWidget {
-  const _MessagesHeader({required this.unreadCount});
+  const _MessagesHeader({required this.unreadCount, this.onMarkAllRead});
 
   final int unreadCount;
+  final VoidCallback? onMarkAllRead;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Expanded(
-            child: Text(
-              'Notifikasi',
-              style: TextStyle(
-                color: AppColors.slate900,
-                fontFamily: AppTheme.fontFamily,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                height: 1.3,
-              ),
-            ),
-          ),
-          if (unreadCount > 0)
-            DecoratedBox(
-              decoration: const BoxDecoration(
-                color: AppColors.primaryAction,
-                borderRadius: BorderRadius.all(Radius.circular(999)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
+          Row(
+            children: [
+              const Expanded(
                 child: Text(
-                  '$unreadCount Baru',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  'Notifikasi',
+                  style: TextStyle(
+                    color: AppColors.slate900,
                     fontFamily: AppTheme.fontFamily,
-                    fontSize: 11,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    height: 1.25,
+                    height: 1.3,
                   ),
                 ),
               ),
+              if (unreadCount > 0)
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    color: AppColors.primaryAction,
+                    borderRadius: BorderRadius.all(Radius.circular(999)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    child: Text(
+                      '$unreadCount Baru',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: AppTheme.fontFamily,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (unreadCount > 0)
+            TextButton(
+              onPressed: onMarkAllRead,
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: const Text('Tandai semua terbaca'),
             ),
         ],
       ),
@@ -297,9 +318,14 @@ class _EmptyMessages extends StatelessWidget {
 }
 
 class _MessageTabs extends StatelessWidget {
-  const _MessageTabs({required this.selectedTab, required this.onSelected});
+  const _MessageTabs({
+    required this.selectedTab,
+    required this.hasUnread,
+    required this.onSelected,
+  });
 
   final MessageTab selectedTab;
+  final bool Function(MessageTab) hasUnread;
   final ValueChanged<MessageTab> onSelected;
 
   @override
@@ -314,16 +340,19 @@ class _MessageTabs extends StatelessWidget {
           _MessageTabButton(
             label: 'Semua',
             selected: selectedTab == MessageTab.all,
+            unread: hasUnread(MessageTab.all),
             onTap: () => onSelected(MessageTab.all),
           ),
           _MessageTabButton(
             label: 'Pesanan',
             selected: selectedTab == MessageTab.orders,
+            unread: hasUnread(MessageTab.orders),
             onTap: () => onSelected(MessageTab.orders),
           ),
           _MessageTabButton(
             label: 'Promo',
             selected: selectedTab == MessageTab.promo,
+            unread: hasUnread(MessageTab.promo),
             onTap: () => onSelected(MessageTab.promo),
           ),
         ],
@@ -336,11 +365,13 @@ class _MessageTabButton extends StatelessWidget {
   const _MessageTabButton({
     required this.label,
     required this.selected,
+    required this.unread,
     required this.onTap,
   });
 
   final String label;
   final bool selected;
+  final bool unread;
   final VoidCallback onTap;
 
   @override
@@ -350,6 +381,7 @@ class _MessageTabButton extends StatelessWidget {
         button: true,
         selected: selected,
         label: 'Tab $label',
+        value: unread ? 'Ada notifikasi belum dibaca' : null,
         child: InkWell(
           onTap: onTap,
           child: SizedBox(
@@ -357,17 +389,35 @@ class _MessageTabButton extends StatelessWidget {
             child: Stack(
               alignment: Alignment.center,
               children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: selected
-                        ? AppColors.primaryAction
-                        : AppColors.slate400,
-                    fontFamily: AppTheme.fontFamily,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    height: 1.3,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          color: selected
+                              ? AppColors.primaryAction
+                              : AppColors.slate400,
+                          fontFamily: AppTheme.fontFamily,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                    if (unread) ...[
+                      const SizedBox(width: 6),
+                      DecoratedBox(
+                        key: ValueKey('unread-tab-$label'),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryAction,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const SizedBox.square(dimension: 7),
+                      ),
+                    ],
+                  ],
                 ),
                 if (selected)
                   const Positioned(

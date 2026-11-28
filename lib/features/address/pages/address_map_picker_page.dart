@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../controllers/address_location_follow_controller.dart';
 import '../controllers/reverse_geocoding_controller.dart';
 
 class AddressMapSelection {
@@ -21,49 +22,101 @@ class AddressMapSelection {
 class AddressMapPickerPage extends StatefulWidget {
   const AddressMapPickerPage({
     this.initialPosition = const LatLng(-7.9526, 112.6137),
+    this.followController,
     super.key,
   });
 
   final LatLng initialPosition;
+  final AddressLocationFollowController? followController;
 
   @override
   State<AddressMapPickerPage> createState() => _AddressMapPickerPageState();
 }
 
-class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
+class _AddressMapPickerPageState extends State<AddressMapPickerPage>
+    with WidgetsBindingObserver {
   late LatLng _selectedPosition;
   late final MapController _mapController;
+  late final AddressLocationFollowController _followController;
   final ReverseGeocodingController _geocodingController =
       ReverseGeocodingController();
   bool _isResolvingAddress = false;
   String? _addressError;
-  bool _isFetchingLocation = false;
   bool _isMapReady = false;
-  final MethodChannel _locationChannel = const MethodChannel('com.cleango.app/location');
+  int _resolveGeneration = 0;
 
   @override
   void initState() {
     super.initState();
     _selectedPosition = widget.initialPosition;
     _mapController = MapController();
+    _followController =
+        widget.followController ??
+        AddressLocationFollowController(
+          locationClient: MethodChannelLocationClient(),
+        );
+    _followController.addListener(_onFollowChanged);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _followController.removeListener(_onFollowChanged);
+    _followController.dispose();
     _mapController.dispose();
     _geocodingController.dispose();
     super.dispose();
   }
 
+  void _onFollowChanged() {
+    final position = _followController.position;
+    setState(() {
+      if (position != null && _followController.isFollowing) {
+        _selectedPosition = position;
+      }
+    });
+    if (position != null && _followController.isFollowing && _isMapReady) {
+      _mapController.move(position, 16);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Android's permission dialog briefly makes Flutter inactive.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _followController.stop();
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    if (_followController.isFollowing) {
+      _followController.stop();
+      return;
+    }
+    await _followController.start();
+  }
+
+  void _selectPoint(LatLng position) {
+    _followController.stop();
+    setState(() {
+      _selectedPosition = position;
+      _addressError = null;
+    });
+  }
+
   Future<void> _confirmLocation() async {
     if (_isResolvingAddress) return;
+    final generation = ++_resolveGeneration;
     setState(() {
       _isResolvingAddress = true;
       _addressError = null;
     });
     try {
+      // Reverse geocoding hanya saat konfirmasi, bukan tiap poll GPS.
       final address = await _geocodingController.resolve(_selectedPosition);
-      if (!mounted) return;
+      if (!mounted || generation != _resolveGeneration) return;
       Navigator.of(context).pop(
         AddressMapSelection(
           position: _selectedPosition,
@@ -72,7 +125,7 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
         ),
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != _resolveGeneration) return;
       setState(() {
         _isResolvingAddress = false;
         _addressError = 'Alamat belum ditemukan. Periksa internet atau pilih titik yang lebih dekat dengan jalan.';
@@ -80,50 +133,15 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
     }
   }
 
-  Future<void> _useMyLocation() async {
-    if (_isFetchingLocation) return;
-    setState(() {
-      _isFetchingLocation = true;
-      _addressError = null;
-    });
-    try {
-      final result = await _locationChannel.invokeMethod<Map<dynamic, dynamic>>('getCurrentLocation');
-      if (!mounted) return;
-      if (result != null && result.containsKey('latitude') && result.containsKey('longitude')) {
-        final lat = result['latitude'] as double;
-        final lng = result['longitude'] as double;
-        final position = LatLng(lat, lng);
-        setState(() {
-          _selectedPosition = position;
-          _addressError = null;
-        });
-        if (mounted && _isMapReady) {
-          _mapController.move(position, 16);
-        }
-      }
-    } on MissingPluginException {
-      if (!mounted) return;
-      setState(() {
-        _addressError = 'Fitur lokasi tidak tersedia. Silakan pilih titik secara manual.';
-      });
-    } on PlatformException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _addressError = switch (e.code) {
-          'permission_denied' => 'Izin lokasi ditolak. Aktifkan di pengaturan aplikasi.',
-          'location_unavailable' => 'Lokasi tidak aktif atau tidak dapat ditemukan.',
-          _ => 'Gagal mendapatkan lokasi. Silakan pilih titik secara manual.',
-        };
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _isFetchingLocation = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final following = _followController.isFollowing;
+    final searching = _followController.isSearching;
+    final statusText =
+        _followController.message ??
+        _addressError ??
+        'Alamat lengkap akan dicari setelah Anda menggunakan titik ini.';
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: AppColors.screenBackground,
@@ -147,11 +165,9 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
                         initialCenter: _selectedPosition,
                         initialZoom: 16,
                         onMapReady: () => _isMapReady = true,
-                        onTap: (_, position) {
-                          setState(() {
-                            _selectedPosition = position;
-                            _addressError = null;
-                          });
+                        onTap: (_, position) => _selectPoint(position),
+                        onPositionChanged: (_, hasGesture) {
+                          if (hasGesture) _followController.stop();
                         },
                       ),
                       children: [
@@ -229,30 +245,38 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  _addressError ?? 'Alamat lengkap akan dicari setelah Anda menggunakan titik ini.',
+                  statusText,
                   style: const TextStyle(
                     fontFamily: AppTheme.fontFamily,
                     color: AppColors.slate500,
                     fontSize: 13,
                   ),
                 ),
+                if (following) ...[
+                  const SizedBox(height: 10),
+                  const _FollowBadge(),
+                ],
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   height: 50,
                   child: OutlinedButton.icon(
-                    onPressed: _isFetchingLocation ? null : _useMyLocation,
-                    icon: _isFetchingLocation
+                    onPressed: searching ? null : _toggleFollow,
+                    icon: searching
                         ? const SizedBox.square(
                             dimension: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.my_location_outlined),
+                        : Icon(
+                            following
+                                ? Icons.stop_circle_outlined
+                                : Icons.my_location_outlined,
+                          ),
                     label: Text(
-                      _isFetchingLocation
+                      searching
                           ? 'Mencari lokasi Anda...'
+                          : following
+                          ? 'Berhenti mengikuti'
                           : 'Gunakan lokasi saya',
                     ),
                     style: OutlinedButton.styleFrom(
@@ -303,6 +327,29 @@ class _AddressMapPickerPageState extends State<AddressMapPickerPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FollowBadge extends StatelessWidget {
+  const _FollowBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.gps_fixed_rounded, color: AppColors.primary, size: 16),
+        const SizedBox(width: 6),
+        Text(
+          'Mengikuti GPS',
+          style: TextStyle(
+            fontFamily: AppTheme.fontFamily,
+            color: AppColors.primary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }

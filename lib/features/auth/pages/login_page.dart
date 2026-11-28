@@ -7,6 +7,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../controllers/auth_session_controller.dart';
+import '../controllers/contact_completion_controller.dart';
 import '../data/api_auth_service.dart';
 import '../data/auth_validators.dart';
 import '../data/google_sign_in_service.dart';
@@ -295,6 +296,12 @@ class _LoginPageState extends State<LoginPage> {
       } catch (_) {}
 
       if (!mounted) return;
+      await context.read<ContactCompletionController>().start(
+        user: result.user,
+        method: ContactCompletionMethod.google,
+        accessToken: result.token,
+      );
+      if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on ApiException catch (e) {
       if (mounted) setState(() => _generalError = e.message);
@@ -369,6 +376,12 @@ class _LoginPageState extends State<LoginPage> {
         if (mounted) await context.read<AddressController>().loadFromApi();
       } catch (_) {}
 
+      if (!mounted) return;
+      await context.read<ContactCompletionController>().start(
+        user: result.user,
+        method: ContactCompletionMethod.phone,
+        accessToken: result.token,
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on ApiException catch (e) {

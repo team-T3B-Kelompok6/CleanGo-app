@@ -7,7 +7,9 @@ import '../data/api_auth_service.dart';
 import 'reset_password_page.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
-  const ForgotPasswordPage({super.key});
+  const ForgotPasswordPage({super.key, this.authService});
+
+  final ApiAuthService? authService;
 
   @override
   State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
@@ -15,7 +17,7 @@ class ForgotPasswordPage extends StatefulWidget {
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   final _identifier = TextEditingController();
-  final ApiAuthService _authService = ApiAuthService();
+  late final ApiAuthService _authService = widget.authService ?? ApiAuthService();
   bool _loading = false;
   String? _error;
 
@@ -31,8 +33,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       setState(() => _error = 'Isi nomor telepon atau email akun Anda.');
       return;
     }
-    final channel = await _chooseChannel();
-    if (channel == null || !mounted) return;
+    final channel = identifier.contains('@') ? 'email' : 'whatsapp';
     setState(() {
       _loading = true;
       _error = null;
@@ -43,6 +44,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         channel: channel,
       );
       if (!mounted) return;
+      if (channel == 'email') {
+        AppNotice.show(
+          context,
+          'Tautan pemulihan telah dikirim ke email. Silakan periksa kotak masuk Anda.',
+          type: AppNoticeType.success,
+        );
+        Navigator.of(context).pop();
+        return;
+      }
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ResetPasswordPage(
@@ -65,47 +75,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     }
   }
 
-  Future<String?> _chooseChannel() {
-    return showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Text(
-                'Pilih kanal kirim OTP',
-                style: TextStyle(
-                  fontFamily: AppTheme.fontFamily,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.chat_bubble_outline_rounded),
-              title: const Text('WhatsApp'),
-              subtitle: const Text('Kirim kode ke nomor WhatsApp akun'),
-              onTap: () => Navigator.pop(context, 'whatsapp'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.mail_outline_rounded),
-              title: const Text('Email'),
-              subtitle: const Text('Kirim kode ke email akun'),
-              onTap: () => Navigator.pop(context, 'email'),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -123,7 +92,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
                 const Text(
-                  'Masukkan nomor telepon atau email akun Anda. Kami akan mengirim kode OTP untuk mengatur ulang kata sandi.',
+                  'Masukkan nomor telepon atau email akun Anda. Nomor telepon menerima kode OTP; email menerima tautan pemulihan.',
                   style: TextStyle(
                     color: AppColors.slate500,
                     fontFamily: AppTheme.fontFamily,
@@ -136,6 +105,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   controller: _identifier,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.done,
+                  onChanged: (_) => setState(() {}),
                   onFieldSubmitted: (_) => _submit(),
                   decoration: InputDecoration(
                     labelText: 'Nomor telepon atau email',
@@ -158,7 +128,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     ),
                   ),
                   child: Text(
-                    _loading ? 'Mengirim…' : 'Kirim Kode OTP',
+                    _loading
+                        ? 'Mengirim…'
+                        : (_identifier.text.contains('@')
+                            ? 'Kirim Tautan Pemulihan'
+                            : 'Kirim Kode OTP'),
                     style: const TextStyle(
                       fontFamily: AppTheme.fontFamily,
                       fontSize: 15,

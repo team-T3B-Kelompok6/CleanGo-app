@@ -24,6 +24,7 @@ class PaymentPage extends StatefulWidget {
     required this.servicePrice,
     required this.platformFee,
     required this.discountAmount,
+    this.promoCode,
     super.key,
   });
 
@@ -32,6 +33,7 @@ class PaymentPage extends StatefulWidget {
   final int servicePrice;
   final int platformFee;
   final int discountAmount;
+  final String? promoCode;
 
   @override
   State<PaymentPage> createState() => _PaymentPageState();
@@ -187,6 +189,7 @@ class _PaymentPageState extends State<PaymentPage> {
         servicePrice: widget.servicePrice,
         platformFee: widget.platformFee,
         discountAmount: widget.discountAmount,
+        promoCode: widget.promoCode,
         checkStatus: checkStatus,
       );
       if (!context.mounted) return;

@@ -32,9 +32,17 @@ class PromoPage extends StatefulWidget {
 }
 
 class _PromoPageState extends State<PromoPage> {
-  late final CheckoutController _selection =
-      CheckoutController(promoApi: widget.promoApi);
+  late final CheckoutController _selection = CheckoutController(
+    promoApi: widget.promoApi,
+  );
   bool _isLoading = false;
+  final _code = TextEditingController();
+
+  @override
+  void dispose() {
+    _code.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -54,6 +62,7 @@ class _PromoPageState extends State<PromoPage> {
       await _selection.applyPromoRemote(
         code: code,
         servicePrice: widget.servicePrice,
+        serviceId: widget.serviceId,
       );
     }
     if (mounted) setState(() => _isLoading = false);
@@ -62,8 +71,29 @@ class _PromoPageState extends State<PromoPage> {
   bool _appliesToService(PromoModel promo) {
     if (promo.scope != 'services') return true;
     final serviceId = widget.serviceId;
-    if (serviceId == null || serviceId.isEmpty) return true;
+    if (promo.serviceIds.isEmpty) return true;
+    if (serviceId == null || serviceId.isEmpty) return false;
     return promo.serviceIds.contains(serviceId);
+  }
+
+  String? _eligibility(PromoModel promo) {
+    if (!_appliesToService(promo)) return 'Tidak berlaku untuk layanan ini';
+    if (promo.remainingQuota == 0) return 'Kuota habis';
+    if (widget.servicePrice < promo.minPurchase) {
+      return 'Min. transaksi ${BookingController.formatRupiah(promo.minPurchase)}';
+    }
+    return null;
+  }
+
+  Future<void> _selectCode(String code) async {
+    if (_isLoading || code.trim().isEmpty) return;
+    setState(() => _isLoading = true);
+    await _selection.applyPromoRemote(
+      code: code,
+      servicePrice: widget.servicePrice,
+      serviceId: widget.serviceId,
+    );
+    if (mounted) setState(() => _isLoading = false);
   }
 
   @override
@@ -116,7 +146,7 @@ class _PromoPageState extends State<PromoPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Promo',
+                                'Pilih Voucher',
                                 style: Theme.of(context).textTheme.titleLarge
                                     ?.copyWith(
                                       fontSize: 24,
@@ -138,59 +168,124 @@ class _PromoPageState extends State<PromoPage> {
                       ],
                     ),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _code,
+                            enabled: !_isLoading,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: const InputDecoration(
+                              labelText: 'Kode voucher',
+                            ),
+                            onSubmitted: _selectCode,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () => _selectCode(_code.text),
+                          child: const Text('Pakai'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if ((_isLoading ? null : _selection.promoError)
+                      case final error?)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: Text(
+                        error,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
                   Expanded(
-                    child: _isLoading
+                    child: _isLoading && _selection.promos.isEmpty
                         ? const Center(child: CircularProgressIndicator())
                         : (() {
-                      final applicable = _selection.promos
-                          .where(_appliesToService)
-                          .toList(growable: false);
-                      if (applicable.isEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              _selection.promoError != null
-                                  ? 'Gagal memuat promo: ${_selection.promoError}'
-                                  : _selection.promos.isEmpty
-                                      ? 'Belum ada promo aktif saat ini.'
-                                      : 'Belum ada promo untuk layanan ini.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: AppColors.slate500,
-                                fontFamily: AppTheme.fontFamily,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      return ListView.separated(
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
-                        itemCount: applicable.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 14),
-                        itemBuilder: (context, index) {
-                          final promo = applicable[index];
-                          final selected =
-                              _selection.appliedPromo?.code == promo.code;
-                          return _PromoOptionCard(
-                            promo: promo,
-                            selected: selected,
-                            savings: BookingController.formatRupiah(
-                              promo.discountAmount(widget.servicePrice),
-                            ),
-                            onTap: () => setState(() {
-                              if (selected) {
-                                _selection.clearPromo();
-                              } else {
-                                _selection.applyPromo(promo.code);
-                              }
-                            }),
-                          );
-                        },
-                      );
-                    })(),
+                            final applicable = _selection.promos.toList();
+                            final eligible =
+                                applicable
+                                    .where(
+                                      (promo) =>
+                                          _eligibility(promo) == null &&
+                                          promo.discountAmount(
+                                                widget.servicePrice,
+                                              ) >
+                                              0,
+                                    )
+                                    .toList()
+                                  ..sort((a, b) {
+                                    final bySavings = b
+                                        .discountAmount(widget.servicePrice)
+                                        .compareTo(
+                                          a.discountAmount(widget.servicePrice),
+                                        );
+                                    return bySavings == 0
+                                        ? a.code.compareTo(b.code)
+                                        : bySavings;
+                                  });
+                            final recommended = eligible.firstOrNull;
+                            if (recommended != null) {
+                              applicable.remove(recommended);
+                              applicable.insert(0, recommended);
+                            }
+                            if (applicable.isEmpty) {
+                              return Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Text(
+                                    _selection.promoError != null
+                                        ? 'Gagal memuat promo: ${_selection.promoError}'
+                                        : _selection.promos.isEmpty
+                                        ? 'Belum ada promo aktif saat ini.'
+                                        : 'Belum ada promo untuk layanan ini.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: AppColors.slate500,
+                                      fontFamily: AppTheme.fontFamily,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }
+                            return ListView.separated(
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
+                              itemCount: applicable.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 14),
+                              itemBuilder: (context, index) {
+                                final promo = applicable[index];
+                                final selected =
+                                    _selection.appliedPromo?.code == promo.code;
+                                return _PromoOptionCard(
+                                  promo: promo,
+                                  selected: selected,
+                                  recommended: promo == recommended,
+                                  unavailable: _eligibility(promo),
+                                  savings: BookingController.formatRupiah(
+                                    promo.discountAmount(widget.servicePrice),
+                                  ),
+                                  onTap: _eligibility(promo) != null
+                                      ? null
+                                      : () {
+                                          if (selected) {
+                                            setState(_selection.clearPromo);
+                                          } else {
+                                            _selectCode(promo.code);
+                                          }
+                                        },
+                                );
+                              },
+                            );
+                          })(),
                   ),
                 ],
               ),
@@ -210,33 +305,47 @@ class _PromoPageState extends State<PromoPage> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: FilledButton(
-                      key: const ValueKey('confirm-promo'),
-                      onPressed: () => Navigator.pop(
-                        context,
-                        _selection.appliedPromo?.code ?? '',
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primaryAction,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_selection.isPromoApplied)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            'Hemat ${BookingController.formatRupiah(_selection.discountAmount(widget.servicePrice))}',
+                          ),
+                        ),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: FilledButton(
+                          key: const ValueKey('confirm-promo'),
+                          onPressed: _isLoading
+                              ? null
+                              : () => Navigator.pop(
+                                  context,
+                                  _selection.appliedPromo?.code ?? '',
+                                ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.primaryAction,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            _selection.isPromoApplied
+                                ? 'Gunakan Promo'
+                                : 'Lanjutkan tanpa Promo',
+                            style: const TextStyle(
+                              fontFamily: AppTheme.fontFamily,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
-                      child: Text(
-                        _selection.isPromoApplied
-                            ? 'Gunakan Promo'
-                            : 'Lanjutkan tanpa Promo',
-                        style: const TextStyle(
-                          fontFamily: AppTheme.fontFamily,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -253,17 +362,26 @@ class _PromoOptionCard extends StatelessWidget {
     required this.promo,
     required this.selected,
     required this.savings,
+    required this.recommended,
+    required this.unavailable,
     required this.onTap,
   });
 
   final PromoModel promo;
   final bool selected;
   final String savings;
-  final VoidCallback onTap;
+  final bool recommended;
+  final String? unavailable;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final formatMoney = BookingController.formatRupiah;
+    final dates = MaterialLocalizations.of(context);
+    final discount = promo.discountType == 'fixed'
+        ? formatMoney((promo.discountValue ?? 0).round())
+        : '${promo.discountValue ?? promo.discountPercent}%';
     return Semantics(
       button: true,
       selected: selected,
@@ -296,16 +414,31 @@ class _PromoOptionCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(promo.title, style: textTheme.titleSmall),
+                      if (recommended)
+                        Text('Direkomendasikan', style: textTheme.labelLarge),
                       const SizedBox(height: 6),
                       Text(promo.code, style: textTheme.labelLarge),
                       const SizedBox(height: 6),
                       Text(
-                        'Potongan biaya layanan, tidak termasuk biaya platform.',
+                        [
+                          'Diskon $discount',
+                          if (promo.maxDiscount != null &&
+                              promo.discountType == 'percentage')
+                            'maks. ${formatMoney(promo.maxDiscount!)}',
+                          if (promo.minPurchase > 0)
+                            'min. ${formatMoney(promo.minPurchase)}',
+                          if (promo.endsOn != null)
+                            'hingga ${dates.formatMediumDate(promo.endsOn!)}',
+                          if (promo.remainingQuota != null)
+                            'sisa ${promo.remainingQuota}',
+                          if (promo.perCustomerLimit != null)
+                            'maks. ${promo.perCustomerLimit} per pelanggan',
+                        ].join(' · '),
                         style: textTheme.bodySmall?.copyWith(fontSize: 13),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Hemat $savings',
+                        unavailable ?? 'Hemat $savings',
                         style: textTheme.labelLarge?.copyWith(
                           color: AppColors.primaryAction,
                         ),

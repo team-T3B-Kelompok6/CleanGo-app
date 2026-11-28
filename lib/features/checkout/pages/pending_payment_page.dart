@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../booking/controllers/booking_controller.dart';
 import '../../booking/data/customer_booking_api.dart';
+import '../../order/controllers/order_controller.dart';
 import 'complete_booking_payment.dart';
 import 'midtrans_checkout_page.dart';
 
@@ -80,6 +82,38 @@ class _PendingPaymentPageState extends State<PendingPaymentPage> {
     }
   }
 
+  Future<void> _cancelOrder() async {
+    if (_busy) return;
+    final controller = context.read<OrderController?>();
+    if (controller == null || !_booking.canCancel) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppDialog(
+        title: 'Batalkan pesanan?',
+        message:
+            'Pesanan ini akan dibatalkan dan dipindahkan ke Riwayat. Tindakan ini tidak dapat dibatalkan.',
+        confirmLabel: 'Batalkan Pesanan',
+        cancelLabel: 'Kembali',
+        onConfirm: () => Navigator.pop(dialogContext, true),
+        isDestructive: true,
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    final result = await controller.cancelPendingPayment(_booking.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!result) {
+      AppNotice.show(
+        context,
+        'Pesanan tidak dapat dibatalkan. Muat ulang dan coba lagi.',
+        type: AppNoticeType.error,
+      );
+      return;
+    }
+    Navigator.of(context).pop(true);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loadingCheckout || _checkoutError != null) {
@@ -117,6 +151,11 @@ class _PendingPaymentPageState extends State<PendingPaymentPage> {
           onPressed: _busy ? null : () => _check(confirmCash: true),
           child: const Text('Konfirmasi Pembayaran Tunai'),
         ),
+        if (_booking.canCancel)
+          TextButton(
+            onPressed: _busy ? null : _cancelOrder,
+            child: const Text('Batalkan Pesanan'),
+          ),
       ]),
     );
   }

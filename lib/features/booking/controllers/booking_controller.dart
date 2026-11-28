@@ -82,14 +82,24 @@ class BookingController extends ChangeNotifier {
   CleaningAddress _address;
   String? _addressId;
   String _note;
+  String _promoCode = '';
   String? _serverDraftKey;
   CreatedBooking? _serverDraft;
   Future<CreatedBooking?>? _creatingDraft;
 
   String get _draftKey =>
-      '${_service?.id}|${isoDate(_selectedDate)}|$_selectedTime|$_addressId|$_note';
+      '${_service?.id}|${isoDate(_selectedDate)}|$_selectedTime|$_addressId|$_note|$_promoCode';
   String? get serverBookingId =>
       _serverDraftKey == _draftKey ? _serverDraft?.id : null;
+
+  /// Kode promo yang dikirim ke server; kosong berarti tanpa promo.
+  String get promoCode => _promoCode;
+  set promoCode(String value) {
+    final normalized = value.trim().toUpperCase();
+    if (normalized == _promoCode) return;
+    _promoCode = normalized;
+    notifyListeners();
+  }
 
   ServiceModel? get service => _service;
   DateTime get selectedDate => _selectedDate;
@@ -192,6 +202,7 @@ class BookingController extends ChangeNotifier {
       time: _selectedTime,
       addressId: _addressId,
       notes: _note,
+      promoCode: _promoCode.isEmpty ? null : _promoCode,
     );
     _creatingDraft = request;
     try {

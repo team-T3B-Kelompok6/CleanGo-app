@@ -10,6 +10,10 @@ class PromoModel {
     this.scope = 'all',
     this.serviceIds = const [],
     this.serverDiscountAmount,
+    this.startsOn,
+    this.endsOn,
+    this.remainingQuota,
+    this.perCustomerLimit,
   });
 
   final String code;
@@ -24,6 +28,10 @@ class PromoModel {
 
   /// Discount computed by the backend for the current cart, when available.
   final int? serverDiscountAmount;
+  final DateTime? startsOn;
+  final DateTime? endsOn;
+  final int? remainingQuota;
+  final int? perCustomerLimit;
 
   String get title =>
       name.isNotEmpty ? name : 'Diskon $discountPercent% biaya layanan';
@@ -48,6 +56,9 @@ class PromoModel {
   factory PromoModel.fromApiJson(Map<String, dynamic> json) {
     final type = json['discountType'] as String? ?? 'percentage';
     final value = json['discountValue'] as num?;
+    final limit = (json['usageLimit'] as num?)?.toInt();
+    final used = (json['activeUsageCount'] as num? ?? json['usedCount'] as num?)
+        ?.toInt();
     return PromoModel(
       code: json['code'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -61,6 +72,12 @@ class PromoModel {
           .map((item) => item.toString())
           .toList(growable: false),
       serverDiscountAmount: (json['discountAmount'] as num?)?.toInt(),
+      startsOn: DateTime.tryParse(json['startsOn'] as String? ?? ''),
+      endsOn: DateTime.tryParse(json['endsOn'] as String? ?? ''),
+      remainingQuota: limit != null && used != null
+          ? (limit - used).clamp(0, limit)
+          : null,
+      perCustomerLimit: (json['perCustomerLimit'] as num?)?.toInt(),
     );
   }
 }

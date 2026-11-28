@@ -41,8 +41,10 @@ class CheckoutController {
     String? serviceId,
   }) async {
     final normalized = code.trim().toUpperCase();
-    clearPromo();
-    if (normalized.isEmpty) return;
+    if (normalized.isEmpty) {
+      clearPromo();
+      return;
+    }
 
     final api = _promoApi;
     if (api == null) {
@@ -50,18 +52,23 @@ class CheckoutController {
       final local = _localMatch(normalized);
       if (local != null) {
         _appliedPromo = local;
-        return;
+        _promoError = null;
+      } else {
+        _appliedPromo = null;
+        _promoError = 'Kode promo tidak valid.';
       }
-      _promoError = 'Kode promo tidak valid.';
       return;
     }
     try {
-      _appliedPromo = await api.validate(
+      final validated = await api.validate(
         code: normalized,
         amount: servicePrice,
         serviceId: serviceId,
       );
+      _appliedPromo = validated;
+      _promoError = null;
     } catch (error) {
+      _appliedPromo = null;
       _promoError = _messageFor(error);
     }
   }

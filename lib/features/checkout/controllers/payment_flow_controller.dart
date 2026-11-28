@@ -42,10 +42,13 @@ class PaymentFlowController {
     required int servicePrice,
     required int platformFee,
     required int discountAmount,
+    String? promoCode,
     bool checkStatus = false,
     DateTime? now,
   }) async {
     if (_completed) return _isSameDay;
+    // Set sebelum cek draf agar booking ulang memakai kode promo yang sama.
+    if (promoCode != null) booking.promoCode = promoCode;
     _bookingId ??= booking.serverBookingId;
     if (_bookingId == null) {
       final scheduleError = booking.validateSchedule(now: now);

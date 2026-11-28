@@ -268,9 +268,11 @@ class CustomerBookingApi {
     required String time,
     String? addressId,
     String notes = '',
+    String? promoCode,
   }) async {
     final token = await _token();
     if (token == null) throw StateError('Sesi pelanggan belum tersedia.');
+    final normalizedPromo = promoCode?.trim().toUpperCase() ?? '';
     final body = <String, dynamic>{
       'serviceId': int.tryParse(serviceId) ?? serviceId,
       'date': date,
@@ -278,6 +280,7 @@ class CustomerBookingApi {
       if (addressId != null && addressId.isNotEmpty)
         'addressId': int.tryParse(addressId) ?? addressId,
       if (notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (normalizedPromo.isNotEmpty) 'promoCode': normalizedPromo,
     };
     final res = await _client.post(
       ApiConfig.customerBookings,

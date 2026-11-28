@@ -195,6 +195,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           discountAmount: _checkoutController.discountAmount(
             booking.servicePriceValue,
           ),
+          promoCode: _checkoutController.appliedPromo?.code,
         ),
       ),
     );

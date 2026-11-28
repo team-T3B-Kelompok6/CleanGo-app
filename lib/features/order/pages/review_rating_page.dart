@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/camera_access.dart';
+import '../../../shared/widgets/app_camera_preview.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/remote_or_asset_image.dart';
 import '../../booking/domain/models/review_photo_model.dart';
@@ -42,6 +42,7 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
   late final ReviewDraftController _draft;
   final TextEditingController _reviewController = TextEditingController();
   bool _isSubmitted = false;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -144,17 +145,24 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
     }
 
     XFile? picked;
-    try {
-      picked = await ImagePicker().pickImage(
-        source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 82,
+    if (source == ImageSource.camera) {
+      picked = await Navigator.push<XFile?>(
+        context,
+        MaterialPageRoute(builder: (_) => const AppCameraPreviewPage()),
       );
-    } on PlatformException catch (e) {
-      if (!mounted) return;
-      _showCameraError(e.code);
-      return;
+    } else {
+      try {
+        picked = await ImagePicker().pickImage(
+          source: source,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+        );
+      } on PlatformException catch (e) {
+        if (!mounted) return;
+        _showCameraError(e.code);
+        return;
+      }
     }
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
@@ -188,15 +196,13 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
   }
 
   void _showCameraError(String code) {
-    AppNotice.show(
-      context,
-      switch (code) {
-        'camera_access_denied' => 'Akses kamera ditolak. Aktifkan di pengaturan aplikasi.',
-        'image_source_not_available' => 'Kamera tidak tersedia pada perangkat ini.',
-        _ => 'Gagal mengambil foto. Coba lagi.',
-      },
-      type: AppNoticeType.error,
-    );
+    AppNotice.show(context, switch (code) {
+      'camera_access_denied' =>
+        'Akses kamera ditolak. Aktifkan di pengaturan aplikasi.',
+      'image_source_not_available' =>
+        'Kamera tidak tersedia pada perangkat ini.',
+      _ => 'Gagal mengambil foto. Coba lagi.',
+    }, type: AppNoticeType.error);
   }
 
   String? _imageType(XFile file) {
@@ -226,7 +232,8 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
   }
 
   Future<void> _submitReview() async {
-    if (_isSubmitted) return;
+    if (_isSubmitted || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
     FocusManager.instance.primaryFocus?.unfocus();
     final orderController = context.read<OrderController>();
     final success = await orderController.submitReview(
@@ -239,10 +246,12 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
     );
 
     if (!mounted) return;
+    setState(() => _isSubmitting = false);
     if (!success) {
       AppNotice.show(
         context,
-        'Ulasan belum dapat dikirim. Pesanan mungkin sudah diulas atau belum selesai.',
+        orderController.reviewSubmissionError ??
+            'Ulasan belum dapat disimpan. Coba lagi.',
         type: AppNoticeType.error,
       );
       return;
@@ -835,7 +844,7 @@ class _ReviewRatingPageState extends State<ReviewRatingPage> {
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: _submitReview,
+            onPressed: _isSubmitting ? null : _submitReview,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF00685F),
               foregroundColor: Colors.white,

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/camera_access.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_camera_preview.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../controllers/personal_data_form_controller.dart';
@@ -138,17 +139,24 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
     }
 
     XFile? picked;
-    try {
-      picked = await ImagePicker().pickImage(
-        source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 82,
+    if (source == ImageSource.camera) {
+      picked = await Navigator.push<XFile?>(
+        context,
+        MaterialPageRoute(builder: (_) => const AppCameraPreviewPage()),
       );
-    } on PlatformException catch (e) {
-      if (!mounted) return;
-      _showCameraError(e.code);
-      return;
+    } else {
+      try {
+        picked = await ImagePicker().pickImage(
+          source: source,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 82,
+        );
+      } on PlatformException catch (e) {
+        if (!mounted) return;
+        _showCameraError(e.code);
+        return;
+      }
     }
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
@@ -222,11 +230,20 @@ class _PersonalDataPageState extends State<PersonalDataPage> {
       phoneNumber:
           '+62 ${PersonalDataFormController.localPhoneDigits(_personalDataForm.phone.text)}',
       email: _personalDataForm.email.text.trim(),
+      gender: _personalDataForm.selectedGender,
+      birthDate: _personalDataForm.selectedBirthDate,
     );
     if (!mounted) return;
     if (!token) {
+      final reason = profileController.error;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal menyimpan data ke server.')),
+        SnackBar(
+          content: Text(
+            reason == null || reason.isEmpty
+                ? 'Gagal menyimpan data ke server.'
+                : 'Gagal menyimpan data ke server: $reason',
+          ),
+        ),
       );
       return;
     }

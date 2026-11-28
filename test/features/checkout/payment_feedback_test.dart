@@ -47,6 +47,7 @@ class _BookingApi extends CustomerBookingApi {
     required String time,
     String? addressId,
     String notes = '',
+    String? promoCode,
   }) async {
     createdCount++;
     return serverBooking;

@@ -16,10 +16,10 @@ class _FakeNotificationApi extends CustomerNotificationApi {
   bool failRead = false;
 
   @override
-  Future<List<Map<String, dynamic>>> fetchNotifications() async {
+  Future<NotificationInbox> fetchNotifications() async {
     listCalls++;
     if (fail) throw StateError('jaringan mati');
-    return rows;
+    return (rows: rows, unreadOrders: null, unreadPromo: null);
   }
 
   @override

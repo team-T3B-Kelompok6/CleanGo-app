@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/storage/token_storage.dart';
 import '../data/customer_profile_service.dart';
 import '../models/user_profile_model.dart';
@@ -45,10 +46,18 @@ class ProfileController extends ChangeNotifier {
     String? fullName,
     String? email,
     String? phoneNumber,
+    String? gender,
+    DateTime? birthDate,
   }) async {
     final token = await _tokenStorage?.readAccessToken();
     if (token == null || token.isEmpty) {
-      updateProfile(fullName: fullName, email: email, phoneNumber: phoneNumber);
+      updateProfile(
+        fullName: fullName,
+        email: email,
+        phoneNumber: phoneNumber,
+        gender: gender,
+        birthDate: birthDate,
+      );
       return true;
     }
     try {
@@ -57,11 +66,13 @@ class ProfileController extends ChangeNotifier {
         fullName: fullName,
         email: email,
         phoneNumber: phoneNumber,
+        gender: gender,
+        birthDate: birthDate,
       );
       notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
+      _error = e is ApiException ? e.message : 'Gagal menyimpan data ke server.';
       notifyListeners();
       return false;
     }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/contact/contact_launcher.dart';
 import '../../../shared/widgets/app_dialog.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../../shared/widgets/chatbot_button.dart';
@@ -59,8 +60,20 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
     _openChatbot(question: question);
   }
 
-  void _showContactSnackBar(String message) {
-    AppNotice.show(context, message, type: AppNoticeType.info);
+  void _openWhatsAppCs() {
+    openWhatsApp(
+      context,
+      phone: cleanGoSupportPhoneWa,
+      targetLabel: 'CS CleanGo',
+    );
+  }
+
+  void _openEmailCs() {
+    openEmail(
+      context,
+      email: cleanGoSupportEmail,
+      subject: 'Bantuan CleanGo',
+    );
   }
 
   void _showHelpInfoModal() {
@@ -333,18 +346,15 @@ class _HelpCenterPageState extends State<HelpCenterPage> {
             ),
             title: 'WhatsApp CS',
             subtitle: 'Respon cepat < 5 menit via chat',
-            onTap: () => _showContactSnackBar(
-              'Membuka WhatsApp CS CleanGo (+62 812-3456-7890)...',
-            ),
+            onTap: _openWhatsAppCs,
           ),
           const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
           // Kirim Email CS
           _buildActionTile(
             icon: Icons.mail_outline_rounded,
             title: 'Kirim Email CS',
-            subtitle: 'cs@cleango.id, Balasan 1–2 jam',
-            onTap: () =>
-                _showContactSnackBar('Menyiapkan email ke cs@cleango.id...'),
+            subtitle: '$cleanGoSupportEmail, Balasan 1–2 jam',
+            onTap: _openEmailCs,
           ),
         ],
       ),

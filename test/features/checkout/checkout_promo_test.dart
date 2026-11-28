@@ -140,7 +140,7 @@ void main() {
 
       await openPromos(tester);
       expect(find.byType(PromoPage), findsOneWidget);
-      expect(find.byType(TextField), findsNothing);
+      expect(find.byType(TextField), findsOneWidget);
       expect(find.text('Diskon 35% biaya layanan'), findsOneWidget);
       expect(find.text('Hemat Rp52.500'), findsOneWidget);
       expect(find.text('Lanjutkan tanpa Promo'), findsOneWidget);

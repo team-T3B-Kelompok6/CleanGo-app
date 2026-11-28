@@ -34,6 +34,7 @@ class _FakeBookingApi extends CustomerBookingApi {
     required String time,
     String? addressId,
     String notes = '',
+    String? promoCode,
   }) async {
     createCalls++;
     lastCreate = {

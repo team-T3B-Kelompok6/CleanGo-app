@@ -21,6 +21,8 @@ import 'features/auth/pages/login_page.dart';
 import 'features/auth/pages/forgot_password_page.dart';
 import 'features/auth/pages/register_page.dart';
 import 'features/auth/controllers/auth_session_controller.dart';
+import 'features/auth/controllers/contact_completion_controller.dart';
+import 'features/auth/widgets/contact_completion_gate.dart';
 import 'features/booking/controllers/booking_controller.dart';
 import 'features/booking/data/booking_draft_repository.dart';
 import 'features/booking/data/customer_booking_api.dart';
@@ -118,6 +120,7 @@ class _NotificationRouteObserver extends NavigatorObserver {
 
 class _CleanGoAppState extends State<CleanGoApp> {
   late final MessageController _messageController;
+  late final ContactCompletionController _contactCompletionController;
   PushNotifications? _push;
   final _navigatorKey = GlobalKey<NavigatorState>();
   RemoteMessage? _pendingTap;
@@ -159,6 +162,9 @@ class _CleanGoAppState extends State<CleanGoApp> {
   @override
   void initState() {
     super.initState();
+    _contactCompletionController = ContactCompletionController(
+      store: widget.preferences,
+    );
     _messageController = MessageController(
       notificationApi: CustomerNotificationApi(
         tokenStorage: widget.tokenStorage,
@@ -198,12 +204,21 @@ class _CleanGoAppState extends State<CleanGoApp> {
       providers: [
         Provider<AppPreferences>.value(value: widget.preferences),
         Provider<TokenStorage>.value(value: widget.tokenStorage),
+        ChangeNotifierProvider<ContactCompletionController>.value(
+          value: _contactCompletionController,
+        ),
         ChangeNotifierProvider(
           create: (_) => AuthSessionController(
             widget.tokenStorage,
             pushNotifications: _push,
             draftRepository: widget.bookingRepository,
             database: widget.database,
+            onSignedOut: _contactCompletionController.clear,
+            onSessionRestored: (token) {
+              unawaited(
+                _contactCompletionController.restore(accessToken: token),
+              );
+            },
           ),
         ),
         ChangeNotifierProvider(
@@ -262,10 +277,14 @@ class _CleanGoAppState extends State<CleanGoApp> {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         builder: (context, child) {
-          return GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-            child: child ?? const SizedBox.shrink(),
+          return ContactCompletionGate(
+            controller: _contactCompletionController,
+            navigatorKey: _navigatorKey,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+              child: child ?? const SizedBox.shrink(),
+            ),
           );
         },
         home: const SplashPage(),

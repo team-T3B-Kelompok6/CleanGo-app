@@ -20,6 +20,7 @@ class _QueuedApi extends CustomerBookingApi {
     required String time,
     String? addressId,
     String notes = '',
+    String? promoCode,
   }) async {
     creates.add((serviceId, time));
     return const CreatedBooking(id: '42', code: 'CG-TEST', status: 'confirmed', totalAmount: 105000);

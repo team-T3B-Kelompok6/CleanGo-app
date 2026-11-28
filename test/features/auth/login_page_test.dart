@@ -1,8 +1,10 @@
 import 'package:cleango_app/core/constants/app_routes.dart';
 import 'package:cleango_app/core/network/api_exception.dart';
+import 'package:cleango_app/core/storage/app_preferences.dart';
 import 'package:cleango_app/core/storage/token_storage.dart';
 import 'package:cleango_app/core/theme/app_theme.dart';
 import 'package:cleango_app/features/auth/controllers/auth_session_controller.dart';
+import 'package:cleango_app/features/auth/controllers/contact_completion_controller.dart';
 import 'package:cleango_app/features/auth/data/api_auth_service.dart';
 import 'package:cleango_app/features/auth/pages/login_page.dart';
 import 'package:flutter/material.dart';
@@ -33,14 +35,45 @@ class _StubAuthService extends ApiAuthService {
   }
 }
 
+class _FakeContactStore implements ContactCompletionStore {
+  final Map<int, int> _skipped = {};
+
+  @override
+  Future<int?> readEmailReminderSkippedAt(int accountId) async =>
+      _skipped[accountId];
+
+  @override
+  Future<void> saveEmailReminderSkippedAt(
+    int accountId,
+    DateTime skippedAt,
+  ) async {
+    _skipped[accountId] = skippedAt.toUtc().millisecondsSinceEpoch;
+  }
+
+  @override
+  Future<String?> readLoginMethod(int accountId) async => null;
+
+  @override
+  Future<void> saveLoginMethod(int accountId, String method) async {}
+}
+
 void main() {
   setUp(() {
     FlutterSecureStorage.setMockInitialValues({});
   });
 
   Widget buildLogin({ApiAuthService? authService}) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthSessionController(SecureTokenStorage()),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => AuthSessionController(SecureTokenStorage()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ContactCompletionController(
+            store: _FakeContactStore(),
+          ),
+        ),
+      ],
       child: MaterialApp(
         theme: AppTheme.light,
         home: LoginPage(authService: authService),

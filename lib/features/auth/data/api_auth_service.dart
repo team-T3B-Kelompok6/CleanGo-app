@@ -120,6 +120,7 @@ class User {
     required this.email,
     this.phone,
     required this.role,
+    this.authProvider,
   });
 
   final int id;
@@ -127,6 +128,7 @@ class User {
   final String email;
   final String? phone;
   final String role;
+  final String? authProvider;
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -135,6 +137,7 @@ class User {
       email: json['email'] as String? ?? '',
       phone: json['phone'] as String?,
       role: json['role'] as String? ?? 'customer',
+      authProvider: json['authProvider'] as String?,
     );
   }
 }

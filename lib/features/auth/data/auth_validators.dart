@@ -56,4 +56,22 @@ abstract final class AuthValidators {
     }
     return null;
   }
+
+  static final RegExp _emailPattern = RegExp(
+    r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}$",
+  );
+
+  /// Email opsional untuk pengingat login nomor telepon: bila diisi, alamat
+  /// internal sementara tidak dianggap email pribadi.
+  static String? optionalEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) return null;
+    if (email.toLowerCase().endsWith('@cleango.customer.local')) {
+      return 'Masukkan email pribadi, bukan email sementara.';
+    }
+    if (!_emailPattern.hasMatch(email)) {
+      return 'Masukkan alamat email yang valid.';
+    }
+    return null;
+  }
 }

@@ -15,14 +15,22 @@ class AuthSessionController extends ChangeNotifier {
     this.pushNotifications,
     this.draftRepository,
     this.database,
+    this.onSignedOut,
+    this.onSessionRestored,
   });
 
   final TokenStorage _tokenStorage;
   final PushNotifications? pushNotifications;
   final BookingDraftRepository? draftRepository;
   final AppDatabase? database;
+  final void Function()? onSignedOut;
+
+  /// Dipanggil sekali per token saat sesi valid dibaca kembali (bukan saat
+  /// login), untuk memulihkan popup kontak setelah aplikasi dibuka ulang.
+  final void Function(String token)? onSessionRestored;
 
   bool _started = false;
+  String? _restoredToken;
 
   void start() {
     if (_started) return;
@@ -36,7 +44,7 @@ class AuthSessionController extends ChangeNotifier {
     pushNotifications?.stopTokenSync();
   }
 
-  Future<bool> hasSession() async {
+  Future<bool> hasSession({bool triggerRestore = true}) async {
     try {
       final token = await _tokenStorage.readAccessToken().timeout(
         const Duration(seconds: 8),
@@ -56,6 +64,12 @@ class AuthSessionController extends ChangeNotifier {
         await _tokenStorage.clearSession();
       } else {
         start();
+        final restored = _restoredToken;
+        final callback = onSessionRestored;
+        if (triggerRestore && restored != token && callback != null) {
+          _restoredToken = token;
+          callback(token);
+        }
       }
       return isValid;
     } catch (_) {
@@ -119,7 +133,7 @@ class AuthSessionController extends ChangeNotifier {
   Future<void> _linkFcmToken() async {
     try {
       stop();
-      await hasSession();
+      await hasSession(triggerRestore: false);
     } catch (_) {
       // Gagal menyambungkan token FCM tidak membatalkan sesi.
     }
@@ -145,6 +159,8 @@ class AuthSessionController extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    onSignedOut?.call();
+    _restoredToken = null;
     stop();
     try {
       // Keep JWT available until ownership-scoped unregister finishes.

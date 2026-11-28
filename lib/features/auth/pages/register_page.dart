@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_notice.dart';
 import '../../profile/controllers/profile_controller.dart';
 import '../controllers/auth_session_controller.dart';
+import '../controllers/contact_completion_controller.dart';
 import '../data/api_auth_service.dart';
 import '../data/auth_validators.dart';
 import '../data/google_sign_in_service.dart';
@@ -304,6 +305,12 @@ class _RegisterPageState extends State<RegisterPage> {
           await context.read<ServiceController>().refreshServices();
         }
       } catch (_) {}
+      if (!mounted) return;
+      await context.read<ContactCompletionController>().start(
+        user: result.user,
+        method: ContactCompletionMethod.google,
+        accessToken: result.token,
+      );
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } on ApiException catch (e) {

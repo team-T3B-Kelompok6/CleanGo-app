@@ -61,6 +61,27 @@ void main() {
       orders.dispose();
     });
 
+    test('kode promo diteruskan ke server dan mengubah kunci draf', () async {
+      await controller.createOrder(
+        booking: booking,
+        addresses: addresses,
+        orders: orders,
+        method: paymentMethodByType(PaymentMethodType.cash),
+        totalPayment: 'Rp145.000',
+        servicePrice: 150000,
+        platformFee: 5000,
+        discountAmount: 10000,
+        promoCode: 'hemat10',
+        now: DateTime(2030, 1, 2),
+      );
+      expect(api.lastPromoCode, 'HEMAT10');
+
+      api.lastPromoCode = null;
+      await booking.createBookingOnServer();
+      expect(api.createdCount, 2);
+      expect(api.lastPromoCode, 'HEMAT10');
+    });
+
     test('cash completion clears draft before identical new booking', () async {
       await controller.createOrder(
         booking: booking,
@@ -393,6 +414,7 @@ class _BookingApi extends CustomerBookingApi {
   int fetchCalls = 0;
   String status = 'paid';
   bool timeoutPayment = false;
+  String? lastPromoCode;
 
   @override
   Future<List<BookingSlotInfo>> availability({
@@ -410,8 +432,10 @@ class _BookingApi extends CustomerBookingApi {
     required String time,
     String? addressId,
     String notes = '',
+    String? promoCode,
   }) async {
     createdCount++;
+    lastPromoCode = promoCode;
     return const CreatedBooking(
       id: '42',
       code: 'CG-42',

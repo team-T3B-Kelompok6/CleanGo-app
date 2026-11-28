@@ -13,16 +13,33 @@ class CustomerProfileService {
     );
   }
 
+  /// Field tambahan `authProvider` dari profil saat ini. Dipakai sebagai
+  /// fallback restore bila metode login tersimpan tidak tersedia.
+  Future<String?> fetchAuthProvider(String token) async {
+    final res = await _client.get(ApiConfig.customerProfile, token: token);
+    final data = (res['data'] ?? res) as Map<String, dynamic>;
+    return data['authProvider'] as String?;
+  }
+
   Future<UserProfileModel> updateProfile(
     String token, {
     String? fullName,
     String? email,
     String? phoneNumber,
+    String? gender,
+    DateTime? birthDate,
   }) async {
     final body = <String, dynamic>{};
     if (fullName != null) body['name'] = fullName;
     if (email != null) body['email'] = email;
     if (phoneNumber != null) body['phone'] = phoneNumber;
+    if (gender != null) body['gender'] = gender;
+    if (birthDate != null) {
+      body['birthDate'] =
+          '${birthDate.year.toString().padLeft(4, '0')}-'
+          '${birthDate.month.toString().padLeft(2, '0')}-'
+          '${birthDate.day.toString().padLeft(2, '0')}';
+    }
     final res = await _client.patch(
       ApiConfig.customerProfile,
       body: body.isEmpty ? null : body,

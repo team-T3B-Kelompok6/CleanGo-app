@@ -199,58 +199,70 @@ class MainActivity : FlutterActivity() {
     private fun fetchLocation(result: MethodChannel.Result, token: Int) {
         val fineGranted = PackageManager.PERMISSION_GRANTED == checkSelfPermission(perm.ACCESS_FINE_LOCATION)
         val coarseGranted = PackageManager.PERMISSION_GRANTED == checkSelfPermission(perm.ACCESS_COARSE_LOCATION)
-        val provider = if (fineGranted) {
-            when {
-                locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-                else -> null
+        val providers = buildList {
+            if (fineGranted && locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                add(LocationManager.GPS_PROVIDER)
             }
-        } else if (coarseGranted) {
-            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-                LocationManager.NETWORK_PROVIDER
-            } else {
-                null
+            if ((fineGranted || coarseGranted) &&
+                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+            ) {
+                add(LocationManager.NETWORK_PROVIDER)
             }
-        } else {
-            null
         }
 
-        if (provider == null) {
-            finishLocation(result, token, null, "location_unavailable", "Lokasi tidak aktif atau tidak dapat ditemukan.")
+        if (providers.isEmpty()) {
+            finishLocation(result, token, null, "location_unavailable", "Aktifkan layanan lokasi untuk mendapatkan posisi.")
             return
         }
 
         locationRequestInProgress = true
-        val cancellationSignal = CancellationSignal()
-        pendingCancellationSignal = cancellationSignal
-        val timeoutRunnable = Runnable {
-            if (pendingLocationResult === result && pendingLocationToken == token && locationRequestInProgress) {
-                finishLocation(result, token, null, "location_timeout", "Lokasi tidak dapat ditemukan dalam waktu yang ditentukan.")
+        fun tryProvider(index: Int) {
+            if (pendingLocationResult !== result || pendingLocationToken != token) return
+            val signal = CancellationSignal()
+            pendingCancellationSignal = signal
+            val hasFallback = index + 1 < providers.size
+            fun nextProvider(failureCode: String) {
+                if (pendingCancellationSignal !== signal) return
+                pendingTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+                pendingTimeoutRunnable = null
+                pendingCancellationSignal = null
+                signal.cancel()
+                if (hasFallback) {
+                    tryProvider(index + 1)
+                } else {
+                    finishLocation(result, token, null, failureCode, "Lokasi tidak dapat ditemukan.")
+                }
             }
-        }
-        pendingTimeoutRunnable = timeoutRunnable
-        mainHandler.postDelayed(timeoutRunnable, 10000)
+            val timeout = Runnable { nextProvider("location_timeout") }
+            pendingTimeoutRunnable = timeout
+            mainHandler.postDelayed(timeout, if (hasFallback) 7000 else 10000)
 
-        try {
-            LocationManagerCompat.getCurrentLocation(
-                locationManager,
-                provider,
-                cancellationSignal,
-                ContextCompat.getMainExecutor(this),
-                object : Consumer<Location?> {
-                    override fun accept(location: Location?) {
-                        if (location == null) {
-                            finishLocation(result, token, null, "location_unavailable", "Lokasi tidak dapat ditemukan.")
-                        } else {
-                            finishLocation(result, token, mapOf("latitude" to location.latitude, "longitude" to location.longitude))
+            try {
+                LocationManagerCompat.getCurrentLocation(
+                    locationManager,
+                    providers[index],
+                    signal,
+                    ContextCompat.getMainExecutor(this),
+                    object : Consumer<Location?> {
+                        override fun accept(location: Location?) {
+                            if (pendingCancellationSignal !== signal) return
+                            if (location == null) {
+                                nextProvider("location_unavailable")
+                            } else {
+                                finishLocation(
+                                    result, token,
+                                    mapOf("latitude" to location.latitude, "longitude" to location.longitude)
+                                )
+                            }
                         }
                     }
-                }
-            )
-        } catch (e: SecurityException) {
-            finishLocation(result, token, null, "permission_denied", "Izin lokasi ditolak. Aktifkan di pengaturan aplikasi.")
-        } catch (e: Exception) {
-            finishLocation(result, token, null, "location_unavailable", "Lokasi tidak aktif atau tidak dapat ditemukan.")
+                )
+            } catch (_: SecurityException) {
+                finishLocation(result, token, null, "permission_denied", "Izin lokasi ditolak. Aktifkan di pengaturan aplikasi.")
+            } catch (_: IllegalArgumentException) {
+                nextProvider("location_unavailable")
+            }
         }
+        tryProvider(0)
     }
 }
